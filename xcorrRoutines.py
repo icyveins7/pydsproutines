@@ -8,21 +8,59 @@ Created on Sat Mar  7 17:03:53 2020
 import numpy as np
 import scipy as sp
 
-def fastXcorr(cutout, rx, shifts=None, normalize=True):
-    """ No frequency scanning xcorr."""
+def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None):
+    """ Optional frequency scanning xcorr."""
     if shifts is None:
         shifts = np.arange(len(rx)-len(cutout)+1)
     
-    result = np.zeros(len(shifts),dtype=np.float64)
-    cutoutNormSq = np.linalg.norm(cutout)**2.0
-    for i in range(len(shifts)):
-        s = shifts[i]
-        result[i] = sp.absolute(np.vdot(rx[s:s+len(cutout)], cutout))**2.0
-        if normalize:
+    if not freqsearch:
+        print('No frequency scanning xcorr..')
+        result = np.zeros(len(shifts),dtype=np.float64)
+        cutoutNormSq = np.linalg.norm(cutout)**2.0
+        for i in range(len(shifts)):
+            s = shifts[i]
+            result[i] = sp.absolute(np.vdot(rx[s:s+len(cutout)], cutout))**2.0 # vdot already takes conj of first arg
             rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
             result[i] = result[i]/cutoutNormSq/rxNormPartSq
             
-    return result
+        return result
+    
+    elif not outputCAF:
+        print('Frequency scanning, but no CAF output (flattened to time)..')
+        result = np.zeros(len(shifts),dtype=np.float64)
+        freqlist = np.zeros(len(shifts),dtype=np.uint32)
+        cutoutNormSq = np.linalg.norm(cutout)**2.0
+        for i in range(len(shifts)):
+            s = shifts[i]
+            pdt = rx[s:s+len(cutout)] * cutout.conj()
+            pdtfft = sp.fft(pdt)
+            pdtfftsq = pdtfft**2.0
+            imax = np.argmax(np.abs(pdtfftsq))
+            freqlist[i] = imax
+            pmax = np.abs(pdtfftsq[imax])
+
+            rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
+            result[i] = pmax/cutoutNormSq/rxNormPartSq
+            
+        return result, freqlist
+    
+    else:
+        print('Frequency scanning, outputting raw CAF...')
+        result = np.zeros((len(shifts), len(cutout)), dtype=np.float64)
+        cutoutNormSq = np.linalg.norm(cutout)**2.0
+        for i in range(len(shifts)):
+            s = shifts[i]
+            pdt = rx[s:s+len(cutout)] * cutout.conj()
+            pdtfft = sp.fft(pdt)
+            pdtfftsq = np.abs(pdtfft**2.0)
+
+            rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
+            result[i] = pdtfftsq/cutoutNormSq/rxNormPartSq
+
+        return result
+    
+            
+    
 
 def convertQF2toSNR(qf2):
     """For xcorr against pure signal."""

@@ -7,8 +7,12 @@ Created on Sat Mar  7 15:18:01 2020
 
 import numpy as np
 
-def randPSKbits(length, m, dtype=np.uint8):
-    return np.random.randint(0,m,length,dtype)
+from numba import jit
+# jit not used if not supported like in randint, or just slower..
+# usually requires loops to be present for some benefit to be seen
+
+def randBits(length, m):
+    return np.random.randint(0,m,length,dtype=np.uint8)
 
 def randPSKsyms(length, m, dtype=np.complex128):
     bits = randPSKbits(length, m).astype(dtype)
@@ -33,6 +37,32 @@ def addSigToNoise(noiseLen, sigStartIdx, signal, bw_signal, chnBW, snr_inband_li
     rx = rx+noise
     return noise, rx
 
+def makeCPFSKsyms(bits, baud, m=2, h=0.5, up=8, phase=0.0):
+    '''
+    Chose the same defaults as the comms toolbox in Matlab.
+    Bits are expressed in 1s and 0s. Digital data (e.g. +/-1) is converted
+    within the function itself.
+    '''
+    T = 1.0/baud;
+    fs = baud * up
+    data = bits * m - 1
+    
+    theta = np.zeros(len(bits) * up)
+    
+    # numpy version
+    i_list = np.floor(np.arange(len(theta)) / up).astype(np.uint32)
+    t_list = np.arange(len(theta)) / fs
+    a_list = np.hstack(([0], np.cumsum(data)))[:len(data)] # accumulator of phase
+    a_list = np.repeat(a_list, up) 
+    
+    theta = ( data[i_list] * np.pi * h * (t_list - i_list * T ) / T ) + np.pi * h * a_list + phase
+    
+    sig = np.exp(1j*theta)
+    
+    return sig, fs, theta, data
+    
+
+@jit(nopython=True)
 def makeFreq(length, fs):
     freq = np.zeros(length)
     for i in range(length):

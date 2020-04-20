@@ -14,7 +14,7 @@ from scipy.fftpack import fftshift
 # parameters
 numBitsPerBurst = 64
 baud = 16000
-numBursts = 20
+numBursts = 10
 numBitsTotal = numBitsPerBurst * numBursts
 m = 2 # m-ary
 h = 1.0/m
@@ -63,7 +63,8 @@ fftrxcm20 = np.fft.fft(rxcm20)
 pw2.plot(freqrx, 20*np.log10(np.abs(fftrxcm20)), pen='r', name='cm20')
 
 # perform xcorr with original
-shifts=np.arange(startIdx - 100, startIdx + 100 + 1)
+shift_lim = 20
+shifts=np.arange(startIdx - shift_lim, startIdx + shift_lim + 1)
 
 ## xcorr with no freq scan
 #xc = fastXcorr(syms, rx, shifts = shifts)
@@ -87,10 +88,10 @@ pw3 = pg.image(title='xcorr CAF plot')
 pw3.setImage(fftshift(xc,1))
 pw3.setPredefinedGradient('thermal')
 # interestingly, there are extra peaks AWAY from the real timeshift
-pw4 = pg.plot(makeFreq(len(syms0), fs),xc[100], title='freq search from CAF, at correct time value')
+pw4 = pg.plot(makeFreq(len(syms0), fs),xc[shift_lim], title='freq search from CAF, at correct time value')
 pw5 = pg.GraphicsWindow(title='freqsearch from CAF, at +/-4 from correct time value')
 pw5_1 = pw5.addPlot(row=0, col=0)
-pw5_1.plot(makeFreq(len(syms0), fs),xc[96])
+pw5_1.plot(makeFreq(len(syms0), fs),xc[shift_lim - 4])
 pw5_2 = pw5.addPlot(row=1, col=0)
-pw5_2.plot(makeFreq(len(syms0), fs),xc[104])
+pw5_2.plot(makeFreq(len(syms0), fs),xc[shift_lim + 4])
 

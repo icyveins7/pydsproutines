@@ -42,6 +42,10 @@ def makeCPFSKsyms(bits, baud, m=2, h=0.5, up=8, phase=0.0):
     Chose the same defaults as the comms toolbox in Matlab.
     Bits are expressed in 1s and 0s. Digital data (e.g. +/-1) is converted
     within the function itself.
+    
+    Note: this function assumes a rectangular pulse of amplitude 1/2T, length T.
+    It has no 'pulse memory' of any other symbols. This is different from the idea
+    of the accumulator, which accumulates the 'pulsed phase' value from all prior symbols.
     '''
     T = 1.0/baud;
     fs = baud * up
@@ -60,6 +64,8 @@ def makeCPFSKsyms(bits, baud, m=2, h=0.5, up=8, phase=0.0):
     sig = np.exp(1j*theta)
     
     return sig, fs, theta, data
+
+
     
 
 @jit(nopython=True)

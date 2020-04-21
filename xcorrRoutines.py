@@ -77,3 +77,11 @@ def expectedEffSNR(snr1, snr2=None):
     
     y = 1.0/(0.5 * (1/snr1 + 1/snr2 + 1/snr1/snr2))
     return y
+
+def sigmaDTO(signalBW, noiseBW, integTime, effSNR):
+    '''
+    Taken from Algorithms for Ambiguity Function Processing. SEYMOUR STEIN. 
+    '''
+    beta = np.pi / np.sqrt(3) * signalBW
+    s = 1.0/beta / np.sqrt(noiseBW * integTime * effSNR)
+    return s

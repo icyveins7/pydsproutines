@@ -6,6 +6,8 @@ Created on Sat Mar  7 15:18:01 2020
 """
 
 import numpy as np
+import scipy as sp
+import scipy.signal as sps
 
 from numba import jit
 # jit not used if not supported like in randint, or just slower..
@@ -49,7 +51,7 @@ def makeCPFSKsyms(bits, baud, m=2, h=0.5, up=8, phase=0.0):
     '''
     T = 1.0/baud;
     fs = baud * up
-    data = bits * m - 1
+    data = bits.astype(np.int8) * m - 1
     
     theta = np.zeros(len(bits) * up)
     
@@ -63,9 +65,49 @@ def makeCPFSKsyms(bits, baud, m=2, h=0.5, up=8, phase=0.0):
     
     sig = np.exp(1j*theta)
     
-    return sig, fs, theta, data
+    return sig, fs, data
 
+def makePulsedCPFSKsyms(bits, baud, g=np.ones(8)/16, m=2, h=0.5, up=8, phase=0.0):
+    '''
+    Uses the pulse shape g to create the signal.
+    g is applied to the phase (in a convolutional way) before the actual symbols are created.
+    This is in contrast to PSK where the pulse shape is applied to the symbols.
+	With the default settings (pulse shape constant over one symbol), this should result in the same array
+	as the non-pulsed function. The pulse shape is by default normalised to have integral 0.5 over the one symbol.
+    
+    In particular, the pulse shape function g is expected to already be scaled by the upsampling rate.
+    In other words, the assumption within this function is that the calculations are done with a normalized sampling rate.
+    
+    Note: this function will return the full convolution. It is up to the user to
+    define where the end or start index is depending on the pulse shape centre, and the
+    corresponding delay introduced. In the default rect-pulse, there is no clear 'delay', so the
+    output can start from index 0 (as it is in the non pulsed function), and the ending len(g) indices
+    can be trimmed off.
+    '''
+    T = 1.0/baud # symbol period
+    fs = baud * up # sample period
+    data = bits.astype(np.int8) * m - 1
+    
+    theta = np.zeros(len(bits) * up + 1)
+    
+    # first create the upsampled version of the data (pad zeros between elements)
+    theta[1::up] = data # we need the zero at the start (before accumulation)
+    
+    # then convolve it with the pulse
+    c = sps.convolve(theta, g)
+    
+    # and now accumulate the phase (from a starting idx)
+    # note, this assumes a normalized sampling rate (fs = 1 Hz)! 
+    # likewise this assumes that the pulse shape has accounted for this value
+    cs = np.cumsum(c)
+    
+    # scale by 2 pi h and initial phase
+    css = cs * 2 * np.pi * h + phase
 
+    sig = np.exp(1j*css)
+    
+    return sig, fs, data
+    
     
 
 @jit(nopython=True)

@@ -16,8 +16,9 @@ def makeSRC4(t,T):
     # this might not happen if t was not generated exactly at the 0 (due to precision)
     infidx = np.argwhere(g==np.inf).flatten()
     
-    print('Correcting inf indices..')
-    g[infidx] = 0.5
+    # print('Correcting inf indices..')
+    if len(infidx)>0:
+        g[infidx] = 0.5
         
     return g
 
@@ -38,5 +39,14 @@ def makeSRC4_clipped(t,T,k=1.0):
         g[zeroidx] = 0
     if (len(zero2idx) > 0):
         g[zero2idx] = 0
+    
+    return g
+
+def makeScaledSRC4(up,T,a=0.5):
+    t = np.arange(4 * up)/up
+    
+    qa = sp.integrate.quad(makeSRC4, 0, 4, T)
+    
+    g = makeSRC4(t, T) / (qa[0] / a)
     
     return g

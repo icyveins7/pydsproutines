@@ -59,8 +59,53 @@ def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None):
 
         return result
     
-            
+
+def fineFreqTimeSearch(x_aligned, y_aligned, fineRes, freqfound, freqRes, fs, td_scan_range, steeringvec=None):
+    '''
+    Performs a finer search to align frequency and time, in two separate processes.
+    As such, this function may not result in the global minimum for TDOA/FDOA in 2-D, but will perform much
+    faster, since it only searches one index in both dimensions, rather than the full 2-D space.
     
+    The best fine frequency will be searched first (assumes that the sample-aligned arrays are correctly time-aligned).
+    Then, using the new value for the fine frequency alignment, the two arrays are then sub-sample time aligned.
+    '''
+    
+    # compute best freq
+    for i in range(len(fineRes)):
+        fineFreq = np.arange(freqfound-freqRes, freqfound+freqRes, fineRes)
+        
+        precomputed = y_aligned.conj() * x_aligned
+        pp = np.zeros(len(fineFreq))
+        fineshifts = np.zeros(len(fineFreq), len(x_aligned))
+        for j in range(len(fineFreq)):
+            fineshifts[j] = np.exp(1j*2*np.pi*-fineFreq[j]*np.arange(len(x_aligned))/fs)
+        
+            pp[j] = np.vdot(precomputed,fineshifts[j])
+        
+        fineFreq_ind = np.argmax(np.abs(pp))
+        freqfound = fineFreq[fineFreq_ind]
+        
+    finefreqfound = freqfound
+        
+    # compute best time alignment
+    if steeringvec is None:
+        steeringvec = makeTimeScanSteervec(td_scan_range)
+    
+    x_aligned = x_aligned * fineshifts[fineFreq_ind]
+    
+    x_fft = np.fft.fft(x)
+    y_fft = np.fft.fft(y)
+    rx_vec = x_fft * y_fft.conj()
+    
+    cost_vec = np.dot(rx_vec, steeringvec.conj().T)/np.linalg.norm(x_fft)/np.linalg.norm(y_fft)
+    idx_td = np.argmax(np.abs(cost_vec))
+    timediff = td_scan_range[idx_td]
+    
+    return finefreqfound, timediff
+    
+def makeTimeScanSteervec(td_scan_range):
+    print('not yet implemented')
+    return 1
 
 def convertQF2toSNR(qf2):
     """For xcorr against pure signal."""

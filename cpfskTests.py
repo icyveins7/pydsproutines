@@ -12,6 +12,7 @@ import time
 import pyqtgraph as pg
 from scipy.fftpack import fftshift
 
+
 # parameters
 numBitsPerBurst = 48
 baud = 16000
@@ -44,7 +45,6 @@ gSRC4 = makeSRC4(np.arange(4 * up)/up,1)
 gSRC4 = makeScaledSRC4(up, 1.0)/up
 pwg = pg.plot(title='SRC4')
 pwg.plot(np.arange(4*up)/up, gSRC4, symbol='x', symbolPen='r')
-
 syms0, fs, data = makePulsedCPFSKsyms(bits, baud, g = gSRC4, up = up) # new method of creation
 
 
@@ -52,12 +52,10 @@ syms0, fs, data = makePulsedCPFSKsyms(bits, baud, g = gSRC4, up = up) # new meth
 fshift_idx = 123
 fshift = fshift_idx * fs / len(syms0) # in order to clip to an index of the fft search, for now
 print('fshift index = %i, corresponding to frequency %fHz' % (fshift_idx, fshift))
-tone = np.exp(1j*2*np.pi*fshift * np.arange(len(syms0)) / fs)
-syms = syms0 * tone # after shifting
 
 # check spectrum
-freq = makeFreq(len(syms), fs)
-fftsyms = np.fft.fft(syms)
+freq = makeFreq(len(syms0), fs)
+fftsyms = np.fft.fft(syms0)
 
 # plot spectrum
 pw = pg.GraphicsWindow(title='cpfsk spectrum (fft vs cm20)')
@@ -65,14 +63,14 @@ pw_1 = pw.addPlot(0,0)
 pw_1.plot(freq, 20*np.log10(np.abs(fftsyms)), name='fft')
 
 # test rabbit ears
-cm20 = syms**2.0
+cm20 = syms0**2.0
 fftcm20 = np.fft.fft(cm20)
 pw_2 = pw.addPlot(1,0)
 pw_2.plot(freq, 20*np.log10(np.abs(fftcm20)), pen='r', name='cm20')
 
 # add noise
-startIdx = len(syms)
-noise, rx = addSigToNoise(3 * len(syms), startIdx, syms, baud, fs, 1000, sigPwr = 1.0)
+startIdx = len(syms0)
+noise, rx, tone = addSigToNoise(3 * len(syms0), startIdx, syms0, baud, fs, 1000, sigPwr = 1.0, fshift = fshift)
 
 # plot new spectrum and rabbit ears?
 freqrx = makeFreq(len(rx), fs)
@@ -106,44 +104,73 @@ freqcutout = makeFreq(len(syms0), fs)
 # pw3 = pg.plot(title='fast xcorr (no freq shifts)')
 # pw3.plot((shifts-startIdx)/fs, xc)
 
-# xcorr with CAF output
-xc = fastXcorr(syms0, rx, freqsearch=True, outputCAF=True, shifts=shifts)
-#xc_mi = np.argmax(xc)
-#print('Xcorr max at %i, val = %f, freqidx = %i' % (xc_mi, xc[xc_mi], freqlist[xc_mi]))
-pw3 = pg.image(title='xcorr CAF plot')
-pw3.setImage(fftshift(xc,1))
-pw3.setPredefinedGradient('thermal')
-# interestingly, there are extra peaks AWAY from the real timeshift
-pw4 = pg.plot(freqcutout,xc[shift_lim], title='freq search from CAF, at correct time value')
-pw5 = pg.GraphicsWindow(title='freqsearch from CAF, at +/-4 from correct time value')
-pw5_1 = pw5.addPlot(row=0, col=0)
-pw5_1.plot(freqcutout,xc[shift_lim - 4])
-pw5_2 = pw5.addPlot(row=1, col=0)
-pw5_2.plot(freqcutout,xc[shift_lim + 4])
+# # xcorr with CAF output
+# xc = fastXcorr(syms0, rx, freqsearch=True, outputCAF=True, shifts=shifts)
+# #xc_mi = np.argmax(xc)
+# #print('Xcorr max at %i, val = %f, freqidx = %i' % (xc_mi, xc[xc_mi], freqlist[xc_mi]))
+# pw3 = pg.image(title='xcorr CAF plot')
+# pw3.setImage(fftshift(xc,1))
+# pw3.setPredefinedGradient('thermal')
+# # interestingly, there are extra peaks AWAY from the real timeshift
+# pw4 = pg.plot(freqcutout,xc[shift_lim], title='freq search from CAF, at correct time value')
+# pw5 = pg.GraphicsWindow(title='freqsearch from CAF, at +/-4 from correct time value')
+# pw5_1 = pw5.addPlot(row=0, col=0)
+# pw5_1.plot(freqcutout,xc[shift_lim - 4])
+# pw5_2 = pw5.addPlot(row=1, col=0)
+# pw5_2.plot(freqcutout,xc[shift_lim + 4])
 
-# look at the TD slope for the correct freqshift
-fdsolvedidx = np.argmax(xc[shift_lim])
-fdsolved = freqcutout[fdsolvedidx]
-xc_tdflatten = xc[:,fdsolvedidx]
-pw6 = pg.plot(title='tdoa flattened')
-pw6.plot((shifts-startIdx)/fs, xc_tdflatten)
+# # look at the TD slope for the correct freqshift
+# fdsolvedidx = np.argmax(xc[shift_lim])
+# fdsolved = freqcutout[fdsolvedidx]
+# xc_tdflatten = xc[:,fdsolvedidx]
+# pw6 = pg.plot(title='tdoa flattened')
+# pw6.plot((shifts-startIdx)/fs, xc_tdflatten)
 
 
 ## add a second signal
 pw7p = []
-si = np.arange(10,18)
+si = np.arange(12,18)
 pw7 = pg.GraphicsWindow(title = 'tdoa flattened, two peaks')
+
 for i in range(len(si)):
     
-    noise2, rx2 = addSigToNoise(3 * len(syms), startIdx + si[i], syms, baud, fs, 1000, sigPwr = 1.0)
+    noise2, rx2, _ = addSigToNoise(3 * len(syms0), startIdx + si[i], syms0, baud, fs, 100000, sigPwr = 1.0, fshift = fshift)
     rx_c = rx2 + rx
+    
+    # # correct it with reversed freq tone
+    # rx_c = rx_c * tone.conj()
     
     # xcorr again with new CAF
     xc_c = fastXcorr(syms0, rx_c, freqsearch=True, outputCAF=True, shifts=shifts)
     fdsolvedidx = np.argmax(xc_c[shift_lim])
     fdsolved = freqcutout[fdsolvedidx]
+    print('fdsolved = ' + str(fdsolved))
     xc_c_tdflatten = xc_c[:,fdsolvedidx]
+    
+    # # xcorr again without CAF, direct to td only
+    # xc_c_tdflatten, xc_c_flist = fastXcorr(syms0, rx_c, freqsearch=True, outputCAF=False, shifts=shifts)
     
     # add to plot
     pw7p.append(pw7.addPlot(row=int(i)/4, col=int(i)%4))
     pw7p[i].plot((shifts-startIdx)/fs, xc_c_tdflatten)
+
+## add second and third signals
+pw8p = []
+pw8 = pg.GraphicsWindow(title = 'tdoa flattened, 3 peaks')
+ssi = np.vstack((np.arange(12,18), np.arange(12,18)))
+for i in range(ssi.shape[1]):
+    for j in range(ssi.shape[1]):
+        noise2, rx2, _ = addSigToNoise(3 * len(syms0), startIdx + ssi[0][i], syms0, baud, fs, 1000000, sigPwr=1.0, fshift = fshift)
+        noise3, rx3, _ = addSigToNoise(3 * len(syms0), startIdx + ssi[0][i] + ssi[1][j], syms0, baud, fs, 1000000, sigPwr=1.0, fshift = fshift)
+        rx_cc = rx3 + rx2 + rx
+
+        # xcorr again with new CAF
+        xc_cc = fastXcorr(syms0, rx_cc, freqsearch=True, outputCAF=True, shifts=shifts)
+        fdsolvedidx = np.argmax(xc_cc[shift_lim])
+        fdsolved = freqcutout[fdsolvedidx]
+        xc_cc_tdflatten = xc_cc[:, fdsolvedidx]
+
+        # add to plot
+        pw8p.append(pw8.addPlot(row=int(i), col=int(j)))
+        pw8p[-1].plot(shifts - startIdx, xc_cc_tdflatten)
+

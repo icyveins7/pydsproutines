@@ -25,7 +25,7 @@ def randnoise(length, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0):
     noise = basicnoise * np.sqrt(1.0/snr_inband_linear) * np.sqrt(chnBW/bw_signal) # pretty sure this is correct now..
     return noise
 
-def addSigToNoise(noiseLen, sigStartIdx, signal, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0):
+def addSigToNoise(noiseLen, sigStartIdx, signal, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0, fshift = None):
     '''Add signal into noisy background at particular index'''
     noise = randnoise(noiseLen, bw_signal, chnBW, snr_inband_linear, sigPwr)
     aveNoisePwr = np.linalg.norm(noise)**2.0/len(noise)
@@ -37,7 +37,14 @@ def addSigToNoise(noiseLen, sigStartIdx, signal, bw_signal, chnBW, snr_inband_li
     rx = np.zeros(noiseLen,dtype=np.complex128)
     rx[sigStartIdx:len(signal)+sigStartIdx] = signal
     rx = rx+noise
-    return noise, rx
+    
+    if fshift is not None:
+        tone = np.exp(1j*2*np.pi*fshift*np.arange(noiseLen)/chnBW)
+        rx = rx * tone
+        
+        return noise, rx, tone
+    else:
+        return noise, rx
 
 def makeCPFSKsyms(bits, baud, m=2, h=0.5, up=8, phase=0.0):
     '''

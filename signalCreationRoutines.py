@@ -17,7 +17,7 @@ def randBits(length, m):
     return np.random.randint(0,m,length,dtype=np.uint8)
 
 def randPSKsyms(length, m, dtype=np.complex128):
-    bits = randPSKbits(length, m).astype(dtype)
+    bits = randBits(length, m).astype(dtype)
     return np.exp(1j*2*np.pi*bits/m), bits
 
 def randnoise(length, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0):
@@ -26,7 +26,7 @@ def randnoise(length, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0):
     return noise
 
 def addSigToNoise(noiseLen, sigStartIdx, signal, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0, fshift = None):
-    '''Add signal into noisy background at particular index'''
+    '''Add signal into noisy background at particular index, with optional frequency shifting.'''
     noise = randnoise(noiseLen, bw_signal, chnBW, snr_inband_linear, sigPwr)
     aveNoisePwr = np.linalg.norm(noise)**2.0/len(noise)
     print('Ave noise power = ' + str(aveNoisePwr))
@@ -45,6 +45,44 @@ def addSigToNoise(noiseLen, sigStartIdx, signal, bw_signal, chnBW, snr_inband_li
         return noise, rx, tone
     else:
         return noise, rx
+    
+    
+def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, snr_inband_linearList, fshifts = None):
+    '''
+    Add many signals into noisy background at particular indices. with optional frequency shiftings.
+    All signals are assumed to have signal power of unity i.e. sigPwr = 1.0 in the single generator function.
+    
+    This function will calculate a single noise array and scale the different signals appropriately to generate the 
+    necessary SNR differences.
+    
+    The noise array will be generated using the supplied scalar (not a list!) values of chnBW and bw_signal, so this
+    implies that all signals added should in theory have the SAME BANDWIDTH as bw_signal, in order to achieve the
+    desired relative SNR values (note, this is not SINR). This noise will use the first SNR in the list to generate 
+    the relative noise array.
+    '''
+    # create standard noise with respect to the first SNR
+    noise = randnoise(noiseLen, bw_signal, chnBW, snr_inband_linearList[0], 1.0)
+    
+    # prepare the different time propagated versions of the noiseless signals
+    numSigs = len(snr_inband_linearList)
+    rx = np.zeros((numSigs, noiseLen), dtype=np.complex128)
+    for i in range(rx.shape[0]):
+        rx[i][sigStartIdxList[i] : len(signalList[i]) + sigStartIdxList[i]] = signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0])
+        
+    if fshifts is not None:
+        
+        tones = np.zeros((numSigs, noiseLen), dtype=np.complex128)
+        
+        for k in range(rx.shape[0]):
+            tones[k] = np.exp(1j*2*np.pi*fshifts[k]*np.arange(noiseLen)/chnBW)
+            rx[k] = rx[k] * tones[k]
+            
+            rxfull = np.sum(rx, axis=0) + noise
+            
+        return noise, rxfull, tones
+    
+    else:   
+        return noise, rxfull
 
 def makeCPFSKsyms(bits, baud, m=2, h=0.5, up=8, phase=0.0):
     '''

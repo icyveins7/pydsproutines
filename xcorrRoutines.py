@@ -130,3 +130,13 @@ def sigmaDTO(signalBW, noiseBW, integTime, effSNR):
     beta = np.pi / np.sqrt(3) * signalBW
     s = 1.0/beta / np.sqrt(noiseBW * integTime * effSNR)
     return s
+
+def theoreticalMultiPeak_SampleLevel(startIdx1, startIdx2):
+    mat = np.zeros((len(startIdx1), len(startIdx1))) # expected same length anyway
+    
+    for i in range(len(mat)):
+        mat[i] = startIdx2[i] - startIdx1
+        
+    mat = mat.flatten()
+    
+    return np.unique(mat)

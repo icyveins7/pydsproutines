@@ -84,11 +84,13 @@ def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, s
             tones[k] = np.exp(1j*2*np.pi*fshifts[k]*np.arange(noiseLen)/chnBW)
             rx[k] = rx[k] * tones[k]
             
-            rxfull = np.sum(rx, axis=0) + noise
+        rxfull = np.sum(rx, axis=0) + noise
             
         return noise, rxfull, tones
     
-    else:   
+    else:
+        rxfull = np.sum(rx, axis=0) + Noise
+        
         return noise, rxfull
 
 def makeCPFSKsyms(bits, baud, m=2, h=0.5, up=8, phase=0.0):

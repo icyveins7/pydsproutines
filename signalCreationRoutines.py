@@ -27,7 +27,12 @@ def randnoise(length, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0):
 
 def addSigToNoise(noiseLen, sigStartIdx, signal, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0, fshift = None):
     '''Add signal into noisy background at particular index, with optional frequency shifting.'''
-    noise = randnoise(noiseLen, bw_signal, chnBW, snr_inband_linear, sigPwr)
+    
+    if snr_inband_linear is np.inf:
+        print('Generating zeros for inf SNR..')
+        noise = np.zeros(noiseLen, dtype=np.complex128)
+    else:
+        noise = randnoise(noiseLen, bw_signal, chnBW, snr_inband_linear, sigPwr)
     aveNoisePwr = np.linalg.norm(noise)**2.0/len(noise)
     print('Ave noise power = ' + str(aveNoisePwr))
     aveSigPwr = np.linalg.norm(signal)**2.0/len(signal)
@@ -59,6 +64,8 @@ def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, s
     implies that all signals added should in theory have the SAME BANDWIDTH as bw_signal, in order to achieve the
     desired relative SNR values (note, this is not SINR). This noise will use the first SNR in the list to generate 
     the relative noise array.
+    
+    SNR supplied values cannot be infinity in this case (for obvious reasons).
     '''
     # create standard noise with respect to the first SNR
     noise = randnoise(noiseLen, bw_signal, chnBW, snr_inband_linearList[0], 1.0)
@@ -153,8 +160,27 @@ def makePulsedCPFSKsyms(bits, baud, g=np.ones(8)/16, m=2, h=0.5, up=8, phase=0.0
     
     return sig, fs, data
     
+def propagateSignal(sig, time, fs, freq=None, tone=None):
+    # generate a tone if no tone is passed in and a freqshift is desired
+    if freq is not None and tone is None:
+        print('Generating tone for freq shift..')
+        tone = np.exp(1j*2*np.pi*freq*np.arange(len(sig))/fs)
+        
+    # propagate the signal in time
+    sigfft = sp.fft(sig)
+    sigFreq = makeFreq(len(sig),fs)
+    mat = np.exp(1j*2*np.pi*sigFreq * -time)
+    preifft = mat * sigfft
+    result = sp.ifft(preifft)
     
-
+    # no freq shift, just return
+    if tone is None:
+        return result
+    # otherwise return the freqshifted version with the tone
+    else:
+        return result * tone, tone
+    
+    
 @jit(nopython=True)
 def makeFreq(length, fs):
     freq = np.zeros(length)

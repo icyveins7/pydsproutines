@@ -93,8 +93,8 @@ def fineFreqTimeSearch(x_aligned, y_aligned, fineRes, freqfound, freqRes, fs, td
     
     x_aligned = x_aligned * fineshifts[fineFreq_ind]
     
-    x_fft = np.fft.fft(x)
-    y_fft = np.fft.fft(y)
+    x_fft = np.fft.fft(x_aligned)
+    y_fft = np.fft.fft(y_aligned)
     rx_vec = x_fft * y_fft.conj()
     
     cost_vec = np.dot(rx_vec, steeringvec.conj().T)/np.linalg.norm(x_fft)/np.linalg.norm(y_fft)

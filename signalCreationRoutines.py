@@ -89,7 +89,7 @@ def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, s
         return noise, rxfull, tones
     
     else:
-        rxfull = np.sum(rx, axis=0) + Noise
+        rxfull = np.sum(rx, axis=0) + noise
         
         return noise, rxfull
 

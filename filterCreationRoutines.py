@@ -11,7 +11,8 @@ import scipy as sp
 
 def makeSRC4(t,T):
     X = 2 * t/T - 4.0
-    g = np.sinc(X)/(1.0-X**2)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        g = np.sinc(X)/(1.0-X**2)
     
     # this might not happen if t was not generated exactly at the 0 (due to precision)
     infidx = np.argwhere(g==np.inf).flatten()

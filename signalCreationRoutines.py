@@ -79,7 +79,8 @@ def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, s
             rx[i][sigStartIdxList[i] : len(signalList[i]) + sigStartIdxList[i]] = signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0])
     else: # otherwise for subsample, move using the function
         for i in range(rx.shape[0]):
-            rx[i] = propagateSignal(signalList[i], sigStartTimeList[i], chnBW, freq=None, tone=None)
+            rx[i][:len(signalList[i])] =  signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0]) # set to 0
+            rx[i] = propagateSignal(rx[i], sigStartTimeList[i], chnBW, freq=None, tone=None) # then propagate required amount
         
     if fshifts is not None:
         

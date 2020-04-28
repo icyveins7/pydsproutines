@@ -52,7 +52,7 @@ def addSigToNoise(noiseLen, sigStartIdx, signal, bw_signal, chnBW, snr_inband_li
         return noise, rx
     
     
-def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, snr_inband_linearList, fshifts = None):
+def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, snr_inband_linearList, fshifts = None, sigStartTimeList = None):
     '''
     Add many signals into noisy background at particular indices. with optional frequency shiftings.
     All signals are assumed to have signal power of unity i.e. sigPwr = 1.0 in the single generator function.
@@ -73,8 +73,13 @@ def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, s
     # prepare the different time propagated versions of the noiseless signals
     numSigs = len(snr_inband_linearList)
     rx = np.zeros((numSigs, noiseLen), dtype=np.complex128)
-    for i in range(rx.shape[0]):
-        rx[i][sigStartIdxList[i] : len(signalList[i]) + sigStartIdxList[i]] = signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0])
+    
+    if sigStartTimeList is None: # use the index version (faster if moving at sample level)
+        for i in range(rx.shape[0]):
+            rx[i][sigStartIdxList[i] : len(signalList[i]) + sigStartIdxList[i]] = signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0])
+    else: # otherwise for subsample, move using the function
+        for i in range(rx.shape[0]):
+            rx[i] = propagateSignal(signalList[i], sigStartTimeList[i], chnBW, freq=None, tone=None)
         
     if fshifts is not None:
         

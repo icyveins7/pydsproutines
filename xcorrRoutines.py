@@ -131,7 +131,10 @@ def sigmaDTO(signalBW, noiseBW, integTime, effSNR):
     s = 1.0/beta / np.sqrt(noiseBW * integTime * effSNR)
     return s
 
-def theoreticalMultiPeak_SampleLevel(startIdx1, startIdx2):
+def theoreticalMultiPeak(startIdx1, startIdx2):
+    '''
+    Works with both indices and floating-point, but of course floating-point may result in 'unique' values being repeated.
+    '''
     mat = np.zeros((len(startIdx1), len(startIdx1))) # expected same length anyway
     
     for i in range(len(mat)):

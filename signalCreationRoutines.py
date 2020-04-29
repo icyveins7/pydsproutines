@@ -8,6 +8,7 @@ Created on Sat Mar  7 15:18:01 2020
 import numpy as np
 import scipy as sp
 import scipy.signal as sps
+import time
 
 from numba import jit
 # jit not used if not supported like in randint, or just slower..
@@ -78,9 +79,13 @@ def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, s
         for i in range(rx.shape[0]):
             rx[i][sigStartIdxList[i] : len(signalList[i]) + sigStartIdxList[i]] = signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0])
     else: # otherwise for subsample, move using the function
+        
         for i in range(rx.shape[0]):
             rx[i][:len(signalList[i])] =  signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0]) # set to 0
-            rx[i] = propagateSignal(rx[i], sigStartTimeList[i], chnBW, freq=None, tone=None) # then propagate required amount
+            
+        ssTime = time.time()
+        rx = propagateSignal(rx, sigStartTimeList, chnBW, freq=None, tone=None) # then propagate required amount
+        print('Subsample propagation took %fs.' % (time.time()-ssTime))
         
     if fshifts is not None:
         
@@ -169,17 +174,21 @@ def makePulsedCPFSKsyms(bits, baud, g=np.ones(8)/16, m=2, h=0.5, up=8, phase=0.0
     return sig, fs, data
     
 def propagateSignal(sig, time, fs, freq=None, tone=None):
+    # to handle 1-D input
+    if sig.ndim == 1:
+        sig = sig.reshape((1,-1)) # automatic 2-d row vector detection using -1
+    
     # generate a tone if no tone is passed in and a freqshift is desired
     if freq is not None and tone is None:
         print('Generating tone for freq shift..')
         tone = np.exp(1j*2*np.pi*freq*np.arange(len(sig))/fs)
         
     # propagate the signal in time
-    sigfft = sp.fft(sig)
-    sigFreq = makeFreq(len(sig),fs)
-    mat = np.exp(1j*2*np.pi*sigFreq * -time)
+    sigfft = np.fft.fft(sig) # this automatically ffts each row
+    sigFreq = makeFreq(sig.shape[1],fs).reshape((1,sig.shape[1])) # construct 2-d, row vector
+    mat = np.exp(1j*2*np.pi*sigFreq * -time.reshape((len(time),1))) # construct 2d matrix for each row having its own time shift    
     preifft = mat * sigfft
-    result = sp.ifft(preifft)
+    result = np.fft.ifft(preifft)
     
     # no freq shift, just return
     if tone is None:

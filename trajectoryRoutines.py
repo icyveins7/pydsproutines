@@ -20,11 +20,11 @@ def createLinearTrajectory(pos1, pos2, stepArray, pos_start=None, randomWalk=Non
     stepArray : Numpy array, 1-D.
         Array of steps. Each point will move by step * directionVectorNormed. Does not need to be equally spaced.
     pos_start : Scalar between [0,1], optional
-        DESCRIPTION. The default is None.
+        The default is None.
         The output will use this as the coefficient along the connecting vector between
         the 2 anchor points, as the position to start iterating at.
     randomWalk : Scalar, optional
-        DESCRIPTION. The default is None.
+        The default is None.
         Adds random noise around the trajectory using a normal distribution.
 
     Returns

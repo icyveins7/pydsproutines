@@ -8,56 +8,121 @@ Created on Sat Mar  7 17:03:53 2020
 import numpy as np
 import scipy as sp
 
-def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None):
-    """ Optional frequency scanning xcorr."""
+def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absResult=True):
+    """
+    Optional frequency scanning xcorr.
+    
+    When absResult is set to False, the result is not absoluted, and is also not given as a 
+    QF^2 value. It is left as a complex value, scaled only by the norm (not norm-squared!) 
+    of the two corresponding array slices.
+    
+    Consequently, when absResult is True (default), then the returned values are QF^2 
+    normalized values.
+    """
     if shifts is None:
         shifts = np.arange(len(rx)-len(cutout)+1)
     
+    # common numbers in all consequent methods
+    cutoutNorm = np.linalg.norm(cutout)
+    cutoutNormSq = cutoutNorm**2.0
+    
     if not freqsearch:
         print('No frequency scanning xcorr..')
-        result = np.zeros(len(shifts),dtype=np.float64)
-        cutoutNormSq = np.linalg.norm(cutout)**2.0
-        for i in range(len(shifts)):
-            s = shifts[i]
-            result[i] = sp.absolute(np.vdot(rx[s:s+len(cutout)], cutout))**2.0 # vdot already takes conj of first arg
-            rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
-            result[i] = result[i]/cutoutNormSq/rxNormPartSq
+    
+        if absResult is True:
+            print('Returning normalized QF^2 real values..')
+            result = np.zeros(len(shifts),dtype=np.float64)
+
+            for i in range(len(shifts)):
+                s = shifts[i]
+                result[i] = sp.absolute(np.vdot(rx[s:s+len(cutout)], cutout))**2.0 # vdot already takes conj of first arg
+                rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
+                result[i] = result[i]/cutoutNormSq/rxNormPartSq
+                
+            return result
+        
+        else:
+            print('Returning normalized QF complex values..')
+            result = np.zeros(len(shifts),dtype=np.complex128)
             
-        return result
+            for i in range(len(shifts)):
+                s = shifts[i]
+                result[i] = np.vdot(rx[s:s+len(cutout)], cutout) # vdot already takes conj of first arg
+                rxNormPart = np.linalg.norm(rx[s:s+len(cutout)])
+                result[i] = result[i]/cutoutNorm/rxNormPart
+                
+            return result
     
     elif not outputCAF:
         print('Frequency scanning, but no CAF output (flattened to time)..')
-        result = np.zeros(len(shifts),dtype=np.float64)
         freqlist = np.zeros(len(shifts),dtype=np.uint32)
-        cutoutNormSq = np.linalg.norm(cutout)**2.0
-        for i in range(len(shifts)):
-            s = shifts[i]
-            pdt = rx[s:s+len(cutout)] * cutout.conj()
-            pdtfft = sp.fft(pdt)
-            pdtfftsq = pdtfft**2.0
-            imax = np.argmax(np.abs(pdtfftsq))
-            freqlist[i] = imax
-            pmax = np.abs(pdtfftsq[imax])
+        
+        if absResult is True:
+            print('Returning normalized QF^2 real values..')
+            result = np.zeros(len(shifts),dtype=np.float64)
 
-            rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
-            result[i] = pmax/cutoutNormSq/rxNormPartSq
+            for i in range(len(shifts)):
+                s = shifts[i]
+                pdt = rx[s:s+len(cutout)] * cutout.conj()
+                pdtfft = sp.fft(pdt)
+                pdtfftsq = pdtfft**2.0
+                imax = np.argmax(np.abs(pdtfftsq))
+                freqlist[i] = imax
+                pmax = np.abs(pdtfftsq[imax])
+    
+                rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
+                result[i] = pmax/cutoutNormSq/rxNormPartSq
+                
+            return result, freqlist
+        
+        else:
+            print('Returning normalized QF complex values..')
+            result = np.zeros(len(shifts),dtype=np.complex128)
             
-        return result, freqlist
+            for i in range(len(shifts)):
+                s = shifts[i]
+                pdt = rx[s:s+len(cutout)] * cutout.conj()
+                pdtfft = sp.fft(pdt)
+                imax = np.argmax(np.abs(pdtfft))
+                freqlist[i] = imax
+                pmax = pdtfft[imax]
+    
+                rxNormPart = np.linalg.norm(rx[s:s+len(cutout)])
+                result[i] = pmax/cutoutNorm/rxNormPart
+                
+            return result, freqlist
     
     else:
         print('Frequency scanning, outputting raw CAF...')
-        result = np.zeros((len(shifts), len(cutout)), dtype=np.float64)
-        cutoutNormSq = np.linalg.norm(cutout)**2.0
-        for i in range(len(shifts)):
-            s = shifts[i]
-            pdt = rx[s:s+len(cutout)] * cutout.conj()
-            pdtfft = sp.fft(pdt)
-            pdtfftsq = np.abs(pdtfft**2.0)
+        
+        if absResult is True:
+            print('Returning normalized QF^2 real values..')
+            result = np.zeros((len(shifts), len(cutout)), dtype=np.float64)
 
-            rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
-            result[i] = pdtfftsq/cutoutNormSq/rxNormPartSq
-
-        return result
+            for i in range(len(shifts)):
+                s = shifts[i]
+                pdt = rx[s:s+len(cutout)] * cutout.conj()
+                pdtfft = sp.fft(pdt)
+                pdtfftsq = np.abs(pdtfft**2.0)
+    
+                rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
+                result[i] = pdtfftsq/cutoutNormSq/rxNormPartSq
+    
+            return result
+        
+        else:
+            print('Returning normalized QF complex values..')
+            result = np.zeros((len(shifts), len(cutout)), dtype=np.complex128)
+            
+            for i in range(len(shifts)):
+                s = shifts[i]
+                pdt = rx[s:s+len(cutout)] * cutout.conj()
+                pdtfft = np.fft.fft(pdt)
+    
+                rxNormPart = np.linalg.norm(rx[s:s+len(cutout)])
+                result[i] = pdtfft/cutoutNorm/rxNormPart
+    
+            return result
     
 
 def fineFreqTimeSearch(x_aligned, y_aligned, fineRes, freqfound, freqRes, fs, td_scan_range, steeringvec=None):

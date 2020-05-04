@@ -196,15 +196,39 @@ def sigmaDTO(signalBW, noiseBW, integTime, effSNR):
     s = 1.0/beta / np.sqrt(noiseBW * integTime * effSNR)
     return s
 
-def theoreticalMultiPeak(startIdx1, startIdx2):
+def theoreticalMultiPeak(startIdx1, startIdx2, snr_linear_1=None, snr_linear_2=None):
     '''
+    Calculates parameters resulting from cross-correlation of multiple copies of a signal in two receivers.
     Works with both indices and floating-point, but of course floating-point may result in 'unique' values being repeated.
     '''
-    mat = np.zeros((len(startIdx1), len(startIdx1))) # expected same length anyway
     
-    for i in range(len(mat)):
-        mat[i] = startIdx2[i] - startIdx1
+    # if no snr supplied, just return the indices
+    if snr_linear_1 is None and snr_linear_2 is None:
+        mat = np.zeros((len(startIdx1), len(startIdx1))) # expected same length anyway
         
-    mat = mat.flatten()
-    
-    return np.unique(mat)
+        for i in range(len(mat)):
+            mat[i] = startIdx2[i] - startIdx1
+            
+        mat = mat.flatten()
+        
+        return np.unique(mat)
+    else:
+        mat = np.zeros((len(startIdx1), len(startIdx1))) # expected same length anyway
+        matEffSNR = np.zeros((len(startIdx1), len(startIdx1))) # expected same length anyway
+        
+        for i in range(len(mat)):
+            mat[i] = startIdx2[i] - startIdx1
+            
+            tmp = 0.5 * ( (1/snr_linear_1) + (1/snr_linear_2[i]) + (1/snr_linear_1/snr_linear_2[i]) )
+            
+            matEffSNR[i] = 1/tmp
+            
+        mat = mat.flatten()
+        matEffSNR = matEffSNR.flatten()
+        
+        u,indices = np.unique(mat, return_index=True)
+        return u, matEffSNR[indices]
+        
+        
+        
+        

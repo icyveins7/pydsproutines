@@ -26,7 +26,7 @@ def randnoise(length, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0):
     noise = basicnoise * np.sqrt(1.0/snr_inband_linear) * np.sqrt(chnBW/bw_signal) # pretty sure this is correct now..
     return noise
 
-def addSigToNoise(noiseLen, sigStartIdx, signal, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0, fshift = None):
+def addSigToNoise(noiseLen, sigStartIdx, signal, bw_signal = 1, chnBW = 1, snr_inband_linear = np.inf, sigPwr = 1.0, fshift = None):
     '''Add signal into noisy background at particular index, with optional frequency shifting.'''
     
     if snr_inband_linear is np.inf:

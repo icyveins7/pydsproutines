@@ -79,13 +79,13 @@ def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, s
         for i in range(rx.shape[0]):
             rx[i][sigStartIdxList[i] : len(signalList[i]) + sigStartIdxList[i]] = signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0])
     else: # otherwise for subsample, move using the function
-        
-        for i in range(rx.shape[0]):
-            rx[i][:len(signalList[i])] =  signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0]) # set to 0
+        raise Exception("CURRENTLY DEBUGGING THIS MODE")
+        # for i in range(rx.shape[0]):
+        #     rx[i][:len(signalList[i])] =  signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0]) # set to 0
             
-        ssTime = time.time()
-        rx = propagateSignal(rx, sigStartTimeList, chnBW, freq=None, tone=None) # then propagate required amount
-        print('Subsample propagation took %fs.' % (time.time()-ssTime))
+        # ssTime = time.time()
+        # rx = propagateSignal(rx, sigStartTimeList, chnBW, freq=None, tone=None) # then propagate required amount
+        # print('Subsample propagation took %fs.' % (time.time()-ssTime))
         
     if fshifts is not None:
         
@@ -185,7 +185,7 @@ def propagateSignal(sig, time, fs, freq=None, tone=None):
     # generate a tone if no tone is passed in and a freqshift is desired
     if freq is not None and tone is None:
         print('Generating tone for freq shift..')
-        tone = np.exp(1j*2*np.pi*freq*np.arange(len(sig))/fs)
+        tone = np.exp(1j*2*np.pi*freq*np.arange(sig.shape[1])/fs)
         
     # propagate the signal in time
     sigfft = np.fft.fft(sig) # this automatically ffts each row
@@ -199,6 +199,7 @@ def propagateSignal(sig, time, fs, freq=None, tone=None):
         return result
     # otherwise return the freqshifted version with the tone
     else:
+        print('Returning shifted signal + tone used.')
         return result * tone, tone
     
     

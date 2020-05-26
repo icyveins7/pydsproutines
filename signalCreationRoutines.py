@@ -174,6 +174,10 @@ def makePulsedCPFSKsyms(bits, baud, g=np.ones(8)/16, m=2, h=0.5, up=8, phase=0.0
     return sig, fs, data
     
 def propagateSignal(sig, time, fs, freq=None, tone=None):
+    # to handle single scalar time shift
+    if not isinstance(time, np.ndarray):
+        time = np.array([time])
+
     # to handle 1-D input
     if sig.ndim == 1:
         sig = sig.reshape((1,-1)) # automatic 2-d row vector detection using -1
@@ -186,7 +190,7 @@ def propagateSignal(sig, time, fs, freq=None, tone=None):
     # propagate the signal in time
     sigfft = np.fft.fft(sig) # this automatically ffts each row
     sigFreq = makeFreq(sig.shape[1],fs).reshape((1,sig.shape[1])) # construct 2-d, row vector
-    mat = np.exp(1j*2*np.pi*sigFreq * -time.reshape((len(time),1))) # construct 2d matrix for each row having its own time shift    
+    mat = np.exp(1j*2*np.pi*sigFreq * -time.reshape((len(time),1))) # construct 2d matrix for each row having its own time shift       
     preifft = mat * sigfft
     result = np.fft.ifft(preifft)
     

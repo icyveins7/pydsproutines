@@ -7,6 +7,66 @@ Created on Sat Mar  7 17:03:53 2020
 
 import numpy as np
 import scipy as sp
+import cupy as cp
+
+GPU_RAM_LIM_BYTES = 6e9 # use to roughly judge if it will fit
+
+
+def cp_fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absResult=True):
+    """
+    Equivalent to fastXcorr, designed to run on gpu.
+    """
+    
+    if shifts is None:
+        shifts = np.arange(len(rx)-len(cutout)+1)
+    
+    # common numbers in all consequent methods
+    cutoutNorm = np.linalg.norm(cutout)
+    cutoutNormSq = cutoutNorm**2.0
+    
+    if not freqsearch:
+        print('Not implemented.')
+        
+    elif not outputCAF:
+        print('Frequency scanning, but no CAF output (flattened to time)..')
+        h_freqlist = np.zeros(len(shifts),dtype=np.uint32)
+        d_freqlist = np.zeros(len(shifts),dtype=cp.uint32)
+        
+        if absResult is True:
+            print('Returning normalized QF^2 real values..')
+            h_result = np.zeros(len(shifts),dtype=np.float64)
+            d_result = np.zeros(len(shifts),dtype=cp.float64)
+
+            # first copy the data in
+            BATCH = 64
+            d_cutout = cp.asarray(cutout)
+            d_rx = cp.asarray(d_rx)
+            
+            numIter = len(shifts)/BATCH
+
+            for i in range(len(shifts)):
+                s = shifts[i]
+                pdt = rx[s:s+len(cutout)] * cutout.conj()
+                pdtfft = sp.fft(pdt)
+                pdtfftsq = pdtfft**2.0
+                imax = np.argmax(np.abs(pdtfftsq))
+                freqlist[i] = imax
+                pmax = np.abs(pdtfftsq[imax])
+    
+                rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
+                result[i] = pmax/cutoutNormSq/rxNormPartSq
+                
+            return result, freqlist
+        
+        else:
+            
+            print('Not implemented.')
+            
+    else:
+        print('Not implemented.')
+        
+        
+
 
 def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absResult=True):
     """

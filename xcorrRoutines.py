@@ -8,6 +8,7 @@ Created on Sat Mar  7 17:03:53 2020
 import numpy as np
 import scipy as sp
 import cupy as cp
+from signalCreationRoutines import makeFreq
 
 GPU_RAM_LIM_BYTES = 6e9 # use to roughly judge if it will fit
 
@@ -195,29 +196,32 @@ def fineFreqTimeSearch(x_aligned, y_aligned, fineRes, freqfound, freqRes, fs, td
     Then, using the new value for the fine frequency alignment, the two arrays are then sub-sample time aligned.
     '''
     
-    # compute best freq
-    for i in range(len(fineRes)):
-        fineFreq = np.arange(freqfound-freqRes, freqfound+freqRes, fineRes)
+    if len(fineRes) > 0:
+        # compute best freq
+        for i in range(len(fineRes)):
+            fineFreq = np.arange(freqfound-freqRes, freqfound+freqRes, fineRes[i])
+            
+            precomputed = y_aligned.conj() * x_aligned
+            pp = np.zeros(len(fineFreq), dtype=np.complex128)
+            fineshifts = np.zeros((len(fineFreq), len(x_aligned)), dtype=np.complex128)
+            for j in range(len(fineFreq)):
+                fineshifts[j] = np.exp(1j*2*np.pi*-fineFreq[j]*np.arange(len(x_aligned))/fs)
+            
+                pp[j] = np.vdot(precomputed,fineshifts[j])
+            
+            fineFreq_ind = np.argmax(np.abs(pp))
+            freqfound = fineFreq[fineFreq_ind]
+            
+        finefreqfound = freqfound
         
-        precomputed = y_aligned.conj() * x_aligned
-        pp = np.zeros(len(fineFreq))
-        fineshifts = np.zeros(len(fineFreq), len(x_aligned))
-        for j in range(len(fineFreq)):
-            fineshifts[j] = np.exp(1j*2*np.pi*-fineFreq[j]*np.arange(len(x_aligned))/fs)
-        
-            pp[j] = np.vdot(precomputed,fineshifts[j])
-        
-        fineFreq_ind = np.argmax(np.abs(pp))
-        freqfound = fineFreq[fineFreq_ind]
-        
-    finefreqfound = freqfound
+        x_aligned = x_aligned * fineshifts[fineFreq_ind]
+    else:
+        finefreqfound = None
         
     # compute best time alignment
     if steeringvec is None:
-        steeringvec = makeTimeScanSteervec(td_scan_range)
-    
-    x_aligned = x_aligned * fineshifts[fineFreq_ind]
-    
+        steeringvec = makeTimeScanSteervec(td_scan_range, fs, len(x_aligned))
+
     x_fft = np.fft.fft(x_aligned)
     y_fft = np.fft.fft(y_aligned)
     rx_vec = x_fft * y_fft.conj()
@@ -226,11 +230,14 @@ def fineFreqTimeSearch(x_aligned, y_aligned, fineRes, freqfound, freqRes, fs, td
     idx_td = np.argmax(np.abs(cost_vec))
     timediff = td_scan_range[idx_td]
     
-    return finefreqfound, timediff
+    return finefreqfound, timediff, cost_vec
     
-def makeTimeScanSteervec(td_scan_range):
-    print('not yet implemented')
-    return 1
+def makeTimeScanSteervec(td_scan_range, fs, siglen):
+    sigFreq = makeFreq(siglen, fs)
+    
+    mat = np.exp(1j*2*np.pi*sigFreq * td_scan_range.reshape((-1,1)))
+    
+    return mat
 
 def convertQF2toSNR(qf2):
     """For xcorr against pure signal."""

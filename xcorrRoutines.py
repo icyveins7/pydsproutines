@@ -13,10 +13,14 @@ from signalCreationRoutines import makeFreq
 GPU_RAM_LIM_BYTES = 6e9 # use to roughly judge if it will fit
 
 
-def cp_fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absResult=True):
+def cp_fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absResult=True, BATCH=1024):
     """
     Equivalent to fastXcorr, designed to run on gpu.
     """
+    
+    # need both to be same type, maintain the type throughout
+    if cutout.dtype is not rx.dtype:
+        raise Exception("Cutout and Rx must be same type, please cast one of them manually.")
     
     if shifts is None:
         shifts = np.arange(len(rx)-len(cutout)+1)
@@ -29,35 +33,66 @@ def cp_fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, abs
         print('Not implemented.')
         
     elif not outputCAF:
-        print('Frequency scanning, but no CAF output (flattened to time)..')
-        h_freqlist = np.zeros(len(shifts),dtype=np.uint32)
-        d_freqlist = np.zeros(len(shifts),dtype=cp.uint32)
         
         if absResult is True:
+            print('Frequency scanning, but no CAF output (flattened to time)..')
+            # h_freqlist = np.zeros(len(shifts),dtype=np.uint32)
+            d_freqlist = cp.zeros(len(shifts),dtype=cp.uint32)
+        
+        
             print('Returning normalized QF^2 real values..')
-            h_result = np.zeros(len(shifts),dtype=np.float64)
-            d_result = np.zeros(len(shifts),dtype=cp.float64)
+            # h_result = np.zeros(len(shifts),dtype=np.float64)
+            d_result = cp.zeros(len(shifts),dtype=cp.float64)
 
             # first copy the data in
-            BATCH = 64
             d_cutout = cp.asarray(cutout)
-            d_rx = cp.asarray(d_rx)
+            d_rx = cp.asarray(rx)
             
-            numIter = len(shifts)/BATCH
-
-            for i in range(len(shifts)):
-                s = shifts[i]
-                pdt = rx[s:s+len(cutout)] * cutout.conj()
-                pdtfft = sp.fft(pdt)
-                pdtfftsq = pdtfft**2.0
-                imax = np.argmax(np.abs(pdtfftsq))
-                freqlist[i] = imax
-                pmax = np.abs(pdtfftsq[imax])
-    
-                rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0
-                result[i] = pmax/cutoutNormSq/rxNormPartSq
+            numIter = int(np.ceil(len(shifts)/BATCH))
+            
+            # allocate data arrays on gpu
+            d_pdt_batch = cp.zeros((BATCH,len(cutout)), dtype=cp.complex128) # let's try using it in place all the way
+            d_rxNormPartSq_batch = cp.zeros((BATCH), dtype=cp.float64)
+            
+            # now iterate over the number of iterations required
+            print("Starting cupy loop")
+            for i in range(numIter):
+                if i == numIter-1: # on the last iteration, may have to clip
+                    # print("FINAL BATCH")
+                    TOTAL_THIS_BATCH = len(shifts) - BATCH * (numIter-1)
+                else:
+                    TOTAL_THIS_BATCH = BATCH
+                # print(i)
+                # print (TOTAL_THIS_BATCH)
+                    
+                for k in range(TOTAL_THIS_BATCH):
+                    s = shifts[i*BATCH + k]
+                    
+                    d_pdt_batch[k] = d_rx[s:s+len(cutout)] * d_cutout.conj()
+                    
+                    d_rxNormPartSq_batch[k] = cp.linalg.norm(d_rx[s:s+len(cutout)])**2.0
+                    
+                # perform the fft (row-wise is done automatically)
+                d_pdtfft_batch = cp.fft.fft(d_pdt_batch)
+                d_pdtfft_batch = cp.abs(d_pdtfft_batch**2.0) # is now abs(pdtfftsq)
                 
-            return result, freqlist
+                imax = cp.argmax(d_pdtfft_batch, axis=-1) # take the arg max for each row
+                
+                # assign to d_freqlist output by slice
+                d_freqlist[i*BATCH : i*BATCH + TOTAL_THIS_BATCH] = imax[:TOTAL_THIS_BATCH]
+                
+                
+                # assign to d_result
+                for k in range(TOTAL_THIS_BATCH):    
+                    d_result[i*BATCH + k] = d_pdtfft_batch[k, imax[k]] / d_rxNormPartSq_batch[k] / cutoutNormSq
+                    
+            
+            
+            # copy all results back
+            h_result = cp.asnumpy(d_result)
+            h_freqlist = cp.asnumpy(d_freqlist)
+                
+            return h_result, h_freqlist
         
         else:
             

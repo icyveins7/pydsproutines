@@ -79,13 +79,13 @@ def addManySigToNoise(noiseLen, sigStartIdxList, signalList, bw_signal, chnBW, s
         for i in range(rx.shape[0]):
             rx[i][sigStartIdxList[i] : len(signalList[i]) + sigStartIdxList[i]] = signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0])
     else: # otherwise for subsample, move using the function
-        raise Exception("CURRENTLY DEBUGGING THIS MODE")
-        # for i in range(rx.shape[0]):
-        #     rx[i][:len(signalList[i])] =  signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0]) # set to 0
+        # raise Exception("CURRENTLY DEBUGGING THIS MODE")
+        for i in range(rx.shape[0]):
+            rx[i][:len(signalList[i])] =  signalList[i] * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0]) # set to 0
             
-        # ssTime = time.time()
-        # rx = propagateSignal(rx, sigStartTimeList, chnBW, freq=None, tone=None) # then propagate required amount
-        # print('Subsample propagation took %fs.' % (time.time()-ssTime))
+        ssTime = time.time()
+        rx = propagateSignal(rx, sigStartTimeList, chnBW, freq=None, tone=None) # then propagate required amount
+        print('Subsample propagation took %fs.' % (time.time()-ssTime))
         
     if fshifts is not None:
         

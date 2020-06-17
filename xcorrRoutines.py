@@ -13,7 +13,7 @@ from signalCreationRoutines import makeFreq
 GPU_RAM_LIM_BYTES = 6e9 # use to roughly judge if it will fit
 
 
-def cp_fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absResult=True, BATCH=1024):
+def cp_fastXcorr(cutout, rx, freqsearch=True, outputCAF=False, shifts=None, absResult=True, BATCH=1024):
     """
     Equivalent to fastXcorr, designed to run on gpu.
     """

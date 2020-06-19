@@ -37,11 +37,12 @@ def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
     Adds a new window with a surface plot and a grid item.
     
     Returns
-    w = window item
+    w = view widget item
     g = grid item
     p = plot item
     '''
     
+    # win = pg.GraphicsWindow()
     w = gl.GLViewWidget()
     w.show()
     w.setWindowTitle(title)
@@ -53,7 +54,7 @@ def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
         sy = np.max(np.abs(y))
         g.scale(sx,sy,1)
         
-        w.setCameraPosition(distance=np.max([sx,sy]))
+        w.setCameraPosition(distance=np.max([sx,sy]) * 2)
         
     g.setDepthValue(10)  # draw grid after surfaces since they may be translucent
     w.addItem(g)

@@ -282,6 +282,10 @@ def convertQF2toEffSNR(qf2):
     """For xcorr of two noisy signals."""
     return 2.0*qf2/(1.0-qf2)
 
+def convertEffSNRtoQF2(effSNR):
+    """For back-conversion."""
+    return effSNR/(2 + effSNR)
+
 def expectedEffSNR(snr1, snr2=None):
     """For calculating expected SNR of two noisy signals."""
     if snr2 is None:

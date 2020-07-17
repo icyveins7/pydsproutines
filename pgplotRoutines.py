@@ -11,7 +11,7 @@ import pyqtgraph.opengl as gl
 from PyQt5.QtCore import Qt
 import numpy as np
 
-def pgPlotDeltaFuncs(fig, x, h, color='r'):
+def pgPlotDeltaFuncs(fig, x, h, color='r', symbol=None):
     '''
     Adds delta function dashed lines to the specified pyqtgraph plot.
 
@@ -29,8 +29,11 @@ def pgPlotDeltaFuncs(fig, x, h, color='r'):
     None.
 
     '''
-    for i in x:
-        fig.plot([i,i], [0, h], pen=pg.mkPen(color=color, style=Qt.DashLine))
+    for i in range(len(x)):
+        if h[i] != 0:
+            fig.plot([x[i],x[i]], [0, h[i]], pen=pg.mkPen(color=color, style=Qt.DashLine))
+        if symbol is not None:
+            fig.plot([x[i]], [h[i]], symbol=symbol, symbolPen=color)
         
 def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
     '''

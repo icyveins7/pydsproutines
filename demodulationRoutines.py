@@ -55,10 +55,15 @@ def ML_demod_QPSK(y, h, up, numSyms):
         # convolve this test symbol set with the channel
         test = np.convolve(h, qpsk_syms_up)
         
-        # find the normalised dot product
+        # # find the normalised dot product
+        # test = test[up : up + len(y)]
+        # test_cost = np.vdot(y, test) / np.linalg.norm(y) / np.linalg.norm(test)
+        # cost[i] = np.abs(test_cost)**2.0
+        
+        # find the smallest norm difference
         test = test[up : up + len(y)]
-        test_cost = np.vdot(y, test) / np.linalg.norm(y) / np.linalg.norm(test)
-        cost[i] = np.abs(test_cost)**2.0
+        test_cost = np.linalg.norm(test - y)
+        cost[i] = -test_cost # minus to maintain the maximization criterion
     
         
         # print(base_4_repr)

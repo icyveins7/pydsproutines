@@ -9,6 +9,7 @@ import numpy as np
 import scipy as sp
 import scipy.signal as sps
 import time
+import sympy
 
 from numba import jit
 # jit not used if not supported like in randint, or just slower..
@@ -216,6 +217,29 @@ def propagateSignalExact(sig, tau_n):
     result = np.fft.ifft(p)
     
     return result
+
+def padZeros_fftfactors(sig, minpad, fftprimeMax=7):
+    lensig = len(sig)
+    
+    totallen = lensig + minpad-1
+    found = False
+    
+    while not found:
+        totallen = totallen + 1
+        
+        d = sympy.ntheory.factorint(totallen)
+        
+        found = True # start by assuming this is correct
+        for i in d.keys():
+            if i > fftprimeMax: # if any of them exceed then this test fails 
+                found = False
+    
+    # after the loop just return everything
+    padlen = totallen - lensig
+    out = np.pad(sig, [0, padlen])
+    
+    return out, padlen, d
+    
     
 @jit(nopython=True)
 def makeFreq(length, fs):

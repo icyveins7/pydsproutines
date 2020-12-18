@@ -71,7 +71,7 @@ def createLinearTrajectory(pos1, pos2, stepArray, pos_start=None, randomWalk=Non
     return result
 
 def createCircularTrajectory(totalSamples, r_a=100000.0, desiredSpeed=100.0, r_h=300.0, sampleTime=3.90625e-6):    
-    #%% initialize a bunch of rx points in a circle in 3d
+    # initialize a bunch of rx points in a circle in 3d
     dtheta_per_s = desiredSpeed/r_a # rad/s
     arcangle = totalSamples * sampleTime * dtheta_per_s # rad
     r_theta = np.arange(0,arcangle,dtheta_per_s * sampleTime)
@@ -87,4 +87,26 @@ def createCircularTrajectory(totalSamples, r_a=100000.0, desiredSpeed=100.0, r_h
     r_xdot = np.vstack((r_xdot_x,r_xdot_y,r_xdot_z)).transpose()
     
     return r_x, r_xdot, arcangle, dtheta_per_s
+
+def calcFOA(r_x, r_xdot, t_x, t_xdot, freq=30e6):
+    '''
+    Expects individual row vectors.
+    All numpy array shapes expected to match.
+    '''
+    
+    lightspd = 299792458.0
+    
+    radial = t_x - r_x # convention pointing towards transmitter
+    radial_n = radial / np.linalg.norm(radial,axis=1).reshape((-1,1)) # don't remove this reshape, nor the axis arg
+    
+    if radial_n.ndim == 1:
+        vradial = np.dot(radial_n, r_xdot) - np.dot(radial_n, t_xdot) # minus or plus?
+    else:
+        vradial = np.zeros(len(radial_n))
+        for i in range(len(radial_n)):
+            vradial[i] = np.dot(radial_n[i,:],r_xdot[i,:]) - np.dot(radial_n[i,:], t_xdot[i,:])
+    
+    foa = vradial/lightspd * freq
+    
+    return foa
     

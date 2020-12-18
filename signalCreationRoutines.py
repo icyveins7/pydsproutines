@@ -202,6 +202,20 @@ def propagateSignal(sig, time, fs, freq=None, tone=None):
         print('Returning shifted signal + tone used.')
         return result * tone, tone
     
+def propagateSignalExact(sig, tau_n):
+    # take the fft of signal
+    fftsig = np.fft.fft(sig)
+    
+    # create the extra complex exponential
+    phaseterm = np.exp(1j*2*np.pi*np.arange(len(fftsig)) * -tau_n/len(fftsig))
+    
+    # multiply in
+    p = fftsig * phaseterm
+    
+    # ifft back
+    result = np.fft.ifft(p)
+    
+    return result
     
 @jit(nopython=True)
 def makeFreq(length, fs):

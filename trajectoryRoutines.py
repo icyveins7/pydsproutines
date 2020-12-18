@@ -69,3 +69,22 @@ def createLinearTrajectory(pos1, pos2, stepArray, pos_start=None, randomWalk=Non
     result = pos0.reshape((-1,1)) + displacements
     
     return result
+
+def createCircularTrajectory(totalSamples, r_a=100000.0, desiredSpeed=100.0, r_h=300.0, sampleTime=3.90625e-6):    
+    #%% initialize a bunch of rx points in a circle in 3d
+    dtheta_per_s = desiredSpeed/r_a # rad/s
+    arcangle = totalSamples * sampleTime * dtheta_per_s # rad
+    r_theta = np.arange(0,arcangle,dtheta_per_s * sampleTime)
+    
+    r_x_x = r_a * np.cos(r_theta)
+    r_x_y = r_a * np.sin(r_theta)
+    r_x_z = np.zeros(len(r_theta)) + r_h
+    r_x = np.vstack((r_x_x,r_x_y,r_x_z)).transpose()
+    
+    r_xdot_x = r_a * -np.sin(r_theta) * dtheta_per_s
+    r_xdot_y = r_a * np.cos(r_theta) * dtheta_per_s
+    r_xdot_z = np.zeros(len(r_theta))
+    r_xdot = np.vstack((r_xdot_x,r_xdot_y,r_xdot_z)).transpose()
+    
+    return r_x, r_xdot, arcangle, dtheta_per_s
+    

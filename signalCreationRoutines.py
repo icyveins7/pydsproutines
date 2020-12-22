@@ -207,16 +207,34 @@ def propagateSignalExact(sig, tau_n):
     # take the fft of signal
     fftsig = np.fft.fft(sig)
     
-    # create the extra complex exponential
-    phaseterm = np.exp(1j*2*np.pi*np.arange(len(fftsig)) * -tau_n/len(fftsig))
+    # pre-allocate
+    result = np.zeros(len(sig), dtype=sig.dtype)
     
-    # multiply in
-    p = fftsig * phaseterm
-    
-    # ifft back
-    result = np.fft.ifft(p)
-    
+    # loop over n values of sig
+    N = len(sig)
+    for n in range(N):
+        ni = n - tau_n[n]
+        
+        pseudotone = np.exp(1j * 2 * np.pi * ni * np.arange(len(sig)) / N)
+        
+        p = 1 / N * pseudotone * fftsig
+        
+        result[n] = np.sum(p)
+        
     return result
+    
+    
+    # # ===================
+    # # create the extra complex exponential
+    # phaseterm = np.exp(1j*2*np.pi*np.arange(len(fftsig)) * -tau_n/len(fftsig))
+    
+    # # multiply in
+    # p = fftsig * phaseterm
+    
+    # # ifft back
+    # result = np.fft.ifft(p)
+    
+    # return result
 
 def padZeros_fftfactors(sig, minpad, fftprimeMax=7):
     lensig = len(sig)

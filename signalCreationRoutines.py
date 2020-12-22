@@ -202,39 +202,27 @@ def propagateSignal(sig, time, fs, freq=None, tone=None):
     else:
         print('Returning shifted signal + tone used.')
         return result * tone, tone
-    
-def propagateSignalExact(sig, tau_n):
+
+def propagateSignalExact(sig, tau, fs):
     # take the fft of signal
     fftsig = np.fft.fft(sig)
     
     # pre-allocate
     result = np.zeros(len(sig), dtype=sig.dtype)
     
-    # loop over n values of sig
+    # loop over n values of sig, discrete version
     N = len(sig)
-    for n in range(N):
-        ni = n - tau_n[n]
+    for n in np.arange(N):
+        ntau = n/fs - tau[n]
         
-        pseudotone = np.exp(1j * 2 * np.pi * ni * np.arange(len(sig)) / N)
+        pseudotone = np.exp(1j * 2 * np.pi * ntau * makeFreq(N,fs))
         
-        p = 1 / N * pseudotone * fftsig
+        p = 1.0 / N * pseudotone * fftsig
         
         result[n] = np.sum(p)
         
+        
     return result
-    
-    
-    # # ===================
-    # # create the extra complex exponential
-    # phaseterm = np.exp(1j*2*np.pi*np.arange(len(fftsig)) * -tau_n/len(fftsig))
-    
-    # # multiply in
-    # p = fftsig * phaseterm
-    
-    # # ifft back
-    # result = np.fft.ifft(p)
-    
-    # return result
 
 def padZeros_fftfactors(sig, minpad, fftprimeMax=7):
     lensig = len(sig)

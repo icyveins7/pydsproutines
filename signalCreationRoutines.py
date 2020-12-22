@@ -210,7 +210,7 @@ def propagateSignalExact(sig, tau, fs):
     # pre-allocate
     result = np.zeros(len(sig), dtype=sig.dtype)
     
-    # loop over n values of sig, discrete version
+    # loop over n values of sig, continuous version
     N = len(sig)
     for n in np.arange(N):
         ntau = n/fs - tau[n]
@@ -220,7 +220,6 @@ def propagateSignalExact(sig, tau, fs):
         p = 1.0 / N * pseudotone * fftsig
         
         result[n] = np.sum(p)
-        
         
     return result
 

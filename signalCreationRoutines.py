@@ -203,7 +203,7 @@ def propagateSignal(sig, time, fs, freq=None, tone=None):
         print('Returning shifted signal + tone used.')
         return result * tone, tone
 
-def propagateSignalExact(sig, tau, fs):
+def propagateSignalExact(sig, tau, fs, f_c=0.0):
     # take the fft of signal
     fftsig = np.fft.fft(sig)
     
@@ -220,6 +220,10 @@ def propagateSignalExact(sig, tau, fs):
         p = 1.0 / N * pseudotone * fftsig
         
         result[n] = np.sum(p)
+        
+    # scale by the carrier frequency to induce the doppler
+    carrier = np.exp(-1j*2*np.pi*f_c*tau)
+    result = result * carrier
         
     return result
 

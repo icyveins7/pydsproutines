@@ -66,3 +66,42 @@ def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
     w.addItem(p)
     
     return w, g, p
+
+def pgPlotPhasorVsTime(complexData, color=(1.0,1.0,1.0,1.0), start=0, end=200, scale='auto', view=None):
+    
+    if view is None:
+        view = gl.GLViewWidget()
+        view.show()
+        ## create three grids, add each to the view
+        xgrid = gl.GLGridItem()
+        ygrid = gl.GLGridItem()
+        zgrid = gl.GLGridItem()
+        view.addItem(xgrid)
+        view.addItem(ygrid)
+        view.addItem(zgrid)
+        
+        ## create axis?
+        axis = gl.GLAxisItem()
+        view.addItem(axis)
+        
+        ## rotate x and y grids to face the correct direction
+        xgrid.rotate(90, 0, 1, 0)
+        ygrid.rotate(90, 1, 0, 0)
+        
+    plotdata = np.vstack((np.real(complexData.flatten()), np.arange(len(complexData)), np.imag(complexData.flatten()))).T
+    
+    if scale=='auto':
+        magicFactor = 10 # this is the number of squares you want it to fill really
+        scale = magicFactor / np.abs(end-start)
+        plotdata[:,1] = (plotdata[:,1]-start) * scale
+    else:
+        plotdata[:,1] = (plotdata[:,1]-start) * scale
+    
+    
+    lineItem = gl.GLLinePlotItem(pos = plotdata[start:end,:], color=color)
+    view.addItem(lineItem)
+    
+    # # print helpful things
+    # print("pyqtgraph uses mousewheel hold + drag to pan the camera.")
+    
+    return view

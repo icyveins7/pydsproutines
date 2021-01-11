@@ -10,6 +10,8 @@ import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from PyQt5.QtCore import Qt
 import numpy as np
+import matplotlib.pyplot as plt
+from signalCreationRoutines import makeFreq
 
 def pgPlotDeltaFuncs(fig, x, h, color='r', symbol=None):
     '''
@@ -105,3 +107,21 @@ def pgPlotPhasorVsTime(complexData, color=(1.0,1.0,1.0,1.0), start=0, end=200, s
     # print("pyqtgraph uses mousewheel hold + drag to pan the camera.")
     
     return view
+
+def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=None):    
+    fig = plt.figure(windowTitle)
+    ax = fig.add_subplot(111)
+    
+    for i in range(len(dataList)):
+        spec = 20*np.log10(np.abs(np.fft.fft(dataList[i])))
+        if colors is not None:
+            ax.plot(makeFreq(len(spec), fs[i]), spec, colors[i])
+        else:
+            ax.plot(makeFreq(len(spec), fs[i]), spec)
+        
+    if labels is not None:
+        plt.legend(labels)
+    
+    plt.title(title)
+    
+    return fig, ax

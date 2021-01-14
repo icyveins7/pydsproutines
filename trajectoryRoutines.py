@@ -74,7 +74,7 @@ def createCircularTrajectory(totalSamples, r_a=100000.0, desiredSpeed=100.0, r_h
     # initialize a bunch of rx points in a circle in 3d
     dtheta_per_s = desiredSpeed/r_a # rad/s
     arcangle = totalSamples * sampleTime * dtheta_per_s # rad
-    r_theta = np.arange(0,arcangle,dtheta_per_s * sampleTime)
+    r_theta = np.arange(0,arcangle,dtheta_per_s * sampleTime)[:totalSamples]
     
     r_x_x = r_a * np.cos(r_theta)
     r_x_y = r_a * np.sin(r_theta)

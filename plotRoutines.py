@@ -8,7 +8,7 @@ Created on Mon Apr 27 16:09:54 2020
 
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QRectF
 import numpy as np
 import matplotlib.pyplot as plt
 from signalCreationRoutines import makeFreq
@@ -68,6 +68,27 @@ def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
     w.addItem(p)
     
     return w, g, p
+
+def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None):
+    '''
+    This is a useful tool to overlay heatmaps onto normal scatter plots,
+    in the mathematical x-y axis (unlike the conventional image axis which has y-axis flipped).
+    
+    heatmap: 2-D array containing the data.
+    x0,y0 : coordinates of bottom-left most point.
+    width, height: scale of the heatmap.
+    '''
+    if window is None:
+        window = pg.plot()
+    
+    # create image item
+    img = pg.ImageItem(heatmap)
+    img.setRect(QRectF(x0,y0,width,height))
+    img.setZValue(-100) # to ensure it's behind everything else
+    window.addItem(img)
+    window.show()
+    
+    return window, img
 
 def pgPlotPhasorVsTime(complexData, color=(1.0,1.0,1.0,1.0), start=0, end=200, scale='auto', view=None):
     

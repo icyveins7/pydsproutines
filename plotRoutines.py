@@ -12,6 +12,8 @@ from PyQt5.QtCore import Qt, QRectF
 import numpy as np
 import matplotlib.pyplot as plt
 from signalCreationRoutines import makeFreq
+from matplotlib import cm
+from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 
 def pgPlotDeltaFuncs(fig, x, h, color='r', symbol=None):
     '''
@@ -85,6 +87,12 @@ def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None):
     img = pg.ImageItem(heatmap)
     img.setRect(QRectF(x0,y0,width,height))
     img.setZValue(-100) # to ensure it's behind everything else
+    
+    # pick one to turn into an actual colormap
+    # cm2use = pg.ColorMap(*zip(*Gradients["bipolar"]["ticks"])) # from pyqtgraph gradients
+    cm2use = pg.colormap.getFromMatplotlib('viridis')
+    img.setLookupTable(cm2use.getLookupTable())
+    
     window.addItem(img)
     window.show()
     

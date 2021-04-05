@@ -51,7 +51,7 @@ void gridsearchtdoa_kernel(int len, float *s1x_list, float *s2x_list,
                            int xn, int yn, float z,
                            float *cost_grid)
 {
-    // allocate shared memory for the fm_slice
+    // allocate shared memory
     extern __shared__ float s[];
     float *s_s1x_l = s; // (len * 3) floats
     float *s_s2x_l = (float*)&s_s1x_l[len * 3]; // (len * 3) floats

@@ -33,6 +33,11 @@ def pgPlotDeltaFuncs(fig, x, h, color='r', symbol=None):
     None.
 
     '''
+    
+    if not hasattr(h, "__len__"):
+        h = np.zeros(x.shape) + h
+        
+    
     for i in range(len(x)):
         if h[i] != 0:
             fig.plot([x[i],x[i]], [0, h[i]], pen=pg.mkPen(color=color, style=Qt.DashLine))

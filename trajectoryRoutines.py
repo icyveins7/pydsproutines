@@ -8,7 +8,6 @@ Created on Thu Apr 30 11:59:47 2020
 
 import numpy as np
 
-
 def createLinearTrajectory(pos1, pos2, stepArray, pos_start=None, randomWalk=None):
     '''
     Parameters
@@ -88,6 +87,7 @@ def createCircularTrajectory(totalSamples, r_a=100000.0, desiredSpeed=100.0, r_h
     
     return r_x, r_xdot, arcangle, dtheta_per_s
 
+
 def calcFOA(r_x, r_xdot, t_x, t_xdot, freq=30e6):
     '''
     Expects individual row vectors.
@@ -102,9 +102,14 @@ def calcFOA(r_x, r_xdot, t_x, t_xdot, freq=30e6):
     if radial_n.ndim == 1:
         vradial = np.dot(radial_n, r_xdot) - np.dot(radial_n, t_xdot) # minus or plus?
     else:
-        vradial = np.zeros(len(radial_n))
-        for i in range(len(radial_n)):
-            vradial[i] = np.dot(radial_n[i,:],r_xdot[i,:]) - np.dot(radial_n[i,:], t_xdot[i,:])
+        # vradial = np.zeros(len(radial_n))
+        # for i in range(len(radial_n)):
+        #     vradial[i] = np.dot(radial_n[i,:],r_xdot[i,:]) - np.dot(radial_n[i,:], t_xdot[i,:])
+        
+        # make distinct numpy calls instead of the loop
+        dot_radial_r = np.sum(radial_n * r_xdot, axis=1)
+        dot_radial_t = np.sum(radial_n * t_xdot, axis=1)
+        vradial = dot_radial_r - dot_radial_t
     
     foa = vradial/lightspd * freq
     

@@ -44,12 +44,11 @@ def czt(x, f1, f2, binWidth, fs):
     fy = fy * fv
     g = np.fft.ifft(fy)
     
-    g = g[m:m+k] * ww[m:m+k]
+    g = g[m-1:m+k-1] * ww[m-1:m+k-1]
     
     return g
 
-
-def dft(x, freqs):
+def dft(x, freqs, fs):
     '''
 
     Parameters
@@ -64,7 +63,11 @@ def dft(x, freqs):
     Array of DFT bin values for input frequencies.
 
     '''
-    tones = np.exp(-1j*2*np.pi*freqs.reshape((-1,1))*np.arange(len(x))/fs)
-    output = tones @ x
+    
+    output = np.zeros(len(freqs),dtype=np.complex128)
+    for i in np.arange(len(freqs)):
+        freq = freqs[i]
+        tone = np.exp(-1j*2*np.pi*freq*np.arange(len(x))/fs)
+        output[i] = np.dot(tone, x)
     
     return output

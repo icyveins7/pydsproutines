@@ -15,7 +15,7 @@ from signalCreationRoutines import makeFreq
 from matplotlib import cm
 from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 
-def pgPlotDeltaFuncs(fig, x, h, color='r', symbol=None):
+def pgPlotDeltaFuncs(fig, x, h, color='r', symbol=None, name=None):
     '''
     Adds delta function dashed lines to the specified pyqtgraph plot.
 
@@ -39,10 +39,15 @@ def pgPlotDeltaFuncs(fig, x, h, color='r', symbol=None):
         
     
     for i in range(len(x)):
+        if i == 0: # use a uniform legend for all the delta points otherwise will flood the legend
+            legendname = name
+        else:
+            legendname = None
+            
         if h[i] != 0:
-            fig.plot([x[i],x[i]], [0, h[i]], pen=pg.mkPen(color=color, style=Qt.DashLine))
+            fig.plot([x[i],x[i]], [0, h[i]], pen=pg.mkPen(color=color, style=Qt.DashLine), name=legendname)
         if symbol is not None:
-            fig.plot([x[i]], [h[i]], symbol=symbol, symbolPen=color)
+            fig.plot([x[i]], [h[i]], symbol=symbol, symbolPen=color, symbolBrush=color, name=legendname)
         
 def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
     '''

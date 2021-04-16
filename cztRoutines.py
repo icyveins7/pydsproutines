@@ -16,8 +16,6 @@ def czt(x, f1, f2, binWidth, fs):
     a = i 2 pi (f1/fs)
     
     cztoptprep(len(x), n, w, a, nfft) # nfft custom to >len(x)+n-1
-    
-    there seems to be a misalignment issue. 1 element off when compared with dft output
     '''
     
     k = int((f2-f1)/binWidth + 1)

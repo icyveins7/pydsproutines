@@ -114,4 +114,80 @@ def calcFOA(r_x, r_xdot, t_x, t_xdot, freq=30e6):
     foa = vradial/lightspd * freq
     
     return foa
+
+def createTriangularSpacedPoints(dist: float, startPt: np.ndarray, numPts: int):
+    '''
+    Spawns locations in a set, beginning with startPt. Each location is spaced 
+    'dist' apart from any other location, e.g.
     
+       2      1
+    
+    3     O      0
+    
+       4      5
+       
+    The alignment is in the shape of triangles. The order of generation is anticlockwise as shown.
+    
+    '''
+    
+    if numPts < 2:
+        raise Exception("Please specify at least 2 points.")
+        
+    origin = np.array([0.0,0.0])
+    
+    ptList = [origin]
+    
+    dirVecs = np.array([[1.0,0.0],
+                     [0.5,np.sqrt(3)/2],
+                     [-0.5,np.sqrt(3)/2],
+                     [-1.0,0.0],
+                     [-0.5,-np.sqrt(3)/2],
+                     [0.5,-np.sqrt(3)/2],
+                     [1.0,0.0]]) * dist # cyclical to ensure indexing later on
+    
+    layer1ptr = 0
+    turnLayer = 0
+    i = 1
+    while i < numPts:
+        idx = i - 1 # we go back to 0-indexing
+        
+        # test for layer
+        layer = 1
+        while idx >= (layer+1)*(layer/2)*6:
+            layer += 1
+            
+        # print("i: %d, idx: %d, layer: %d"% (i,idx,layer)) # verbose index printing
+        
+        if layer == 1: # then it's simple, just take the genVec and propagate
+            newPt = origin + dirVecs[idx]
+            ptList.append(newPt)
+            i += 1
+        else:
+            # use the pointer at layer 1
+            layerptr = origin + dirVecs[layer1ptr]
+            
+            if turnLayer == 0: # go straight all the way
+                for d in range(layer-1):
+                    layerptr = layerptr + dirVecs[layer1ptr]
+                ptList.append(np.copy(layerptr))
+                turnLayer = layer - 1 # now set it to turn
+            else:
+                for d in range(turnLayer-1): # go straight for some layers
+                    layerptr = layerptr + dirVecs[layer1ptr]
+                for d in range(layer - turnLayer):
+                    layerptr = layerptr + dirVecs[layer1ptr+1]
+                ptList.append(np.copy(layerptr))
+                turnLayer = turnLayer - 1 # decrement
+                if turnLayer == 0: # if we have hit turnLayer 0, time to move the layer1ptr
+                    layer1ptr = (layer1ptr + 1) % 6
+                    
+            
+            i+=1
+            
+    # swap to array for cleanliness
+    ptList = np.array(ptList)
+    ptList = ptList + startPt # move the origin
+
+    return ptList
+            
+        

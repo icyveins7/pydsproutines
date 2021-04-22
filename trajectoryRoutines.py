@@ -5,8 +5,9 @@ Created on Thu Apr 30 11:59:47 2020
 @author: Seo
 """
 
-
+import time
 import numpy as np
+import cupy as cp
 
 def createLinearTrajectory(pos1, pos2, stepArray, pos_start=None, randomWalk=None):
     '''
@@ -92,27 +93,31 @@ def calcFOA(r_x, r_xdot, t_x, t_xdot, freq=30e6):
     '''
     Expects individual row vectors.
     All numpy array shapes expected to match.
+    
+    Assumed that arrays are either all cupy arrays or all numpy arrays,
+    operates agnostically using cupy/numpy.
     '''
+    xp = cp.get_array_module(r_x)
     
     lightspd = 299792458.0
     
     radial = t_x - r_x # convention pointing towards transmitter
-    radial_n = radial / np.linalg.norm(radial,axis=1).reshape((-1,1)) # don't remove this reshape, nor the axis arg
+    radial_n = radial / xp.linalg.norm(radial,axis=1).reshape((-1,1)) # don't remove this reshape, nor the axis arg
     
     if radial_n.ndim == 1:
-        vradial = np.dot(radial_n, r_xdot) - np.dot(radial_n, t_xdot) # minus or plus?
+        vradial = xp.dot(radial_n, r_xdot) - xp.dot(radial_n, t_xdot) # minus or plus?
     else:
         # vradial = np.zeros(len(radial_n))
         # for i in range(len(radial_n)):
         #     vradial[i] = np.dot(radial_n[i,:],r_xdot[i,:]) - np.dot(radial_n[i,:], t_xdot[i,:])
         
         # make distinct numpy calls instead of the loop
-        dot_radial_r = np.sum(radial_n * r_xdot, axis=1)
-        dot_radial_t = np.sum(radial_n * t_xdot, axis=1)
+        dot_radial_r = xp.sum(radial_n * r_xdot, axis=1)
+        dot_radial_t = xp.sum(radial_n * t_xdot, axis=1)
         vradial = dot_radial_r - dot_radial_t
-    
+
     foa = vradial/lightspd * freq
-    
+
     return foa
 
 def createTriangularSpacedPoints(numPts: int, dist: float=1.0,  startPt: np.ndarray=np.array([0,0])):

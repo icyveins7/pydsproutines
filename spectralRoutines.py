@@ -69,3 +69,15 @@ def dft(x, freqs, fs):
         output[i] = np.dot(tone, x)
     
     return output
+
+def toneSpectrum(f0, freqs, fs, N, phi=0, A=1.0):
+    '''
+    Returns a spectrum corresponding to applying DFT to a tone with frequency f0 and phase phi,
+    at values specified by the 'freqs' array.
+    
+    See the tone reproduction notebook for details.
+    '''
+    
+    vals = -1j * A * (1 - np.exp(-1j*2*np.pi*(freqs-f0)*N/fs))/(2*np.pi*(freqs-f0)/fs) * np.exp(1j*phi)
+    
+    return vals

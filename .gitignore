@@ -2,3 +2,5 @@
 *.exp
 *.lib
 *.obj
+*.pyc
+.ipynb_checkpoints/

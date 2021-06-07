@@ -5,6 +5,10 @@ Created on Mon Jun  7 11:55:54 2021
 @author: Seo
 """
 
+# Note that this is faster when comparing purepython to purepython with the softvit function earlier,
+# BUT ONLY with all numba disabled (remember to disable it for Fmat_direct_slice as well, which gets called)
+# timings are ~0.35 for this, ~1.35 for the softvit i.e. this is faster for pure python, need to test numba
+
 import numpy as np
 import scipy as sp
 import scipy.signal as sps
@@ -42,8 +46,10 @@ class ViterbiDemodulator:
         
         # Construct paths
         paths = np.zeros((self.alphabetlen, pathlen), dtype=self.alphabet.dtype)
+        self.temppaths = np.zeros_like(paths)
         # Construct path metrics
         pathmetrics = np.zeros(self.alphabetlen, dtype=np.float64) + np.inf
+        self.temppathmetrics = np.zeros_like(pathmetrics)
         
         # Construct the first symbol path metric
         for a in np.arange(self.alphabetlen):
@@ -55,7 +61,7 @@ class ViterbiDemodulator:
             # KEEP IT SIMPLE FOR NOW, UPSAMPLE THE WHOLE PATH
             upguess = np.zeros(pathlen * self.up, dtype=paths.dtype)
             upguess[::self.up] = guess
-            print(upguess[:self.up*2])
+            # print(upguess[:self.up*2])
             
             # Loop over all sources
             x_all = np.zeros((self.L, self.pulselen), dtype=np.complex128)
@@ -68,11 +74,11 @@ class ViterbiDemodulator:
                 
             summed = np.sum(x_all, axis=0)
             
-            print("Writing to pathmetric[%d]" % (a))
+            # print("Writing to pathmetric[%d]" % (a))
             pathmetrics[a] = np.linalg.norm(y[0*self.up:1*self.up] - summed[:self.up])**2
             
-        print(pathmetrics)
-        print(paths)
+        # print(pathmetrics)
+        # print(paths)
         
         # Iterate over the rest of the symbols
         for n in np.arange(1, pathlen):
@@ -82,7 +88,7 @@ class ViterbiDemodulator:
             # Extract and update best paths
             self.calcPathMetrics(shortbranchmetrics, branchmetrics, paths, pathmetrics, n)
             
-            if n == 244:
+            if n == 20:
                 break
             
             # print("--------------------------")
@@ -102,6 +108,10 @@ class ViterbiDemodulator:
         branchmetrics = np.zeros(self.pretransitions.shape)
         shortbranchmetrics = np.zeros_like(branchmetrics)
         
+        # Preallocate vectors
+        guess = np.zeros(paths.shape[1], dtype=paths.dtype)
+        upguess = np.zeros(pathlen * self.up, dtype=paths.dtype)
+        
         # Select the current symbol
         for p in np.arange(paths.shape[0]):
             # Select a valid pre-transition path
@@ -116,12 +126,14 @@ class ViterbiDemodulator:
                     shortbranchmetrics[p,t] = np.inf
                     continue
                 
-                guess = np.copy(paths[self.pretransitions[p,t]])
+                # guess = np.copy(paths[self.pretransitions[p,t]]) # move this out of the loop without a copy, set values in here
+                guess[:] = paths[self.pretransitions[p,t]] # like this
                 guess[n] = self.alphabet[p]
                 # print("Guess:")
                 # print(guess)
                 # KEEP IT SIMPLE FOR NOW, UPSAMPLE THE WHOLE PATH
-                upguess = np.zeros(pathlen * self.up, dtype=paths.dtype)
+                # upguess = np.zeros(pathlen * self.up, dtype=paths.dtype) # move this out of the loop and set values
+                upguess[:] = 0 # zero out first
                 upguess[::self.up] = guess
                 # print(upguess[:n*self.up+1:self.up])
                 # assert(np.all(upguess[::self.up] == guess))
@@ -151,20 +163,23 @@ class ViterbiDemodulator:
     
     
     def calcPathMetrics(self, shortbranchmetrics, branchmetrics, paths, pathmetrics, n):
-        paths2 = np.copy(paths)
-        pathmetrics2 = np.copy(pathmetrics)
+
+        self.temppaths[:,:] = paths[:,:]
+        self.temppathmetrics[:] = pathmetrics[:]
         
         for p in np.arange(branchmetrics.shape[0]):
+
             if np.all(branchmetrics[p,:] == np.inf):
-                pathmetrics2[p] = np.inf
+                self.temppathmetrics[p] = np.inf
                 continue
             bestPrevIdx = np.argmin(branchmetrics[p,:])
-            paths2[p,:] = paths[self.pretransitions[p,bestPrevIdx],:] # copy the whole path over
-            paths2[p,n] = self.alphabet[p]
-            pathmetrics2[p] = pathmetrics[self.pretransitions[p,bestPrevIdx]] + shortbranchmetrics[p,bestPrevIdx]
+            self.temppaths[p,:] = paths[self.pretransitions[p,bestPrevIdx],:] # copy the whole path over
+            self.temppaths[p,n] = self.alphabet[p]
+            self.temppathmetrics[p] = pathmetrics[self.pretransitions[p,bestPrevIdx]] + shortbranchmetrics[p,bestPrevIdx]
             
-        paths[:,:] = paths2[:,:]
-        pathmetrics[:] = pathmetrics2[:]
+
+        paths[:,:] = self.temppaths[:,:]
+        pathmetrics[:] = self.temppathmetrics[:]
         
         # print("New paths:")
         # print(paths)

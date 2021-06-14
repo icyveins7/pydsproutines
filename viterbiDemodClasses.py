@@ -88,7 +88,7 @@ class ViterbiDemodulator:
             # Extract and update best paths
             self.calcPathMetrics(shortbranchmetrics, branchmetrics, paths, pathmetrics, n)
             
-            if n == 20:
+            if n == 30:
                 break
             
             # print("--------------------------")
@@ -109,7 +109,7 @@ class ViterbiDemodulator:
         shortbranchmetrics = np.zeros_like(branchmetrics)
         
         # Preallocate vectors
-        guess = np.zeros(paths.shape[1], dtype=paths.dtype)
+        guess = np.zeros(pathlen, dtype=paths.dtype)
         upguess = np.zeros(pathlen * self.up, dtype=paths.dtype)
         
         # Select the current symbol
@@ -139,10 +139,19 @@ class ViterbiDemodulator:
                 # assert(np.all(upguess[::self.up] == guess))
                 
                 # Loop over all sources
+                s = np.max([n*self.up - self.pulselen + 1,0])
                 x_all = np.zeros((self.L, self.pulselen), dtype=np.complex128)
                 for i in np.arange(self.L): 
-                    s = np.max([n*self.up - self.pulselen,0])
-                    xc = np.convolve(self.pulses[i], upguess[s:n*self.up+1])[-self.pulselen:]
+                    
+                    # # this is equivalent, as tested below
+                    upguesspad = np.pad(upguess[s:n*self.up+1], (0,self.pulselen-1)) # pad zeros to pulselen-1
+                    xc = sps.lfilter(self.pulses[i], 1, upguesspad)[-self.pulselen:]
+                    
+                    # # original
+                    # xc2 = np.convolve(self.pulses[i], upguess[s:n*self.up+1])[-self.pulselen:]
+                    # if (not np.all(xc==xc2)):
+                    #     print("What$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+                    
                     # xc = np.convolve(self.pulses[i], upguess[n*self.up-self.pulselen:n*self.up+1])[-self.pulselen:]
                     # xcs = np.exp(1j*(-self.omegas[i]*np.arange(n*self.up,n*self.up+self.pulselen))) * xc
                     xcs = self.omegavectors[i,n*self.up:n*self.up+self.pulselen] * xc
@@ -181,10 +190,10 @@ class ViterbiDemodulator:
         paths[:,:] = self.temppaths[:,:]
         pathmetrics[:] = self.temppathmetrics[:]
         
-        # print("New paths:")
-        # print(paths)
-        # print("New pathmetrics")
-        # print(pathmetrics)
+        print("New paths:")
+        print(paths)
+        print("New pathmetrics")
+        print(pathmetrics)
         
     def genOmegaVectors(self, ylength):
         self.omegavectors = np.zeros((len(self.omegas),ylength),dtype=np.complex128)

@@ -4,3 +4,6 @@
 *.obj
 *.pyc
 .ipynb_checkpoints/
+*.bin
+*.exe
+

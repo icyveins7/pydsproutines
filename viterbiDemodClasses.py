@@ -85,13 +85,23 @@ class ViterbiDemodulator:
             # Calculate all branches
             branchmetrics, shortbranchmetrics = self.calcAllBranchMetrics(y, paths, pathmetrics, n)
             
+            # print(branchmetrics)
+            # print(shortbranchmetrics)
+            
             # Extract and update best paths
             self.calcPathMetrics(shortbranchmetrics, branchmetrics, paths, pathmetrics, n)
             
-            if n == 30:
-                break
+            # if n == 20:
+            #     break
             
             # print("--------------------------")
+            
+        # get best path
+        bestPathIdx = np.argmin(pathmetrics)
+        bestPath = paths[bestPathIdx,:]
+        
+        return bestPath, pathmetrics, paths
+        
         
     def calcAllBranchMetrics(self, y, paths, pathmetrics, n):
         '''
@@ -119,12 +129,14 @@ class ViterbiDemodulator:
                 # if self.pretransitions[p,t] != 0: # DEBUG
                 #     continue
                 
-                # print("Alphabet %d->%d at index %d" % (self.pretransitions[p,t],p,n))
+                
                 if pathmetrics[self.pretransitions[p,t]] == np.inf:
                     # print("Pretransition is inf, skipping!")
                     branchmetrics[p,t] = np.inf
                     shortbranchmetrics[p,t] = np.inf
                     continue
+                
+                # print("Alphabet %d->%d at index %d" % (self.pretransitions[p,t],p,n))
                 
                 # guess = np.copy(paths[self.pretransitions[p,t]]) # move this out of the loop without a copy, set values in here
                 guess[:] = paths[self.pretransitions[p,t]] # like this
@@ -190,10 +202,10 @@ class ViterbiDemodulator:
         paths[:,:] = self.temppaths[:,:]
         pathmetrics[:] = self.temppathmetrics[:]
         
-        print("New paths:")
-        print(paths)
-        print("New pathmetrics")
-        print(pathmetrics)
+        # print("New paths:")
+        # print(paths)
+        # print("New pathmetrics")
+        # print(pathmetrics)
         
     def genOmegaVectors(self, ylength):
         self.omegavectors = np.zeros((len(self.omegas),ylength),dtype=np.complex128)

@@ -94,6 +94,16 @@ class ViterbiDemodulator:
             # if n == 20:
             #     break
             
+            # # DEBUG
+            # print("Branchmetrics")
+            # print(branchmetrics)
+            # print("Shortbranchmetrics")
+            # print(shortbranchmetrics)
+            # print("New paths:")
+            # print(paths)
+            # print("New pathmetrics")
+            # print(pathmetrics)
+        
             # print("--------------------------")
             
         # get best path
@@ -202,10 +212,7 @@ class ViterbiDemodulator:
         paths[:,:] = self.temppaths[:,:]
         pathmetrics[:] = self.temppathmetrics[:]
         
-        # print("New paths:")
-        # print(paths)
-        # print("New pathmetrics")
-        # print(pathmetrics)
+        
         
     def genOmegaVectors(self, ylength):
         self.omegavectors = np.zeros((len(self.omegas),ylength),dtype=np.complex128)

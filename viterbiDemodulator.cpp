@@ -21,6 +21,7 @@ class ViterbiDemodulator
 
 		// Settings (with defaults)
 		std::vector<Ipp8u> allowedStartSymbolIndices = { 0 };
+		bool useThreading = false;
 
 		// Useful constants
 		Ipp64fc inf64fc = { std::numeric_limits<double>::infinity() , std::numeric_limits<double>::infinity() };
@@ -33,8 +34,10 @@ class ViterbiDemodulator
 		std::vector<Ipp8u*> bufVec;
         
 		// Runtime vectors (resized in methods)
+		std::vector<ippe::vector<Ipp8u>> paths_index;
         std::vector<ippe::vector<Ipp64fc>> paths;
         ippe::vector<Ipp64f> pathmetrics;
+		std::vector<ippe::vector<Ipp8u>> temppaths_index;
 		std::vector<ippe::vector<Ipp64fc>> temppaths;
 		ippe::vector<Ipp64f> temppathmetrics;
 		
@@ -42,8 +45,9 @@ class ViterbiDemodulator
 		std::vector<std::vector<Ipp64f>> shortbranchmetrics;
 
 		// Workspace vectors
+		ippe::vector<Ipp8u> guess_index;
 		ippe::vector<Ipp64fc> guess;
-		ippe::vector<Ipp64fc> upguess;
+		//ippe::vector<Ipp64fc> upguess;
 
 		ippe::vector<Ipp64fc> x_sum;
 		std::vector<ippe::vector<Ipp64fc>> x_all;
@@ -131,6 +135,11 @@ class ViterbiDemodulator
 			}
 		}
 
+		void setUseThreading(bool in)
+		{
+			useThreading = in;
+		}
+
 		void printPathMetrics()
 		{
 			printf("Path metrics:\n");
@@ -195,16 +204,27 @@ class ViterbiDemodulator
 			// Pregenerate omega vectors
 			prepareOmegaVectors(ylength);
 
-			// Allocate paths/branchs and their metrics
+			// Allocate paths
+			paths_index.resize(alphabet.size());
 			paths.resize(alphabet.size());
+			temppaths_index.resize(alphabet.size());
 			temppaths.resize(alphabet.size());
+
 			for (int i = 0; i < paths.size(); i++) {
+				temppaths_index.at(i).resize(pathlen);
+				ippsSet_8u(IPP_MAX_8U, temppaths_index.at(i).data(), temppaths_index.at(i).size());
+				
+				paths_index.at(i).resize(pathlen);
+				ippsSet_8u(IPP_MAX_8U, paths_index.at(i).data(), paths_index.at(i).size());
+
 				paths.at(i).resize(pathlen);
 				ippsZero_64fc(paths.at(i).data(), paths.at(i).size());
+
 				temppaths.at(i).resize(pathlen);
 				ippsZero_64fc(temppaths.at(i).data(), temppaths.at(i).size());
 			}
 
+			// Allocate pathmetrics
 			pathmetrics.resize(alphabet.size());
 			temppathmetrics.resize(alphabet.size());
 			ippsSet_64f(std::numeric_limits<double>::infinity(), pathmetrics.data(), pathmetrics.size());
@@ -232,10 +252,11 @@ class ViterbiDemodulator
 				{
 					printf("Calculating first symbol path metric directly for index %d\n", a);
 
-					// Get the branch leading to this alphabet index
-					
-					paths.at(a).at(0) = alphabet.at(a);
-					calcBranchMetricSingle(0, y, paths.at(a));
+					paths_index.at(a).at(0) = a;
+					calcBranchMetricSingle(0, y, paths_index.at(a));
+
+					//paths.at(a).at(0) = alphabet.at(a);
+					//calcBranchMetricSingle(0, y, paths.at(a));
 
 					// Sum all the sources, along with the multiply of the omegavector
 					ippsZero_64fc(x_sum.data(), x_sum.size());
@@ -263,24 +284,20 @@ class ViterbiDemodulator
 				// Branches
 				calcBranchMetrics(y, n, pathlen);
 
-				//// Debug
-				//printBranchMetrics();
-
 				// Paths
 				calcPathMetrics(n);
 
 				//// Debug
+				//printBranchMetrics();
 				//printPathMetrics();
-
-				// Debug
-				if (n == 20) {
-					break;
-				}
 			}
 
 			auto t2 = std::chrono::high_resolution_clock::now();
 			auto timetaken = std::chrono::duration<double>(t2 - t1).count();
 			printf("Time taken for run = %f s.\n", timetaken);
+
+			// Dump output
+			dumpOutput();
 		}
 
 
@@ -289,55 +306,70 @@ class ViterbiDemodulator
 			// Select current symbol
 			for (int p = 0; p < alphabet.size(); p++)
 			{
-				// Select a pre-transition path
-				for (int t = 0; t < preTransitions.at(p).size(); t++) 
-				{
-					if (pathmetrics.at(preTransitions.at(p).at(t)) == std::numeric_limits<double>::infinity())
-					{
-						branchmetrics.at(p).at(t) = std::numeric_limits<double>::infinity();
-						shortbranchmetrics.at(p).at(t) = std::numeric_limits<double>::infinity();
-					}
-					else // Main process
-					{
-						//printf("%4d: Pre-transition %d->%d\n", n, preTransitions.at(p).at(t), p);
-						// Copy values over to guess
-						ippsCopy_64fc(paths.at(preTransitions.at(p).at(t)).data(), guess.data(), pathlen);
-						guess.at(n) = alphabet.at(p); // Set new value for this index
-
-						// Don't need this in C++!
-						//int uplen = upguess.size();
-						//int phase = 0;
-						//ippsSampleUp_64fc(guess, pathlen, upguess, &uplen, up, &phase);
-
-						calcBranchMetricSingle(n, y, guess);
-
-						// Sum all the sources, along with the multiply of the omegavector
-						ippsZero_64fc(x_sum.data(), x_sum.size());
-						for (int i = 0; i < numSrc; i++) {
-							ippsAddProduct_64fc(x_all.at(i).data(), &omegavectors.at(i).at(n*up), x_sum.data(), pulselen);
-						}
-
-						// Calculate the branchArray and the norms from it
-						ippsSub_64fc(x_sum.data(), &y[n*up], branchArray.data(), x_sum.size());
-						ippsNorm_L2_64fc64f(branchArray.data(), branchArray.size(), &branchmetrics.at(p).at(t));
-						ippsNorm_L2_64fc64f(branchArray.data(), up, &shortbranchmetrics.at(p).at(t));
-						
-						// Squaring done separately
-						branchmetrics.at(p).at(t) = branchmetrics.at(p).at(t) * branchmetrics.at(p).at(t);
-						shortbranchmetrics.at(p).at(t) = shortbranchmetrics.at(p).at(t) * shortbranchmetrics.at(p).at(t);
-
-						
-					}
-
-				} // end of loop over pretransition
+				// Inner function for looping over preTransitions for current symbol
+				calcBranchMetricsInner(p, y, n, pathlen);
 			} // end of loop over symbol
         }
+
+		void calcBranchMetricsInner(int p, Ipp64fc *y, int n, int pathlen)
+		{
+			// Select a pre-transition path
+			for (int t = 0; t < preTransitions.at(p).size(); t++)
+			{
+				if (pathmetrics.at(preTransitions.at(p).at(t)) == std::numeric_limits<double>::infinity())
+				{
+					branchmetrics.at(p).at(t) = std::numeric_limits<double>::infinity();
+					shortbranchmetrics.at(p).at(t) = std::numeric_limits<double>::infinity();
+				}
+				else // Main process
+				{
+					//printf("%4d: Pre-transition %d->%d\n", n, preTransitions.at(p).at(t), p);
+
+					// Copy values to guess index instead
+					int num2copy = pulselen / up + 1; // this is the maximum number of symbols that will be required, no need to copy the entire path
+					num2copy = IPP_MIN(num2copy, n);
+					ippsCopy_8u(&paths_index.at(preTransitions.at(p).at(t)).at(n - num2copy), &guess_index.at(n - num2copy), num2copy); // this has very insignificant change, probably only see it at very long pathlen (in fact, removing this line entirely has almost no impact on the timing)
+					//ippsCopy_8u(paths_index.at(preTransitions.at(p).at(t)).data(), guess_index.data(), pathlen);
+					guess_index.at(n) = (Ipp8u)p;
+
+					//// Copy values over to guess
+					//ippsCopy_64fc(paths.at(preTransitions.at(p).at(t)).data(), guess.data(), pathlen);
+					//guess.at(n) = alphabet.at(p); // Set new value for this index
+
+					// Don't need this in C++!
+					//int uplen = upguess.size();
+					//int phase = 0;
+					//ippsSampleUp_64fc(guess, pathlen, upguess, &uplen, up, &phase);
+
+					calcBranchMetricSingle(n, y, guess_index);
+					//calcBranchMetricSingle(n, y, guess);
+
+					// Sum all the sources, along with the multiply of the omegavector
+					ippsZero_64fc(x_sum.data(), x_sum.size());
+					for (int i = 0; i < numSrc; i++) {
+						ippsAddProduct_64fc(x_all.at(i).data(), &omegavectors.at(i).at(n*up), x_sum.data(), pulselen);
+					}
+
+					// Calculate the branchArray and the norms from it
+					ippsSub_64fc(x_sum.data(), &y[n*up], branchArray.data(), x_sum.size());
+					ippsNorm_L2_64fc64f(branchArray.data(), branchArray.size(), &branchmetrics.at(p).at(t));
+					ippsNorm_L2_64fc64f(branchArray.data(), up, &shortbranchmetrics.at(p).at(t));
+
+					// Squaring done separately
+					branchmetrics.at(p).at(t) = branchmetrics.at(p).at(t) * branchmetrics.at(p).at(t);
+					shortbranchmetrics.at(p).at(t) = shortbranchmetrics.at(p).at(t) * shortbranchmetrics.at(p).at(t);
+
+
+				}
+			} // end of loop over pretransition
+		}
 
 		/// <summary>
 		/// Calculates the branch for symbol at path index n
 		/// </summary>
 		/// <param name="guess"> Vector containing the in-order chain of symbols, including the new symbol at index n </param>
-		void calcBranchMetricSingle(int n, Ipp64fc *y, ippe::vector<Ipp64fc> &guess)
+		//void calcBranchMetricSingle(int n, Ipp64fc *y, ippe::vector<Ipp64fc> &guess)
+		void calcBranchMetricSingle(int n, Ipp64fc *y, ippe::vector<Ipp8u> &guess_index)
 		{
 			int guessIdx;
 			// Get tracking index
@@ -346,23 +378,21 @@ class ViterbiDemodulator
 			for (int i = 0; i < numSrc; i++) {
 				// Set the one value array
 				ippsZero_64fc(oneValArray.data(), oneValArray.size());
-				oneValArray.at(0) = guess.at(n);
+				//oneValArray.at(0) = guess.at(n);
+				oneValArray.at(0) = alphabet.at(guess_index.at(n)); // convert the index to the complex valued symbol
 
 				// Construct the delay line backwards
 				ippsZero_64fc(delaySrc.data(), delaySrc.size());
 				for (int j = up; j < delaySrc.size(); j = j + up) {
 					guessIdx = n - j / up;
 					if (guessIdx >= 0) {
-						delaySrc.at(delaySrc.size() - j) = guess.at(guessIdx);
+						//delaySrc.at(delaySrc.size() - j) = guess.at(guessIdx);
+						delaySrc.at(delaySrc.size() - j) = alphabet.at(guess_index.at(guessIdx)); // convert the index to the complex valued symbol
 					}
 				}
 
 				// Filter
 				ippsFIRSR_64fc(oneValArray.data(), x_all.at(i).data(), pulselen, pSpecVec.at(i), delaySrc.data(), NULL, bufVec.at(i));
-
-				//// Multiply by omegavector // we get to do this below in the accumulation step with 1 instruction
-				//ippsMul_64fc_I(&omegavectors.at(i).at(n*up), x_all.at(i).data(), pulselen);
-
 			}
 
 		}
@@ -378,7 +408,10 @@ class ViterbiDemodulator
 				if (std::all_of(branchmetrics.at(p).begin(), branchmetrics.at(p).end(), [](Ipp64f i) {return isinf(i); }))
 				{
 					temppathmetrics.at(p) = std::numeric_limits<double>::infinity();
-					ippsCopy_64fc(paths.at(p).data(), temppaths.at(p).data(), paths.at(p).size()); // vector assignment doesn't work with Ipp types
+
+					ippsCopy_8u(paths_index.at(p).data(), temppaths_index.at(p).data(), paths_index.at(p).size());
+
+					//ippsCopy_64fc(paths.at(p).data(), temppaths.at(p).data(), paths.at(p).size()); // vector assignment doesn't work with Ipp types
 				}
 				else
 				{
@@ -386,15 +419,22 @@ class ViterbiDemodulator
 
 					//printf("Best branch to %d is from %d, minval = %.8f\n", p, preTransitions.at(p).at(bestPrevIdx), minVal);
 
-					ippsCopy_64fc(paths.at(preTransitions.at(p).at(bestPrevIdx)).data(), temppaths.at(p).data(), temppaths.at(p).size());
-					temppaths.at(p).at(n) = alphabet.at(p);
+					ippsCopy_8u(paths_index.at(preTransitions.at(p).at(bestPrevIdx)).data(), temppaths_index.at(p).data(), temppaths_index.at(p).size());
+					temppaths_index.at(p).at(n) = (Ipp8u)p;
+
+					/*ippsCopy_64fc(paths.at(preTransitions.at(p).at(bestPrevIdx)).data(), temppaths.at(p).data(), temppaths.at(p).size());
+					temppaths.at(p).at(n) = alphabet.at(p);*/
+
+					// Update the path metric
 					temppathmetrics.at(p) = pathmetrics.at(preTransitions.at(p).at(bestPrevIdx)) + shortbranchmetrics.at(p).at(bestPrevIdx);
 				}
 			}
 
 			// Write back to main vectors
 			for (int i = 0; i < paths.size(); i++) {
-				ippsCopy_64fc(temppaths.at(i).data(), paths.at(i).data(), temppaths.at(i).size());
+				ippsCopy_8u(temppaths_index.at(i).data(), paths_index.at(i).data(), temppaths_index.at(i).size());
+
+				//ippsCopy_64fc(temppaths.at(i).data(), paths.at(i).data(), temppaths.at(i).size());
 			}
 			ippsCopy_64f(temppathmetrics.data(), pathmetrics.data(), temppathmetrics.size());
         }
@@ -460,8 +500,9 @@ class ViterbiDemodulator
 		void prepareBranchMetricWorkspace(int pathlen)
 		{
 			// Allocate guesses
+			guess_index.resize(pathlen);
 			guess.resize(pathlen);
-			upguess.resize(pathlen * up);
+			//upguess.resize(pathlen * up);
 
 			// Allocate workspace (actually can move these into ctor?)
 			x_sum.resize(pulselen);
@@ -472,6 +513,22 @@ class ViterbiDemodulator
 			oneValArray.resize(pulselen);
 			delaySrc.resize(pulselen - 1);
 			branchArray.resize(pulselen);
+		}
+
+		void dumpOutput()
+		{
+			// Used for debugging
+			printPathMetrics();
+
+			FILE *fp = fopen("paths.bin", "wb");
+			for (int i = 0; i < paths.size(); i++) {
+				fwrite(paths.at(i).data(), sizeof(Ipp64fc), paths.at(i).size(), fp);
+			}
+			fclose(fp);
+
+			fp = fopen("pathmetrics.bin", "wb");
+			fwrite(pathmetrics.data(), sizeof(Ipp64f), pathmetrics.size(), fp);
+			fclose(fp);
 		}
 
 };
@@ -546,7 +603,7 @@ int main()
 	vd.setAllowedStartSymbolIndices();
 
 	// Test run
-	vd.run(y.data(), y.size(), 2000);
+	vd.run(y.data(), y.size(), 8000);
 
 	//vd.printOmegaVectors(64000, 64010);
     

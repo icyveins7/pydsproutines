@@ -35,10 +35,8 @@ class ViterbiDemodulator
         
 		// Runtime vectors (resized in methods)
 		std::vector<ippe::vector<Ipp8u>> paths_index;
-        std::vector<ippe::vector<Ipp64fc>> paths;
         ippe::vector<Ipp64f> pathmetrics;
 		std::vector<ippe::vector<Ipp8u>> temppaths_index;
-		std::vector<ippe::vector<Ipp64fc>> temppaths;
 		ippe::vector<Ipp64f> temppathmetrics;
 		
 		std::vector<std::vector<Ipp64f>> branchmetrics; // use std vector for these so as to enable <algorithm> iterator uses
@@ -46,9 +44,6 @@ class ViterbiDemodulator
 
 		// Workspace vectors
 		ippe::vector<Ipp8u> guess_index;
-		ippe::vector<Ipp64fc> guess;
-		//ippe::vector<Ipp64fc> upguess;
-
 		ippe::vector<Ipp64fc> x_sum;
 		std::vector<ippe::vector<Ipp64fc>> x_all;
 		ippe::vector<Ipp64fc> oneValArray;
@@ -153,10 +148,10 @@ class ViterbiDemodulator
 		void printPaths(int n, int s=0)
 		{
 			printf("Paths: \n");
-			for (int i = 0; i < paths.size(); i++) {
+			for (int i = 0; i < paths_index.size(); i++) {
 				printf("%d: ", i);
 				for (int j = s; j <= n; j++) {
-					printf("%.1g+%.1gi ", paths.at(i).at(j).re, paths.at(i).at(j).im);
+					printf("%.1g+%.1gi ", alphabet.at(paths_index.at(i).at(j)).re, alphabet.at(paths_index.at(i).at(j)).im);
 				}
 				printf("\n");
 			}
@@ -206,22 +201,14 @@ class ViterbiDemodulator
 
 			// Allocate paths
 			paths_index.resize(alphabet.size());
-			paths.resize(alphabet.size());
 			temppaths_index.resize(alphabet.size());
-			temppaths.resize(alphabet.size());
 
-			for (int i = 0; i < paths.size(); i++) {
+			for (int i = 0; i < paths_index.size(); i++) {
 				temppaths_index.at(i).resize(pathlen);
 				ippsSet_8u(IPP_MAX_8U, temppaths_index.at(i).data(), temppaths_index.at(i).size());
 				
 				paths_index.at(i).resize(pathlen);
 				ippsSet_8u(IPP_MAX_8U, paths_index.at(i).data(), paths_index.at(i).size());
-
-				paths.at(i).resize(pathlen);
-				ippsZero_64fc(paths.at(i).data(), paths.at(i).size());
-
-				temppaths.at(i).resize(pathlen);
-				ippsZero_64fc(temppaths.at(i).data(), temppaths.at(i).size());
 			}
 
 			// Allocate pathmetrics
@@ -254,9 +241,6 @@ class ViterbiDemodulator
 
 					paths_index.at(a).at(0) = a;
 					calcBranchMetricSingle(0, y, paths_index.at(a));
-
-					//paths.at(a).at(0) = alphabet.at(a);
-					//calcBranchMetricSingle(0, y, paths.at(a));
 
 					// Sum all the sources, along with the multiply of the omegavector
 					ippsZero_64fc(x_sum.data(), x_sum.size());
@@ -332,15 +316,6 @@ class ViterbiDemodulator
 					//ippsCopy_8u(paths_index.at(preTransitions.at(p).at(t)).data(), guess_index.data(), pathlen);
 					guess_index.at(n) = (Ipp8u)p;
 
-					//// Copy values over to guess
-					//ippsCopy_64fc(paths.at(preTransitions.at(p).at(t)).data(), guess.data(), pathlen);
-					//guess.at(n) = alphabet.at(p); // Set new value for this index
-
-					// Don't need this in C++!
-					//int uplen = upguess.size();
-					//int phase = 0;
-					//ippsSampleUp_64fc(guess, pathlen, upguess, &uplen, up, &phase);
-
 					calcBranchMetricSingle(n, y, guess_index);
 					//calcBranchMetricSingle(n, y, guess);
 
@@ -367,8 +342,7 @@ class ViterbiDemodulator
 		/// <summary>
 		/// Calculates the branch for symbol at path index n
 		/// </summary>
-		/// <param name="guess"> Vector containing the in-order chain of symbols, including the new symbol at index n </param>
-		//void calcBranchMetricSingle(int n, Ipp64fc *y, ippe::vector<Ipp64fc> &guess)
+		/// <param name="guess_index"> Vector containing the in-order chain of symbols' alphabet indices, including the new symbol at index n </param>
 		void calcBranchMetricSingle(int n, Ipp64fc *y, ippe::vector<Ipp8u> &guess_index)
 		{
 			int guessIdx;
@@ -410,8 +384,6 @@ class ViterbiDemodulator
 					temppathmetrics.at(p) = std::numeric_limits<double>::infinity();
 
 					ippsCopy_8u(paths_index.at(p).data(), temppaths_index.at(p).data(), paths_index.at(p).size());
-
-					//ippsCopy_64fc(paths.at(p).data(), temppaths.at(p).data(), paths.at(p).size()); // vector assignment doesn't work with Ipp types
 				}
 				else
 				{
@@ -422,19 +394,14 @@ class ViterbiDemodulator
 					ippsCopy_8u(paths_index.at(preTransitions.at(p).at(bestPrevIdx)).data(), temppaths_index.at(p).data(), temppaths_index.at(p).size());
 					temppaths_index.at(p).at(n) = (Ipp8u)p;
 
-					/*ippsCopy_64fc(paths.at(preTransitions.at(p).at(bestPrevIdx)).data(), temppaths.at(p).data(), temppaths.at(p).size());
-					temppaths.at(p).at(n) = alphabet.at(p);*/
-
 					// Update the path metric
 					temppathmetrics.at(p) = pathmetrics.at(preTransitions.at(p).at(bestPrevIdx)) + shortbranchmetrics.at(p).at(bestPrevIdx);
 				}
 			}
 
 			// Write back to main vectors
-			for (int i = 0; i < paths.size(); i++) {
+			for (int i = 0; i < paths_index.size(); i++) {
 				ippsCopy_8u(temppaths_index.at(i).data(), paths_index.at(i).data(), temppaths_index.at(i).size());
-
-				//ippsCopy_64fc(temppaths.at(i).data(), paths.at(i).data(), temppaths.at(i).size());
 			}
 			ippsCopy_64f(temppathmetrics.data(), pathmetrics.data(), temppathmetrics.size());
         }
@@ -501,8 +468,6 @@ class ViterbiDemodulator
 		{
 			// Allocate guesses
 			guess_index.resize(pathlen);
-			guess.resize(pathlen);
-			//upguess.resize(pathlen * up);
 
 			// Allocate workspace (actually can move these into ctor?)
 			x_sum.resize(pulselen);
@@ -520,9 +485,9 @@ class ViterbiDemodulator
 			// Used for debugging
 			printPathMetrics();
 
-			FILE *fp = fopen("paths.bin", "wb");
-			for (int i = 0; i < paths.size(); i++) {
-				fwrite(paths.at(i).data(), sizeof(Ipp64fc), paths.at(i).size(), fp);
+			FILE *fp = fopen("paths_index.bin", "wb");
+			for (int i = 0; i < paths_index.size(); i++) {
+				fwrite(paths_index.at(i).data(), sizeof(Ipp8u), paths_index.at(i).size(), fp);
 			}
 			fclose(fp);
 

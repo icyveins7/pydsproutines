@@ -7,6 +7,9 @@
 #include <chrono>
 #include <algorithm>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
+//#include <atomic>
 
 class ViterbiDemodulator
 {
@@ -50,8 +53,14 @@ class ViterbiDemodulator
 		std::vector<ippe::vector<Ipp64fc>> oneValArray_thd;
 		std::vector<ippe::vector<Ipp64fc>> delaySrc_thd;
 		std::vector<ippe::vector<Ipp64fc>> branchArray_thd;
+
 		std::vector<std::thread> thd;
-    
+		std::vector<Ipp8u> ready; // DO NOT USE VECTOR<BOOL> FOR THESE 2
+		std::vector<Ipp8u> processed;
+		std::vector<std::mutex> mut;
+		std::vector<std::condition_variable> cv;
+		//std::atomic<int> numprocessed; // using this is too slow
+
     public:
         ViterbiDemodulator(Ipp64fc *in_alphabet, uint8_t alphabetLen,
                             uint8_t *in_preTransitions, uint8_t preTransitionsLen,
@@ -246,9 +255,16 @@ class ViterbiDemodulator
 			oneValArray_thd.resize(numThds);
 			delaySrc_thd.resize(numThds);
 			branchArray_thd.resize(numThds);
-			thd.resize(numThds);
 
-			
+			// Threads, mutexes, cond variables
+			thd.resize(numThds);
+			ready.resize(numThds);
+			processed.resize(numThds);
+			//mut.resize(numThds); // mutexes are not resizable in a vector due to no copy constructor
+			//cv.resize(numThds); // same for condition vars
+			mut = std::vector<std::mutex>(numThds); // directly re-construct it as a workaround?
+			cv = std::vector<std::condition_variable>(numThds);
+
 			for (int i = 0; i < numThds; i++) {
 				// Allocate guesses
 				guess_index_thd.at(i).resize(pathlen);
@@ -306,12 +322,10 @@ class ViterbiDemodulator
 			prepareBranchMetricWorkspace(pathlen);
 			
 			// Construct the path metric for the first symbol
-			int t;
-
 			for (int a = 0; a < alphabet.size(); a++)
 			{
 				// Point references
-				t = getWorkspaceIdx(a);
+				int t = getWorkspaceIdx(a);
 				ippe::vector<Ipp8u> &guess_index = guess_index_thd.at(t);
 				ippe::vector<Ipp64fc> &x_sum = x_sum_thd.at(t);
 				std::vector<ippe::vector<Ipp64fc>> &x_all = x_all_thd.at(t);
@@ -354,6 +368,24 @@ class ViterbiDemodulator
 
 			// Loop over the rest of the symbols
 			printf("Beginning loop over symbols..\n");
+
+			// Pre-launch threads
+			if (useThreading) {
+				for (int t = 0; t < thd.size(); t++) {
+					ready.at(t) = false;
+					processed.at(t) = false;
+
+					thd.at(t) = std::thread(&ViterbiDemodulator::calcBranchMetricsInnerPrelaunch, this, t, y, pathlen,
+						std::ref(guess_index_thd.at(t)), // one workspace vector each
+						std::ref(x_sum_thd.at(t)),
+						std::ref(x_all_thd.at(t)),
+						std::ref(oneValArray_thd.at(t)),
+						std::ref(delaySrc_thd.at(t)),
+						std::ref(branchArray_thd.at(t)),
+						bufVec_thd.at(t));
+				}
+			}
+
 			for (int n = 1; n < pathlen; n++) 
 			{
 				// Branches
@@ -369,6 +401,13 @@ class ViterbiDemodulator
 				//	printf("Finished %d\n", n);
 				//}
 			}
+			
+			// Close all prelaunched threads
+			if (useThreading) {
+				for (int t = 0; t < thd.size(); t++) {
+					thd.at(t).join(); // close all threads
+				}
+			}
 
 			auto t2 = std::chrono::high_resolution_clock::now();
 			auto timetaken = std::chrono::duration<double>(t2 - t1).count();
@@ -383,22 +422,37 @@ class ViterbiDemodulator
         {
 			int t;
 
+			//numprocessed = 0;
+
+			//printf("\n");
+			//for (int d = 0; d < processed.size(); d++) {
+			//	printf("addr: processed[%d] = %p\n", d, &processed.at(d));
+			//}
+
 			// Select current symbol
 			for (int p = 0; p < alphabet.size(); p++)
 			{
 				t = getWorkspaceIdx(p);
 
 				if (useThreading) {
-					//printf("Using thread %d for symbol %d\n", t, p);
-					// Here is where we spawn threads for each symbol in the alphabet
-					thd.at(t) = std::thread(&ViterbiDemodulator::calcBranchMetricsInner, this, p, y, n, pathlen,
-						std::ref(guess_index_thd.at(t)), // one workspace vector each
-						std::ref(x_sum_thd.at(t)),
-						std::ref(x_all_thd.at(t)),
-						std::ref(oneValArray_thd.at(t)),
-						std::ref(delaySrc_thd.at(t)),
-						std::ref(branchArray_thd.at(t)),
-						bufVec_thd.at(t));
+					// For pre-launched threads, we signal
+					{
+						std::lock_guard<std::mutex> lk(mut.at(t));
+						processed.at(t) = 0;
+						//printf("Set processed[%d] to %d from main, addr:%p\n", t, (int)processed.at(t), &processed.at(t));
+						ready.at(t) = 1;
+					}
+					cv.at(t).notify_one();
+
+					//// Here is where we spawn threads for each symbol in the alphabet
+					//thd.at(t) = std::thread(&ViterbiDemodulator::calcBranchMetricsInner, this, p, y, n, pathlen,
+					//	std::ref(guess_index_thd.at(t)), // one workspace vector each
+					//	std::ref(x_sum_thd.at(t)),
+					//	std::ref(x_all_thd.at(t)),
+					//	std::ref(oneValArray_thd.at(t)),
+					//	std::ref(delaySrc_thd.at(t)),
+					//	std::ref(branchArray_thd.at(t)),
+					//	bufVec_thd.at(t));
 				}
 				else {
 					// Inner function for looping over preTransitions for current symbol
@@ -415,11 +469,79 @@ class ViterbiDemodulator
 
 			// If threading, wait for them
 			if (useThreading) {
+				// Pre-launched threads: just wait for processed to be signalled
 				for (t = 0; t < thd.size(); t++) {
-					thd.at(t).join();
+					while (ready.at(t) == 1 || processed.at(t) == 0) {
+					//while (numprocessed<thd.size()){
+						std::unique_lock<std::mutex> lk(mut.at(t));
+						//cv.at(t).wait_for(lk, std::chrono::duration<double>(0.1), [&] {printf("processed[%d]=%d\n", t, (int)processed.at(t)); return (bool)processed.at(t); });
+						cv.at(t).wait_for(lk, std::chrono::duration<double>(0.1), [&] {return (bool)processed.at(t); });
+						//cv.at(t).wait_for(lk, std::chrono::duration<double>(0.1), [&] {return (numprocessed==thd.size()); }); // atomics too slow
+						// time out and try again because sometimes the worker thread is too fast and notifies before this call
+						//printf("Timed out %d, %d\n", n, t);
+					}
+					// When done, reset processed (ready should have been reset inside thread)
+					//processed.at(t) = false;
+					//printf("Pre-launched %d complete.\n", t);
 				}
+				//printf("Pre-launch for %d complete\n", n);
+
+				//for (t = 0; t < thd.size(); t++) {
+				//	thd.at(t).join();
+				//}
 			}
         }
+
+		/// <summary>
+		/// This function wraps the standard threaded / single-threaded function but uses condition variables to signal. Note that 'n' is not an argument here.
+		/// </summary>
+		/// <param name="p"> Symbol index, corresponds to thread index </param>
+		void calcBranchMetricsInnerPrelaunch(int p, Ipp64fc *y, int pathlen,
+			ippe::vector<Ipp8u> &guess_index, // workspace vectors
+			ippe::vector<Ipp64fc> &x_sum,
+			std::vector<ippe::vector<Ipp64fc>> &x_all,
+			ippe::vector<Ipp64fc> &oneValArray,
+			ippe::vector<Ipp64fc> &delaySrc,
+			ippe::vector<Ipp64fc> &branchArray,
+			Ipp8u *buf)
+		{
+			printf("Pre-launch for %d success.\n", p);
+
+			for (int n = 1; n < pathlen; n++) {
+				// Wait til main thread is ready
+				std::unique_lock<std::mutex> lk(mut.at(p));
+				cv.at(p).wait(lk, [&]{return (bool)ready.at(p); });
+
+				//printf("Pre-launched %d, n=%d ready->processing\n", p, n);
+
+				// Process using standard function
+				calcBranchMetricsInner(p, y, n, pathlen,
+					guess_index,
+					x_sum,
+					x_all,
+					oneValArray,
+					delaySrc,
+					branchArray,
+					buf);
+
+				// Send back to main thread
+				processed.at(p) = 1;
+				//if (processed.at(p) != 1) {
+				//	printf("WTF IT FAILED RIGHT AFTER IT WAS SETTTTTTTTTT %d\n", p);
+				//}
+				ready.at(p) = 0; // so that it will not relock again
+				//numprocessed++;
+
+				lk.unlock();
+				cv.at(p).notify_one();
+
+				//printf("Pre-launched %d, n=%d notified, processedbool=%d\n", p, n, (int)processed.at(p));
+				//if (processed.at(p) != 1) {
+				//	printf("%d: why didn't it change in %d??\n", n, p);
+				//} // BECAUSE HERE IT ALREADY NOTIFIED, THE MAIN THREAD COULD HAVE SWITCHED IT BACK ALREADY
+
+			}
+		}
 
 		/// <param name="p"> Symbol index </param>
 		void calcBranchMetricsInner(int p, Ipp64fc *y, int n, int pathlen,

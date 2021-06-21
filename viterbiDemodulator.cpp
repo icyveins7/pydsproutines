@@ -6,6 +6,7 @@
 #include <cmath>
 #include <chrono>
 #include <algorithm>
+#include <thread>
 
 class ViterbiDemodulator
 {
@@ -29,9 +30,9 @@ class ViterbiDemodulator
 		// Omega tone vectors
 		std::vector<ippe::vector<Ipp64fc>> omegavectors;
 
-		// Filter requirements (create one for each pulse)
+		// Filter requirements (create one spec for each pulse, one buffer for each thread)
 		std::vector<IppsFIRSpec_64fc*> pSpecVec;
-		std::vector<Ipp8u*> bufVec;
+		std::vector<Ipp8u*> bufVec_thd;
         
 		// Runtime vectors (resized in methods)
 		std::vector<ippe::vector<Ipp8u>> paths_index;
@@ -42,13 +43,14 @@ class ViterbiDemodulator
 		std::vector<std::vector<Ipp64f>> branchmetrics; // use std vector for these so as to enable <algorithm> iterator uses
 		std::vector<std::vector<Ipp64f>> shortbranchmetrics;
 
-		// Workspace vectors
-		ippe::vector<Ipp8u> guess_index;
-		ippe::vector<Ipp64fc> x_sum;
-		std::vector<ippe::vector<Ipp64fc>> x_all;
-		ippe::vector<Ipp64fc> oneValArray;
-		ippe::vector<Ipp64fc> delaySrc;
-		ippe::vector<Ipp64fc> branchArray;
+		// Workspace vectors, each symbol in the alphabet requires one, so that one thread can be assigned to each
+		std::vector<ippe::vector<Ipp8u>> guess_index_thd;
+		std::vector<ippe::vector<Ipp64fc>> x_sum_thd;
+		std::vector<std::vector<ippe::vector<Ipp64fc>>> x_all_thd;
+		std::vector<ippe::vector<Ipp64fc>> oneValArray_thd;
+		std::vector<ippe::vector<Ipp64fc>> delaySrc_thd;
+		std::vector<ippe::vector<Ipp64fc>> branchArray_thd;
+		std::vector<std::thread> thd;
     
     public:
         ViterbiDemodulator(Ipp64fc *in_alphabet, uint8_t alphabetLen,
@@ -96,6 +98,42 @@ class ViterbiDemodulator
         {
 			freePulseFilters();
         }
+
+		// Pulse filter preparation is done in ctor, before threading is selected, so just allocate for the threading anyway
+		void preparePulseFilters()
+		{
+			// Calculate the size requirements
+			int             specSize, bufSize;
+			IppStatus status;
+			// Get sizes of the spec structure and the work buffer
+			status = ippsFIRSRGetSize(pulselen, ipp64fc, &specSize, &bufSize);
+		
+			// Create a spec structure for each source (i.e. each pulse)
+			for (int i = 0; i < numSrc; i++) {
+				IppsFIRSpec_64fc *pSpec = (IppsFIRSpec_64fc*)ippsMalloc_8u(specSize);
+				ippsFIRSRInit_64fc(pulses.at(i).data(), pulselen, ippAlgDirect, pSpec); // test ippAlgFFT?
+				// add to the vectors
+				pSpecVec.push_back(pSpec);
+			}
+
+			// Create a buffer for each thread
+			for (int i = 0; i < alphabet.size(); i++){
+				Ipp8u *buf = ippsMalloc_8u(bufSize);
+				// add to the vector
+				bufVec_thd.push_back(buf);
+			}
+
+		}
+
+		void freePulseFilters()
+		{
+			for (auto i : pSpecVec) {
+				ippsFree(i);
+			}
+			for (auto i : bufVec_thd) {
+				ippsFree(i);
+			}
+		}
 
         void printAlphabet()
         {
@@ -189,6 +227,43 @@ class ViterbiDemodulator
 			printf("\n");
 		}
 
+		int getWorkspaceIdx(int s) {
+			if (useThreading) { return s; }
+			else { return 0; }
+		}
+
+		void prepareBranchMetricWorkspace(int pathlen)
+		{
+			// Allocate number of arrays according to threading use
+			int alphabetlen = alphabet.size();
+			int numThds;
+			if (useThreading) { numThds = alphabet.size(); }
+			else { numThds = 1; }
+
+			guess_index_thd.resize(numThds);
+			x_sum_thd.resize(numThds);
+			x_all_thd.resize(numThds);
+			oneValArray_thd.resize(numThds);
+			delaySrc_thd.resize(numThds);
+			branchArray_thd.resize(numThds);
+			thd.resize(numThds);
+
+			
+			for (int i = 0; i < numThds; i++) {
+				// Allocate guesses
+				guess_index_thd.at(i).resize(pathlen);
+
+				// Allocate workspace (actually can move these into ctor?)
+				x_sum_thd.at(i).resize(pulselen);
+				x_all_thd.at(i).resize(numSrc);
+				for (int j = 0; j < numSrc; j++) {
+					x_all_thd.at(i).at(j).resize(pulselen);
+				}
+				oneValArray_thd.at(i).resize(pulselen);
+				delaySrc_thd.at(i).resize(pulselen - 1);
+				branchArray_thd.at(i).resize(pulselen);
+			}
+		}
         
 		// Runtime
 		void run(Ipp64fc *y, int ylength, int pathlen)
@@ -231,8 +306,19 @@ class ViterbiDemodulator
 			prepareBranchMetricWorkspace(pathlen);
 			
 			// Construct the path metric for the first symbol
+			int t;
+
 			for (int a = 0; a < alphabet.size(); a++)
 			{
+				// Point references
+				t = getWorkspaceIdx(a);
+				ippe::vector<Ipp8u> &guess_index = guess_index_thd.at(t);
+				ippe::vector<Ipp64fc> &x_sum = x_sum_thd.at(t);
+				std::vector<ippe::vector<Ipp64fc>> &x_all = x_all_thd.at(t);
+				ippe::vector<Ipp64fc> &oneValArray = oneValArray_thd.at(t);
+				ippe::vector<Ipp64fc> &delaySrc = delaySrc_thd.at(t);
+				ippe::vector<Ipp64fc> &branchArray = branchArray_thd.at(t);
+
 				// Only conduct the path metric for the set indices
 				auto findresult = std::find(allowedStartSymbolIndices.begin(), allowedStartSymbolIndices.end(), (Ipp8u)a);
 				if (findresult != std::end(allowedStartSymbolIndices))
@@ -240,7 +326,12 @@ class ViterbiDemodulator
 					printf("Calculating first symbol path metric directly for index %d\n", a);
 
 					paths_index.at(a).at(0) = a;
-					calcBranchMetricSingle(0, y, paths_index.at(a));
+					calcBranchMetricSingle(0, y, 
+						paths_index.at(a), // we directly just use the paths_index
+						oneValArray,
+						delaySrc,
+						x_all,
+						bufVec_thd.at(a));
 
 					// Sum all the sources, along with the multiply of the omegavector
 					ippsZero_64fc(x_sum.data(), x_sum.size());
@@ -274,6 +365,9 @@ class ViterbiDemodulator
 				//// Debug
 				//printBranchMetrics();
 				//printPathMetrics();
+				//if (n % 100 == 0) {
+				//	printf("Finished %d\n", n);
+				//}
 			}
 
 			auto t2 = std::chrono::high_resolution_clock::now();
@@ -287,15 +381,55 @@ class ViterbiDemodulator
 
         void calcBranchMetrics(Ipp64fc *y, int n, int pathlen)
         {
+			int t;
+
 			// Select current symbol
 			for (int p = 0; p < alphabet.size(); p++)
 			{
-				// Inner function for looping over preTransitions for current symbol
-				calcBranchMetricsInner(p, y, n, pathlen);
+				t = getWorkspaceIdx(p);
+
+				if (useThreading) {
+					//printf("Using thread %d for symbol %d\n", t, p);
+					// Here is where we spawn threads for each symbol in the alphabet
+					thd.at(t) = std::thread(&ViterbiDemodulator::calcBranchMetricsInner, this, p, y, n, pathlen,
+						std::ref(guess_index_thd.at(t)), // one workspace vector each
+						std::ref(x_sum_thd.at(t)),
+						std::ref(x_all_thd.at(t)),
+						std::ref(oneValArray_thd.at(t)),
+						std::ref(delaySrc_thd.at(t)),
+						std::ref(branchArray_thd.at(t)),
+						bufVec_thd.at(t));
+				}
+				else {
+					// Inner function for looping over preTransitions for current symbol
+					calcBranchMetricsInner(p, y, n, pathlen,
+						guess_index_thd.at(t), // this should be t = 0 for non-threading anyway
+						x_sum_thd.at(t),
+						x_all_thd.at(t),
+						oneValArray_thd.at(t),
+						delaySrc_thd.at(t),
+						branchArray_thd.at(t),
+						bufVec_thd.at(t));
+				}
 			} // end of loop over symbol
+
+			// If threading, wait for them
+			if (useThreading) {
+				for (t = 0; t < thd.size(); t++) {
+					thd.at(t).join();
+				}
+			}
         }
 
-		void calcBranchMetricsInner(int p, Ipp64fc *y, int n, int pathlen)
+		/// <param name="p"> Symbol index </param>
+		void calcBranchMetricsInner(int p, Ipp64fc *y, int n, int pathlen,
+									ippe::vector<Ipp8u> &guess_index, // workspace vectors
+									ippe::vector<Ipp64fc> &x_sum,
+									std::vector<ippe::vector<Ipp64fc>> &x_all,
+									ippe::vector<Ipp64fc> &oneValArray,
+									ippe::vector<Ipp64fc> &delaySrc,
+									ippe::vector<Ipp64fc> &branchArray,
+									Ipp8u *buf)
 		{
 			// Select a pre-transition path
 			for (int t = 0; t < preTransitions.at(p).size(); t++)
@@ -316,8 +450,12 @@ class ViterbiDemodulator
 					//ippsCopy_8u(paths_index.at(preTransitions.at(p).at(t)).data(), guess_index.data(), pathlen);
 					guess_index.at(n) = (Ipp8u)p;
 
-					calcBranchMetricSingle(n, y, guess_index);
-					//calcBranchMetricSingle(n, y, guess);
+					calcBranchMetricSingle(n, y,
+						guess_index,
+						oneValArray,
+						delaySrc,
+						x_all,
+						buf);
 
 					// Sum all the sources, along with the multiply of the omegavector
 					ippsZero_64fc(x_sum.data(), x_sum.size());
@@ -333,8 +471,6 @@ class ViterbiDemodulator
 					// Squaring done separately
 					branchmetrics.at(p).at(t) = branchmetrics.at(p).at(t) * branchmetrics.at(p).at(t);
 					shortbranchmetrics.at(p).at(t) = shortbranchmetrics.at(p).at(t) * shortbranchmetrics.at(p).at(t);
-
-
 				}
 			} // end of loop over pretransition
 		}
@@ -343,7 +479,12 @@ class ViterbiDemodulator
 		/// Calculates the branch for symbol at path index n
 		/// </summary>
 		/// <param name="guess_index"> Vector containing the in-order chain of symbols' alphabet indices, including the new symbol at index n </param>
-		void calcBranchMetricSingle(int n, Ipp64fc *y, ippe::vector<Ipp8u> &guess_index)
+		void calcBranchMetricSingle(int n, Ipp64fc *y, 
+			ippe::vector<Ipp8u> &guess_index,
+			ippe::vector<Ipp64fc> &oneValArray,
+			ippe::vector<Ipp64fc> &delaySrc,
+			std::vector<ippe::vector<Ipp64fc>> &x_all,
+			Ipp8u *buf)
 		{
 			int guessIdx;
 			// Get tracking index
@@ -366,7 +507,7 @@ class ViterbiDemodulator
 				}
 
 				// Filter
-				ippsFIRSR_64fc(oneValArray.data(), x_all.at(i).data(), pulselen, pSpecVec.at(i), delaySrc.data(), NULL, bufVec.at(i));
+				ippsFIRSR_64fc(oneValArray.data(), x_all.at(i).data(), pulselen, pSpecVec.at(i), delaySrc.data(), NULL, buf);
 			}
 
 		}
@@ -435,51 +576,6 @@ class ViterbiDemodulator
 			}
 		}
 
-		void preparePulseFilters()
-		{
-			for (int i = 0; i < numSrc; i++) {
-				IppsFIRSpec_64fc *pSpec;
-				Ipp8u           *buf;
-				int             specSize, bufSize;
-				IppStatus status;
-				//get sizes of the spec structure and the work buffer
-				status = ippsFIRSRGetSize(pulselen, ipp64fc, &specSize, &bufSize);
-				pSpec = (IppsFIRSpec_64fc*)ippsMalloc_8u(specSize);
-				buf = ippsMalloc_8u(bufSize);
-				//initialize the spec structure
-				ippsFIRSRInit_64fc(pulses.at(i).data(), pulselen, ippAlgDirect, pSpec);
-				// add to the vectors
-				pSpecVec.push_back(pSpec);
-				bufVec.push_back(buf);
-			}
-		}
-
-		void freePulseFilters()
-		{
-			for (auto i : pSpecVec) {
-				ippsFree(i);
-			}
-			for (auto i : bufVec) {
-				ippsFree(i);
-			}
-		}
-
-		void prepareBranchMetricWorkspace(int pathlen)
-		{
-			// Allocate guesses
-			guess_index.resize(pathlen);
-
-			// Allocate workspace (actually can move these into ctor?)
-			x_sum.resize(pulselen);
-			x_all.resize(numSrc);
-			for (int i = 0; i < numSrc; i++) {
-				x_all.at(i).resize(pulselen);
-			}
-			oneValArray.resize(pulselen);
-			delaySrc.resize(pulselen - 1);
-			branchArray.resize(pulselen);
-		}
-
 		void dumpOutput()
 		{
 			// Used for debugging
@@ -498,7 +594,7 @@ class ViterbiDemodulator
 
 };
 
-int main()
+int main(int argc, char *argv[])
 {
     ippe::vector<Ipp64fc> alphabet(4);
     alphabet.at(0) = {1.0, 0.0};
@@ -568,7 +664,14 @@ int main()
 	vd.setAllowedStartSymbolIndices();
 
 	// Test run
-	vd.run(y.data(), y.size(), 8000);
+	if (strcmp(argv[1], "0") == 0) {
+		vd.run(y.data(), y.size(), 8000);
+	}
+
+	if (strcmp(argv[1], "1") == 0) {
+		vd.setUseThreading(true);
+		vd.run(y.data(), y.size(), 8000);
+	}
 
 	//vd.printOmegaVectors(64000, 64010);
     

@@ -9,67 +9,37 @@ import time
 import numpy as np
 import cupy as cp
 
-def createLinearTrajectory(pos1, pos2, stepArray, pos_start=None, randomWalk=None):
-    '''
-    Parameters
-    ----------
-    pos1 : Numpy array, 1-D.
-        Anchor position 1. Starting position defaults to this.
-    pos2 : Numpy array, 1-D.
-        Anchor position 2.
-    stepArray : Numpy array, 1-D.
-        Array of steps. Each point will move by step * directionVectorNormed. Does not need to be equally spaced.
-    pos_start : Scalar between [0,1], optional
-        The default is None.
-        The output will use this as the coefficient along the connecting vector between
-        the 2 anchor points, as the position to start iterating at.
-    randomWalk : Scalar, optional
-        The default is None.
-        Adds random noise around the trajectory using a normal distribution.
-
-    Returns
-    -------
-    Matrix of column vectors of positions along the trajectory.
-    For steps which exceed the 2nd anchor point, the direction reverses i.e.
-    the trajectory is constructed as a bounce between the two anchor points.
-    '''
-    
-    if pos_start is None:
-        pos0 = pos1
-    else:
-        raise NotImplementedError
-        
-    result = np.zeros((len(pos1), len(stepArray)))
-    finalStepArray = np.zeros(stepArray.shape)
-    
+def createLinearTrajectory(totalSamples, pos1, pos2, speed, sampleTime, start_coeff=0):
+    # Define connecting vector between two anchors
     dirVec = pos2 - pos1
     anchorDist = np.linalg.norm(dirVec)
     dirVecNormed = dirVec / np.linalg.norm(dirVec)
-    # revDirVecNormed = -dirVecNormed
     
-    lengthsCovered = np.floor(stepArray / anchorDist)
-    idxReverse = np.argwhere(lengthsCovered%2==1).flatten()
+    # Define the start position
+    pos_start = pos1 + start_coeff * dirVec
     
-    # in these indices, calculate the remaining length
-    remainderLen = np.remainder(stepArray[idxReverse], anchorDist)
+    # Calculate percentage of anchor-anchor distance travelled per sample
+    distPerSample = sampleTime * speed
+    percentPerSample = distPerSample / anchorDist
     
-    # these are removed from the full length to induce the backward motion from the 2nd anchor point
-    finalStepArray[idxReverse] = anchorDist - remainderLen 
+    # Formulate in terms of multiples of anchorDist
+    percentAnchorDist = start_coeff + np.arange(totalSamples) * percentPerSample
     
-    # for forward we do the same
-    idxForward = np.argwhere(lengthsCovered%2==0).flatten()
+    # First, correct the ones that have returned full cycles
+    percentAnchorDist = np.mod(percentAnchorDist, 2) # 2 means it is back at anchor pos1 (not pos_start necessarily!)
+    # Then, correct the ones which are in reverse direction
+    reverseIdx = np.argwhere(percentAnchorDist > 1.0)
+    percentAnchorDist[reverseIdx] = 2.0 - percentAnchorDist[reverseIdx] # this will move it backwards appropriately e.g. 1.1 -> 0.9
     
-    remainderForwardLen = np.remainder(stepArray[idxForward], anchorDist)
+    # These indices have the velocities flipped
+    r_xdot = np.zeros((totalSamples, len(pos1))) + dirVecNormed * speed # everything is identical, except for the flips which are handled next
+    r_xdot[reverseIdx,:] = -r_xdot[reverseIdx,:]
     
-    finalStepArray[idxForward] = remainderForwardLen
+    # Now compute the positions r_x
+    r_x = pos1 + percentAnchorDist.reshape((-1,1)) * dirVec
     
-    # now calculate the values
-    displacements = dirVecNormed.reshape((-1,1))  * finalStepArray.reshape((1,-1))
+    return r_x, r_xdot
     
-    result = pos0.reshape((-1,1)) + displacements
-    
-    return result
-
 def createCircularTrajectory(totalSamples, r_a=100000.0, desiredSpeed=100.0, r_h=300.0, sampleTime=3.90625e-6, phi=0):    
     # initialize a bunch of rx points in a circle in 3d
     dtheta_per_s = desiredSpeed/r_a # rad/s

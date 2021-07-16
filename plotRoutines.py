@@ -164,3 +164,23 @@ def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=
     plt.title(title)
     
     return fig, ax
+
+
+def plotTrajectory2d(r_x, r_xdot=None, r_xfmt='b.', quiver_scale=None, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+        
+    # plot the points
+    ax.plot(r_x[:,0], r_x[:,1], r_xfmt)
+    
+    # get some scaling based on the positions if not supplied
+    if quiver_scale is None:
+        quiver_scale = np.mean(np.linalg.norm(np.diff(r_x, axis=0), axis=1))
+    
+    # plot the velocity vectors as quivers
+    r_xdot_normed = r_xdot / np.linalg.norm(r_xdot, axis=1).reshape((-1,1))
+    ax.quiver(r_x[:,0], r_x[:,1], r_xdot_normed[:,0] * quiver_scale, r_xdot_normed[:,1] * quiver_scale, scale_units='xy', angles='xy', scale=1)
+    
+    ax.axis('equal')
+    
+    return ax

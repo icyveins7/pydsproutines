@@ -6,4 +6,6 @@
 .ipynb_checkpoints/
 *.bin
 *.exe
-
+cython_ext/build/*
+*.pyd
+cython_ext/*.pyd

@@ -456,5 +456,5 @@ class BurstyViterbiDemodulator(ViterbiDemodulator):
 # vd = ViterbiDemodulator(alphabet, pretransitionIdx, pulses, omega_l, up)
 # vd.calcBranchMetrics(y.flatten(), paths, 1)
 
-vd = BurstyViterbiDemodulator(alphabet, pretransitionIdx, pulses, omega_l, up, 71, 9, np.array([0,2]))
-bestPath, pathmetrics, paths = vd.run(ynoise.flatten(), 8000)
+# vd = BurstyViterbiDemodulator(alphabet, pretransitionIdx, pulses, omega_l, up, 71, 9, np.array([0,2]))
+# bestPath, pathmetrics, paths = vd.run(ynoise.flatten(), 8000)

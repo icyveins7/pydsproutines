@@ -1,3 +1,5 @@
+#pragma once
+
 #include "ipp.h"
 #include <string>
 
@@ -115,7 +117,7 @@ namespace ippe
 	
 	// default ctor
 	template <typename T>
-	vector<T>::vector(size_t count)
+	inline vector<T>::vector(size_t count)
 	{
 		// std::cout<<"There is no default template for IPP vectors. Please specify a valid IPP type." << std::endl;
 		throw NO_DEFAULT;
@@ -123,7 +125,7 @@ namespace ippe
 	
 	// Ipp8u ctor
 	template <>
-	vector<Ipp8u>::vector(size_t count)
+	inline vector<Ipp8u>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -134,7 +136,7 @@ namespace ippe
 	
 	// Ipp16u ctor
 	template <>
-	vector<Ipp16u>::vector(size_t count)
+	inline vector<Ipp16u>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -145,7 +147,7 @@ namespace ippe
 	
 	// Ipp32u ctor
 	template <>
-	vector<Ipp32u>::vector(size_t count)
+	inline vector<Ipp32u>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -156,7 +158,7 @@ namespace ippe
 	
 	// Ipp8s ctor
 	template <>
-	vector<Ipp8s>::vector(size_t count)
+	inline vector<Ipp8s>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -167,7 +169,7 @@ namespace ippe
 	
 	// Ipp16s ctor
 	template <>
-	vector<Ipp16s>::vector(size_t count)
+	inline vector<Ipp16s>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -178,7 +180,7 @@ namespace ippe
 	
 	// Ipp32s ctor
 	template <>
-	vector<Ipp32s>::vector(size_t count)
+	inline vector<Ipp32s>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -189,7 +191,7 @@ namespace ippe
 	
 	// Ipp64s ctor
 	template <>
-	vector<Ipp64s>::vector(size_t count)
+	inline vector<Ipp64s>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -200,7 +202,7 @@ namespace ippe
 	
 	// Ipp32f ctor
 	template <>
-	vector<Ipp32f>::vector(size_t count)
+	inline vector<Ipp32f>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -211,7 +213,7 @@ namespace ippe
 	
 	// Ipp64f ctor
 	template <>
-	vector<Ipp64f>::vector(size_t count)
+	inline vector<Ipp64f>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -222,7 +224,7 @@ namespace ippe
 	
 	// Ipp8sc ctor
 	template <>
-	vector<Ipp8sc>::vector(size_t count)
+	inline vector<Ipp8sc>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -233,7 +235,7 @@ namespace ippe
 	
 	// Ipp16sc ctor
 	template <>
-	vector<Ipp16sc>::vector(size_t count)
+	inline vector<Ipp16sc>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -244,7 +246,7 @@ namespace ippe
 	
 	// Ipp32sc ctor
 	template <>
-	vector<Ipp32sc>::vector(size_t count)
+	inline vector<Ipp32sc>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -255,7 +257,7 @@ namespace ippe
 	
 	// Ipp64sc ctor
 	template <>
-	vector<Ipp64sc>::vector(size_t count)
+	inline vector<Ipp64sc>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -266,7 +268,7 @@ namespace ippe
 	
 	// Ipp32fc ctor
 	template <>
-	vector<Ipp32fc>::vector(size_t count)
+	inline vector<Ipp32fc>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -277,7 +279,7 @@ namespace ippe
 	
 	// Ipp64fc ctor
 	template <>
-	vector<Ipp64fc>::vector(size_t count)
+	inline vector<Ipp64fc>::vector(size_t count)
 	{
 		vector_base(count);
 		
@@ -290,7 +292,7 @@ namespace ippe
 	
 	// default resize
 	template <typename T>
-	void vector<T>::resize(size_t count)
+	inline void vector<T>::resize(size_t count)
 	{
 		// std::cout << "No default resize. This should never happen, should have been caught in ctor." << std::endl;
 		throw NO_DEFAULT;
@@ -298,7 +300,7 @@ namespace ippe
 	
 	// Ipp8u resize
 	template <>
-	void vector<Ipp8u>::resize(size_t count)
+	inline void vector<Ipp8u>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -314,7 +316,7 @@ namespace ippe
 	}
 	// Ipp16u resize, copy function does not exist
 	template <>
-	void vector<Ipp16u>::resize(size_t count)
+	inline void vector<Ipp16u>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -330,7 +332,7 @@ namespace ippe
 	}
 	// Ipp32u resize, copy function does not exist
 	template <>
-	void vector<Ipp32u>::resize(size_t count)
+	inline void vector<Ipp32u>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -346,7 +348,7 @@ namespace ippe
 	}
 	// Ipp8s resize, copy function does not exist
 	template <>
-	void vector<Ipp8s>::resize(size_t count)
+	inline void vector<Ipp8s>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -362,7 +364,7 @@ namespace ippe
 	}
 	// Ipp16s resize
 	template <>
-	void vector<Ipp16s>::resize(size_t count)
+	inline void vector<Ipp16s>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -378,7 +380,7 @@ namespace ippe
 	}
 	// Ipp32s resize
 	template <>
-	void vector<Ipp32s>::resize(size_t count)
+	inline void vector<Ipp32s>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -394,7 +396,7 @@ namespace ippe
 	}
 	// Ipp64s resize
 	template <>
-	void vector<Ipp64s>::resize(size_t count)
+	inline void vector<Ipp64s>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -410,7 +412,7 @@ namespace ippe
 	}
 	// Ipp32f resize
 	template <>
-	void vector<Ipp32f>::resize(size_t count)
+	inline void vector<Ipp32f>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -426,7 +428,7 @@ namespace ippe
 	}
 	// Ipp64f resize
 	template <>
-	void vector<Ipp64f>::resize(size_t count)
+	inline void vector<Ipp64f>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -442,7 +444,7 @@ namespace ippe
 	}
 	// Ipp8sc resize, copy function does not exist
 	template <>
-	void vector<Ipp8sc>::resize(size_t count)
+	inline void vector<Ipp8sc>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -458,7 +460,7 @@ namespace ippe
 	}
 	// Ipp16sc resize
 	template <>
-	void vector<Ipp16sc>::resize(size_t count)
+	inline void vector<Ipp16sc>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -474,7 +476,7 @@ namespace ippe
 	}
 	// Ipp32sc resize
 	template <>
-	void vector<Ipp32sc>::resize(size_t count)
+	inline void vector<Ipp32sc>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -490,7 +492,7 @@ namespace ippe
 	}
 	// Ipp64sc resize
 	template <>
-	void vector<Ipp64sc>::resize(size_t count)
+	inline void vector<Ipp64sc>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -506,7 +508,7 @@ namespace ippe
 	}
 	// Ipp32fc resize
 	template <>
-	void vector<Ipp32fc>::resize(size_t count)
+	inline void vector<Ipp32fc>::resize(size_t count)
 	{
 		base_resize(count);
 				
@@ -522,7 +524,7 @@ namespace ippe
 	}
 	// Ipp64fc resize
 	template <>
-	void vector<Ipp64fc>::resize(size_t count)
+	inline void vector<Ipp64fc>::resize(size_t count)
 	{
 		base_resize(count);
 				

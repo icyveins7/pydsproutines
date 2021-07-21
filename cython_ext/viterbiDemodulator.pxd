@@ -27,7 +27,8 @@ cdef extern from "viterbiDemodulator.h":
         void printPathMetrics()
         void printPaths(int, int)
         void printBranchMetrics()
-        void printOmegaVectors(int, int)
+        string printOmegaVectors(int, int)
+        string printPulses(int, int)
         
         int getWorkspaceIdx(int)
         void setUseThreading(bool)

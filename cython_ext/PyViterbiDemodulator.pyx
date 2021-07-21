@@ -12,19 +12,20 @@ cdef class PyViterbiDemodulator:
     def __cinit__(self, np.ndarray[np.complex128_t, ndim=1] in_alphabet, unsigned int alphabetLen,
             		np.ndarray[np.uint8_t, ndim=2] in_preTransitions, unsigned int preTransitionsLen,
             		unsigned int in_numSrc,
-            		np.ndarray[np.complex128_t, ndim=2] in_pulses, int in_pulselen, 
+            		np.ndarray[np.complex128_t, ndim=1] in_pulses, int in_pulselen, 
             		np.ndarray[np.float64_t, ndim=1] in_omegas, 
             		unsigned int in_up):
         
         print("Attempting to init..")
         
-        contiguousPretransitions = np.ascontiguousarray(in_preTransitions)
-        contiguousPulses = np.ascontiguousarray(in_pulses)
+        contiguousPretransitions = np.ascontiguousarray(in_preTransitions, dtype=np.uint8)
+        # contiguousPulses = np.ascontiguousarray(in_pulses, dtype=np.complex128) # this doesn't work?
+        # print(contiguousPulses)
         
         self.vd = new ViterbiDemodulator(<Ipp64fc*>in_alphabet.data, <uint8_t>alphabetLen,
                                          <bytes>contiguousPretransitions.data.tobytes(), <uint8_t>preTransitionsLen, # DO NOT CHANGE FROM <BYTES>, NOR THE .tobytes() !!!
                                          <uint8_t>in_numSrc,
-                                         <Ipp64fc*>contiguousPulses.data, in_pulselen,
+                                         <Ipp64fc*>in_pulses.data, in_pulselen,
                                          <Ipp64f*>in_omegas.data,
                                          in_up)
         
@@ -54,7 +55,10 @@ cdef class PyViterbiDemodulator:
         self.vd.printBranchMetrics()
         
     def printOmegaVectors(self, s, e):
-        self.vd.printOmegaVectors(s,e)
+        print(self.vd.printOmegaVectors(s,e).decode('utf-8'))
+        
+    def printPulses(self, s, e):
+        print(self.vd.printPulses(s,e).decode('utf-8'))
         
     def getWorkspaceIdx(self, s):
         return self.vd.getWorkspaceIdx(s)

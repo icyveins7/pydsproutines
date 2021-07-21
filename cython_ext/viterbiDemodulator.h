@@ -80,7 +80,8 @@ public:
 	void printPathMetrics();
 	void printPaths(int n, int s = 0);
 	void printBranchMetrics();
-	void printOmegaVectors(int s, int e);
+	std::string printOmegaVectors(int s, int e);
+	std::string printPulses(int s, int e);
 
 	// Get/Set
 	int getWorkspaceIdx(int s);
@@ -116,7 +117,7 @@ public:
 	void prepareOmegaVectors(int length);
 
 	// Main run-time method
-	void run(Ipp64fc* y, int ylength, int pathlen);
+	int run(Ipp64fc* y, int ylength, int pathlen);
 
 	// Debugging
 	void dumpOutput();

@@ -196,15 +196,47 @@ void ViterbiDemodulator::printBranchMetrics()
 	printf("\n");
 }
 
-void ViterbiDemodulator::printOmegaVectors(int s, int e)
+std::string ViterbiDemodulator::printOmegaVectors(int s, int e)
 {
-	printf("Omega vectors:\n");
+	int len = (e - s + 1) * omegavectors.size() * 128;
+	char* tmp = (char*)malloc(sizeof(char) * len);
+
+	snprintf(tmp, len, "Omega vectors:\n");
 	for (int i = 0; i < omegavectors.size(); i++) {
 		for (int j = s; j < e; j++) {
-			printf("%d,%d : %.8f + %.8fi\n", i, j, omegavectors.at(i).at(j).re, omegavectors.at(i).at(j).im);
+			snprintf(tmp, len, "%s%d,%d : %.8f + %.8fi\n", tmp, i, j, omegavectors.at(i).at(j).re, omegavectors.at(i).at(j).im);
+			//printf("%d,%d : %.8f + %.8fi\n", i, j, omegavectors.at(i).at(j).re, omegavectors.at(i).at(j).im);
 		}
 	}
-	printf("\n");
+	snprintf(tmp, len, "%s\n", tmp);
+
+	std::string out(tmp);
+
+	free(tmp);
+
+	printf("%s", out.c_str());
+
+	return out;
+}
+
+std::string ViterbiDemodulator::printPulses(int s, int e) 
+{
+	int len = (e - s + 1) * pulselen * numSrc * 128;
+	char* tmp = (char*)malloc(sizeof(char) * len);
+
+	snprintf(tmp, len, "Pulses:\n");
+	for (int i = 0; i < pulses.size(); i++) {
+		for (int j = s; j < e; j++) {
+			snprintf(tmp, len, "%s%d,%d : %.6f + %.6fi\n", tmp, i, j, pulses.at(i).at(j).re, pulses.at(i).at(j).im);
+		}
+	}
+	snprintf(tmp, len, "%s\n", tmp);
+
+	std::string out(tmp);
+	free(tmp);
+
+	printf("%s", out.c_str());
+	return out;
 }
 
 int ViterbiDemodulator::getWorkspaceIdx(int s) {
@@ -253,7 +285,7 @@ void ViterbiDemodulator::prepareBranchMetricWorkspace(int pathlen)
 }
 
 // Runtime
-void ViterbiDemodulator::run(Ipp64fc* y, int ylength, int pathlen)
+int ViterbiDemodulator::run(Ipp64fc* y, int ylength, int pathlen)
 {
 	// Time the run
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -386,6 +418,8 @@ void ViterbiDemodulator::run(Ipp64fc* y, int ylength, int pathlen)
 
 	// Dump output
 	dumpOutput();
+
+	return 0;
 }
 
 

@@ -1374,13 +1374,6 @@ static PyObject *__Pyx__GetModuleGlobalName(PyObject *name, PY_UINT64_T *dict_ve
 static CYTHON_INLINE PyObject *__Pyx__GetModuleGlobalName(PyObject *name);
 #endif
 
-/* PyCFunctionFastCall.proto */
-#if CYTHON_FAST_PYCCALL
-static CYTHON_INLINE PyObject *__Pyx_PyCFunction_FastCall(PyObject *func, PyObject **args, Py_ssize_t nargs);
-#else
-#define __Pyx_PyCFunction_FastCall(func, args, nargs)  (assert(0), NULL)
-#endif
-
 /* PyFunctionFastCall.proto */
 #if CYTHON_FAST_PYCALL
 #define __Pyx_PyFunction_FastCall(func, args, nargs)\
@@ -1404,16 +1397,10 @@ static PyObject *__Pyx_PyFunction_FastCallDict(PyObject *func, PyObject **args, 
     (assert(__pyx_pyframe_localsplus_offset), (PyObject **)(((char *)(frame)) + __pyx_pyframe_localsplus_offset))
 #endif
 
-/* PyObjectCall2Args.proto */
-static CYTHON_UNUSED PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2);
-
 /* PyObjectCallMethO.proto */
 #if CYTHON_COMPILING_IN_CPYTHON
 static CYTHON_INLINE PyObject* __Pyx_PyObject_CallMethO(PyObject *func, PyObject *arg);
 #endif
-
-/* PyObjectCallOneArg.proto */
-static CYTHON_INLINE PyObject* __Pyx_PyObject_CallOneArg(PyObject *func, PyObject *arg);
 
 /* PyObjectCallNoArg.proto */
 #if CYTHON_COMPILING_IN_CPYTHON
@@ -1421,6 +1408,16 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_CallNoArg(PyObject *func);
 #else
 #define __Pyx_PyObject_CallNoArg(func) __Pyx_PyObject_Call(func, __pyx_empty_tuple, NULL)
 #endif
+
+/* PyCFunctionFastCall.proto */
+#if CYTHON_FAST_PYCCALL
+static CYTHON_INLINE PyObject *__Pyx_PyCFunction_FastCall(PyObject *func, PyObject **args, Py_ssize_t nargs);
+#else
+#define __Pyx_PyCFunction_FastCall(func, args, nargs)  (assert(0), NULL)
+#endif
+
+/* PyObjectCallOneArg.proto */
+static CYTHON_INLINE PyObject* __Pyx_PyObject_CallOneArg(PyObject *func, PyObject *arg);
 
 /* PyThreadStateGet.proto */
 #if CYTHON_FAST_THREAD_STATE
@@ -1863,9 +1860,11 @@ static const char __pyx_k_data[] = "data";
 static const char __pyx_k_main[] = "__main__";
 static const char __pyx_k_name[] = "__name__";
 static const char __pyx_k_test[] = "__test__";
+static const char __pyx_k_dtype[] = "dtype";
 static const char __pyx_k_in_up[] = "in_up";
 static const char __pyx_k_numpy[] = "numpy";
 static const char __pyx_k_print[] = "print";
+static const char __pyx_k_uint8[] = "uint8";
 static const char __pyx_k_import[] = "__import__";
 static const char __pyx_k_reduce[] = "__reduce__";
 static const char __pyx_k_pathlen[] = "pathlen";
@@ -1904,6 +1903,7 @@ static PyObject *__pyx_n_s_alphabetLen;
 static PyObject *__pyx_n_s_ascontiguousarray;
 static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_n_s_data;
+static PyObject *__pyx_n_s_dtype;
 static PyObject *__pyx_n_s_e;
 static PyObject *__pyx_n_s_getstate;
 static PyObject *__pyx_n_s_import;
@@ -1936,6 +1936,7 @@ static PyObject *__pyx_n_s_setstate;
 static PyObject *__pyx_n_s_setstate_cython;
 static PyObject *__pyx_n_s_test;
 static PyObject *__pyx_n_s_tobytes;
+static PyObject *__pyx_n_s_uint8;
 static PyObject *__pyx_n_s_y;
 static PyObject *__pyx_n_s_ylength;
 static int __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator___cinit__(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyArrayObject *__pyx_v_in_alphabet, unsigned int __pyx_v_alphabetLen, PyArrayObject *__pyx_v_in_preTransitions, unsigned int __pyx_v_preTransitionsLen, unsigned int __pyx_v_in_numSrc, PyArrayObject *__pyx_v_in_pulses, int __pyx_v_in_pulselen, PyArrayObject *__pyx_v_in_omegas, unsigned int __pyx_v_in_up); /* proto */
@@ -1947,14 +1948,15 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_10printP
 static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_12printPaths(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_n, PyObject *__pyx_v_s); /* proto */
 static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_14printBranchMetrics(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_16printOmegaVectors(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_s, PyObject *__pyx_v_e); /* proto */
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_18getWorkspaceIdx(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_s); /* proto */
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_20setAllowedStartSymbolIndices(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self); /* proto */
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_22setUseThreading(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_i); /* proto */
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_24run(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyArrayObject *__pyx_v_y, PyObject *__pyx_v_ylength, PyObject *__pyx_v_pathlen); /* proto */
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_26calcBranchMetrics(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyArrayObject *__pyx_v_y, PyObject *__pyx_v_n, PyObject *__pyx_v_pathlen); /* proto */
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_28dumpOutput(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self); /* proto */
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_30__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self); /* proto */
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_32__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_18printPulses(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_s, PyObject *__pyx_v_e); /* proto */
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_20getWorkspaceIdx(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_s); /* proto */
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_22setAllowedStartSymbolIndices(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_24setUseThreading(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_i); /* proto */
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_26run(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyArrayObject *__pyx_v_y, PyObject *__pyx_v_ylength, PyObject *__pyx_v_pathlen); /* proto */
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_28calcBranchMetrics(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyArrayObject *__pyx_v_y, PyObject *__pyx_v_n, PyObject *__pyx_v_pathlen); /* proto */
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_30dumpOutput(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_32__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_34__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
 static PyObject *__pyx_tp_new_20PyViterbiDemodulator_PyViterbiDemodulator(PyTypeObject *t, PyObject *a, PyObject *k); /*proto*/
 static PyObject *__pyx_int_0;
 static PyObject *__pyx_tuple_;
@@ -2123,7 +2125,6 @@ static int __pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_1__cinit__(PyO
 
 static int __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator___cinit__(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyArrayObject *__pyx_v_in_alphabet, unsigned int __pyx_v_alphabetLen, PyArrayObject *__pyx_v_in_preTransitions, unsigned int __pyx_v_preTransitionsLen, unsigned int __pyx_v_in_numSrc, PyArrayObject *__pyx_v_in_pulses, int __pyx_v_in_pulselen, PyArrayObject *__pyx_v_in_omegas, unsigned int __pyx_v_in_up) {
   PyObject *__pyx_v_contiguousPretransitions = NULL;
-  PyObject *__pyx_v_contiguousPulses = NULL;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_in_alphabet;
   __Pyx_Buffer __pyx_pybuffer_in_alphabet;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_in_omegas;
@@ -2137,8 +2138,10 @@ static int __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator___cinit__(stru
   PyObject *__pyx_t_1 = NULL;
   PyObject *__pyx_t_2 = NULL;
   PyObject *__pyx_t_3 = NULL;
-  uint8_t *__pyx_t_4;
-  ViterbiDemodulator *__pyx_t_5;
+  PyObject *__pyx_t_4 = NULL;
+  PyObject *__pyx_t_5 = NULL;
+  uint8_t *__pyx_t_6;
+  ViterbiDemodulator *__pyx_t_7;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -2171,9 +2174,9 @@ static int __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator___cinit__(stru
   __pyx_pybuffernd_in_preTransitions.diminfo[0].strides = __pyx_pybuffernd_in_preTransitions.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_in_preTransitions.diminfo[0].shape = __pyx_pybuffernd_in_preTransitions.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_in_preTransitions.diminfo[1].strides = __pyx_pybuffernd_in_preTransitions.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_in_preTransitions.diminfo[1].shape = __pyx_pybuffernd_in_preTransitions.rcbuffer->pybuffer.shape[1];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_in_pulses.rcbuffer->pybuffer, (PyObject*)__pyx_v_in_pulses, &__Pyx_TypeInfo___pyx_t_double_complex, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 12, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_in_pulses.rcbuffer->pybuffer, (PyObject*)__pyx_v_in_pulses, &__Pyx_TypeInfo___pyx_t_double_complex, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 12, __pyx_L1_error)
   }
-  __pyx_pybuffernd_in_pulses.diminfo[0].strides = __pyx_pybuffernd_in_pulses.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_in_pulses.diminfo[0].shape = __pyx_pybuffernd_in_pulses.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_in_pulses.diminfo[1].strides = __pyx_pybuffernd_in_pulses.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_in_pulses.diminfo[1].shape = __pyx_pybuffernd_in_pulses.rcbuffer->pybuffer.shape[1];
+  __pyx_pybuffernd_in_pulses.diminfo[0].strides = __pyx_pybuffernd_in_pulses.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_in_pulses.diminfo[0].shape = __pyx_pybuffernd_in_pulses.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_in_omegas.rcbuffer->pybuffer, (PyObject*)__pyx_v_in_omegas, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 12, __pyx_L1_error)
@@ -2185,7 +2188,7 @@ static int __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator___cinit__(stru
  * 
  *         print("Attempting to init..")             # <<<<<<<<<<<<<<
  * 
- *         contiguousPretransitions = np.ascontiguousarray(in_preTransitions)
+ *         contiguousPretransitions = np.ascontiguousarray(in_preTransitions, dtype=np.uint8)
  */
   __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_print, __pyx_tuple_, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 19, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -2194,200 +2197,163 @@ static int __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator___cinit__(stru
   /* "PyViterbiDemodulator.pyx":21
  *         print("Attempting to init..")
  * 
- *         contiguousPretransitions = np.ascontiguousarray(in_preTransitions)             # <<<<<<<<<<<<<<
- *         contiguousPulses = np.ascontiguousarray(in_pulses)
- * 
+ *         contiguousPretransitions = np.ascontiguousarray(in_preTransitions, dtype=np.uint8)             # <<<<<<<<<<<<<<
+ *         # contiguousPulses = np.ascontiguousarray(in_pulses, dtype=np.complex128) # this doesn't work?
+ *         # print(contiguousPulses)
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 21, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 21, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = NULL;
-  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_3))) {
-    __pyx_t_2 = PyMethod_GET_SELF(__pyx_t_3);
-    if (likely(__pyx_t_2)) {
-      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_3);
-      __Pyx_INCREF(__pyx_t_2);
-      __Pyx_INCREF(function);
-      __Pyx_DECREF_SET(__pyx_t_3, function);
-    }
-  }
-  __pyx_t_1 = (__pyx_t_2) ? __Pyx_PyObject_Call2Args(__pyx_t_3, __pyx_t_2, ((PyObject *)__pyx_v_in_preTransitions)) : __Pyx_PyObject_CallOneArg(__pyx_t_3, ((PyObject *)__pyx_v_in_preTransitions));
-  __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 21, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 21, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_v_contiguousPretransitions = __pyx_t_1;
-  __pyx_t_1 = 0;
-
-  /* "PyViterbiDemodulator.pyx":22
- * 
- *         contiguousPretransitions = np.ascontiguousarray(in_preTransitions)
- *         contiguousPulses = np.ascontiguousarray(in_pulses)             # <<<<<<<<<<<<<<
- * 
- *         self.vd = new ViterbiDemodulator(<Ipp64fc*>in_alphabet.data, <uint8_t>alphabetLen,
- */
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 22, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 22, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_ascontiguousarray); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 21, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = NULL;
-  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_2))) {
-    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_2);
-    if (likely(__pyx_t_3)) {
-      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_2);
-      __Pyx_INCREF(__pyx_t_3);
-      __Pyx_INCREF(function);
-      __Pyx_DECREF_SET(__pyx_t_2, function);
-    }
-  }
-  __pyx_t_1 = (__pyx_t_3) ? __Pyx_PyObject_Call2Args(__pyx_t_2, __pyx_t_3, ((PyObject *)__pyx_v_in_pulses)) : __Pyx_PyObject_CallOneArg(__pyx_t_2, ((PyObject *)__pyx_v_in_pulses));
-  __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
-  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 22, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_1 = PyTuple_New(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 21, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_INCREF(((PyObject *)__pyx_v_in_preTransitions));
+  __Pyx_GIVEREF(((PyObject *)__pyx_v_in_preTransitions));
+  PyTuple_SET_ITEM(__pyx_t_1, 0, ((PyObject *)__pyx_v_in_preTransitions));
+  __pyx_t_3 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 21, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 21, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_uint8); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 21, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_dtype, __pyx_t_5) < 0) __PYX_ERR(0, 21, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_t_5 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_1, __pyx_t_3); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 21, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_v_contiguousPulses = __pyx_t_1;
-  __pyx_t_1 = 0;
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_v_contiguousPretransitions = __pyx_t_5;
+  __pyx_t_5 = 0;
 
-  /* "PyViterbiDemodulator.pyx":25
+  /* "PyViterbiDemodulator.pyx":26
  * 
  *         self.vd = new ViterbiDemodulator(<Ipp64fc*>in_alphabet.data, <uint8_t>alphabetLen,
  *                                          <bytes>contiguousPretransitions.data.tobytes(), <uint8_t>preTransitionsLen, # DO NOT CHANGE FROM <BYTES>, NOR THE .tobytes() !!!             # <<<<<<<<<<<<<<
  *                                          <uint8_t>in_numSrc,
- *                                          <Ipp64fc*>contiguousPulses.data, in_pulselen,
+ *                                          <Ipp64fc*>in_pulses.data, in_pulselen,
  */
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_v_contiguousPretransitions, __pyx_n_s_data); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 25, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_tobytes); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_v_contiguousPretransitions, __pyx_n_s_data); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 26, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = NULL;
-  if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_3))) {
-    __pyx_t_2 = PyMethod_GET_SELF(__pyx_t_3);
-    if (likely(__pyx_t_2)) {
-      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_3);
-      __Pyx_INCREF(__pyx_t_2);
-      __Pyx_INCREF(function);
-      __Pyx_DECREF_SET(__pyx_t_3, function);
-    }
-  }
-  __pyx_t_1 = (__pyx_t_2) ? __Pyx_PyObject_CallOneArg(__pyx_t_3, __pyx_t_2) : __Pyx_PyObject_CallNoArg(__pyx_t_3);
-  __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_tobytes); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 26, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  if (unlikely(__pyx_t_1 == Py_None)) {
-    PyErr_SetString(PyExc_TypeError, "expected bytes, NoneType found");
-    __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_3 = NULL;
+  if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_1))) {
+    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_1);
+    if (likely(__pyx_t_3)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_1);
+      __Pyx_INCREF(__pyx_t_3);
+      __Pyx_INCREF(function);
+      __Pyx_DECREF_SET(__pyx_t_1, function);
+    }
   }
-  __pyx_t_4 = __Pyx_PyBytes_AsWritableUString(__pyx_t_1); if (unlikely((!__pyx_t_4) && PyErr_Occurred())) __PYX_ERR(0, 25, __pyx_L1_error)
+  __pyx_t_5 = (__pyx_t_3) ? __Pyx_PyObject_CallOneArg(__pyx_t_1, __pyx_t_3) : __Pyx_PyObject_CallNoArg(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+  if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 26, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (unlikely(__pyx_t_5 == Py_None)) {
+    PyErr_SetString(PyExc_TypeError, "expected bytes, NoneType found");
+    __PYX_ERR(0, 26, __pyx_L1_error)
+  }
+  __pyx_t_6 = __Pyx_PyBytes_AsWritableUString(__pyx_t_5); if (unlikely((!__pyx_t_6) && PyErr_Occurred())) __PYX_ERR(0, 26, __pyx_L1_error)
 
-  /* "PyViterbiDemodulator.pyx":27
- *                                          <bytes>contiguousPretransitions.data.tobytes(), <uint8_t>preTransitionsLen, # DO NOT CHANGE FROM <BYTES>, NOR THE .tobytes() !!!
- *                                          <uint8_t>in_numSrc,
- *                                          <Ipp64fc*>contiguousPulses.data, in_pulselen,             # <<<<<<<<<<<<<<
- *                                          <Ipp64f*>in_omegas.data,
- *                                          in_up)
- */
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_v_contiguousPulses, __pyx_n_s_data); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 27, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-
-  /* "PyViterbiDemodulator.pyx":24
- *         contiguousPulses = np.ascontiguousarray(in_pulses)
+  /* "PyViterbiDemodulator.pyx":25
+ *         # print(contiguousPulses)
  * 
  *         self.vd = new ViterbiDemodulator(<Ipp64fc*>in_alphabet.data, <uint8_t>alphabetLen,             # <<<<<<<<<<<<<<
  *                                          <bytes>contiguousPretransitions.data.tobytes(), <uint8_t>preTransitionsLen, # DO NOT CHANGE FROM <BYTES>, NOR THE .tobytes() !!!
  *                                          <uint8_t>in_numSrc,
  */
   try {
-    __pyx_t_5 = new ViterbiDemodulator(((Ipp64fc *)__pyx_v_in_alphabet->data), ((uint8_t)__pyx_v_alphabetLen), __pyx_t_4, ((uint8_t)__pyx_v_preTransitionsLen), ((uint8_t)__pyx_v_in_numSrc), ((Ipp64fc *)__pyx_t_3), __pyx_v_in_pulselen, ((Ipp64f *)__pyx_v_in_omegas->data), __pyx_v_in_up);
+    __pyx_t_7 = new ViterbiDemodulator(((Ipp64fc *)__pyx_v_in_alphabet->data), ((uint8_t)__pyx_v_alphabetLen), __pyx_t_6, ((uint8_t)__pyx_v_preTransitionsLen), ((uint8_t)__pyx_v_in_numSrc), ((Ipp64fc *)__pyx_v_in_pulses->data), __pyx_v_in_pulselen, ((Ipp64f *)__pyx_v_in_omegas->data), __pyx_v_in_up);
   } catch(...) {
     __Pyx_CppExn2PyErr();
-    __PYX_ERR(0, 24, __pyx_L1_error)
+    __PYX_ERR(0, 25, __pyx_L1_error)
   }
-  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_v_self->vd = __pyx_t_5;
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_v_self->vd = __pyx_t_7;
 
-  /* "PyViterbiDemodulator.pyx":31
+  /* "PyViterbiDemodulator.pyx":32
  *                                          in_up)
  * 
  *         self.printAlphabet()             # <<<<<<<<<<<<<<
  *         self.printValidTransitions()
  *         self.printOmega()
  */
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_printAlphabet); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 31, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_printAlphabet); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 32, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = NULL;
+  __pyx_t_3 = NULL;
   if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_1))) {
-    __pyx_t_2 = PyMethod_GET_SELF(__pyx_t_1);
-    if (likely(__pyx_t_2)) {
+    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_1);
+    if (likely(__pyx_t_3)) {
       PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_1);
-      __Pyx_INCREF(__pyx_t_2);
+      __Pyx_INCREF(__pyx_t_3);
       __Pyx_INCREF(function);
       __Pyx_DECREF_SET(__pyx_t_1, function);
     }
   }
-  __pyx_t_3 = (__pyx_t_2) ? __Pyx_PyObject_CallOneArg(__pyx_t_1, __pyx_t_2) : __Pyx_PyObject_CallNoArg(__pyx_t_1);
-  __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 31, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_5 = (__pyx_t_3) ? __Pyx_PyObject_CallOneArg(__pyx_t_1, __pyx_t_3) : __Pyx_PyObject_CallNoArg(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+  if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 32, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-  /* "PyViterbiDemodulator.pyx":32
+  /* "PyViterbiDemodulator.pyx":33
  * 
  *         self.printAlphabet()
  *         self.printValidTransitions()             # <<<<<<<<<<<<<<
  *         self.printOmega()
  * 
  */
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_printValidTransitions); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 32, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_printValidTransitions); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = NULL;
+  __pyx_t_3 = NULL;
   if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_1))) {
-    __pyx_t_2 = PyMethod_GET_SELF(__pyx_t_1);
-    if (likely(__pyx_t_2)) {
+    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_1);
+    if (likely(__pyx_t_3)) {
       PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_1);
-      __Pyx_INCREF(__pyx_t_2);
+      __Pyx_INCREF(__pyx_t_3);
       __Pyx_INCREF(function);
       __Pyx_DECREF_SET(__pyx_t_1, function);
     }
   }
-  __pyx_t_3 = (__pyx_t_2) ? __Pyx_PyObject_CallOneArg(__pyx_t_1, __pyx_t_2) : __Pyx_PyObject_CallNoArg(__pyx_t_1);
-  __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 32, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_5 = (__pyx_t_3) ? __Pyx_PyObject_CallOneArg(__pyx_t_1, __pyx_t_3) : __Pyx_PyObject_CallNoArg(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+  if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-  /* "PyViterbiDemodulator.pyx":33
+  /* "PyViterbiDemodulator.pyx":34
  *         self.printAlphabet()
  *         self.printValidTransitions()
  *         self.printOmega()             # <<<<<<<<<<<<<<
  * 
  *     def __dealloc__(self):
  */
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_printOmega); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 33, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_n_s_printOmega); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 34, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = NULL;
+  __pyx_t_3 = NULL;
   if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_1))) {
-    __pyx_t_2 = PyMethod_GET_SELF(__pyx_t_1);
-    if (likely(__pyx_t_2)) {
+    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_1);
+    if (likely(__pyx_t_3)) {
       PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_1);
-      __Pyx_INCREF(__pyx_t_2);
+      __Pyx_INCREF(__pyx_t_3);
       __Pyx_INCREF(function);
       __Pyx_DECREF_SET(__pyx_t_1, function);
     }
   }
-  __pyx_t_3 = (__pyx_t_2) ? __Pyx_PyObject_CallOneArg(__pyx_t_1, __pyx_t_2) : __Pyx_PyObject_CallNoArg(__pyx_t_1);
-  __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 33, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_5 = (__pyx_t_3) ? __Pyx_PyObject_CallOneArg(__pyx_t_1, __pyx_t_3) : __Pyx_PyObject_CallNoArg(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+  if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 34, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
   /* "PyViterbiDemodulator.pyx":12
  *     cdef ViterbiDemodulator* vd
@@ -2404,6 +2370,8 @@ static int __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator___cinit__(stru
   __Pyx_XDECREF(__pyx_t_1);
   __Pyx_XDECREF(__pyx_t_2);
   __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_4);
+  __Pyx_XDECREF(__pyx_t_5);
   { PyObject *__pyx_type, *__pyx_value, *__pyx_tb;
     __Pyx_PyThreadState_declare
     __Pyx_PyThreadState_assign
@@ -2423,12 +2391,11 @@ static int __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator___cinit__(stru
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_in_pulses.rcbuffer->pybuffer);
   __pyx_L2:;
   __Pyx_XDECREF(__pyx_v_contiguousPretransitions);
-  __Pyx_XDECREF(__pyx_v_contiguousPulses);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":35
+/* "PyViterbiDemodulator.pyx":36
  *         self.printOmega()
  * 
  *     def __dealloc__(self):             # <<<<<<<<<<<<<<
@@ -2451,7 +2418,7 @@ static void __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_2__dealloc__(
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__dealloc__", 0);
 
-  /* "PyViterbiDemodulator.pyx":36
+  /* "PyViterbiDemodulator.pyx":37
  * 
  *     def __dealloc__(self):
  *         del self.vd             # <<<<<<<<<<<<<<
@@ -2460,7 +2427,7 @@ static void __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_2__dealloc__(
  */
   delete __pyx_v_self->vd;
 
-  /* "PyViterbiDemodulator.pyx":35
+  /* "PyViterbiDemodulator.pyx":36
  *         self.printOmega()
  * 
  *     def __dealloc__(self):             # <<<<<<<<<<<<<<
@@ -2472,7 +2439,7 @@ static void __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_2__dealloc__(
   __Pyx_RefNannyFinishContext();
 }
 
-/* "PyViterbiDemodulator.pyx":38
+/* "PyViterbiDemodulator.pyx":39
  *         del self.vd
  * 
  *     def printAlphabet(self):             # <<<<<<<<<<<<<<
@@ -2503,21 +2470,21 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_4printAl
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("printAlphabet", 0);
 
-  /* "PyViterbiDemodulator.pyx":39
+  /* "PyViterbiDemodulator.pyx":40
  * 
  *     def printAlphabet(self):
  *         print(self.vd.printAlphabet().decode('utf-8'))             # <<<<<<<<<<<<<<
  * 
  *     def printValidTransitions(self):
  */
-  __pyx_t_1 = __Pyx_decode_cpp_string(__pyx_v_self->vd->printAlphabet(), 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 39, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_decode_cpp_string(__pyx_v_self->vd->printAlphabet(), 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 40, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 39, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 40, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "PyViterbiDemodulator.pyx":38
+  /* "PyViterbiDemodulator.pyx":39
  *         del self.vd
  * 
  *     def printAlphabet(self):             # <<<<<<<<<<<<<<
@@ -2539,7 +2506,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_4printAl
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":41
+/* "PyViterbiDemodulator.pyx":42
  *         print(self.vd.printAlphabet().decode('utf-8'))
  * 
  *     def printValidTransitions(self):             # <<<<<<<<<<<<<<
@@ -2570,21 +2537,21 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_6printVa
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("printValidTransitions", 0);
 
-  /* "PyViterbiDemodulator.pyx":42
+  /* "PyViterbiDemodulator.pyx":43
  * 
  *     def printValidTransitions(self):
  *         print(self.vd.printValidTransitions().decode('utf-8'))             # <<<<<<<<<<<<<<
  * 
  *     def printOmega(self):
  */
-  __pyx_t_1 = __Pyx_decode_cpp_string(__pyx_v_self->vd->printValidTransitions(), 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 42, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_decode_cpp_string(__pyx_v_self->vd->printValidTransitions(), 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 43, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 42, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 43, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "PyViterbiDemodulator.pyx":41
+  /* "PyViterbiDemodulator.pyx":42
  *         print(self.vd.printAlphabet().decode('utf-8'))
  * 
  *     def printValidTransitions(self):             # <<<<<<<<<<<<<<
@@ -2606,7 +2573,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_6printVa
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":44
+/* "PyViterbiDemodulator.pyx":45
  *         print(self.vd.printValidTransitions().decode('utf-8'))
  * 
  *     def printOmega(self):             # <<<<<<<<<<<<<<
@@ -2637,21 +2604,21 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_8printOm
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("printOmega", 0);
 
-  /* "PyViterbiDemodulator.pyx":45
+  /* "PyViterbiDemodulator.pyx":46
  * 
  *     def printOmega(self):
  *         print(self.vd.printOmega().decode('utf-8'))             # <<<<<<<<<<<<<<
  * 
  *     def printPathMetrics(self):
  */
-  __pyx_t_1 = __Pyx_decode_cpp_string(__pyx_v_self->vd->printOmega(), 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 45, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_decode_cpp_string(__pyx_v_self->vd->printOmega(), 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 46, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 45, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 46, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "PyViterbiDemodulator.pyx":44
+  /* "PyViterbiDemodulator.pyx":45
  *         print(self.vd.printValidTransitions().decode('utf-8'))
  * 
  *     def printOmega(self):             # <<<<<<<<<<<<<<
@@ -2673,7 +2640,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_8printOm
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":47
+/* "PyViterbiDemodulator.pyx":48
  *         print(self.vd.printOmega().decode('utf-8'))
  * 
  *     def printPathMetrics(self):             # <<<<<<<<<<<<<<
@@ -2699,7 +2666,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_10printP
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("printPathMetrics", 0);
 
-  /* "PyViterbiDemodulator.pyx":48
+  /* "PyViterbiDemodulator.pyx":49
  * 
  *     def printPathMetrics(self):
  *         self.vd.printPathMetrics()             # <<<<<<<<<<<<<<
@@ -2708,7 +2675,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_10printP
  */
   __pyx_v_self->vd->printPathMetrics();
 
-  /* "PyViterbiDemodulator.pyx":47
+  /* "PyViterbiDemodulator.pyx":48
  *         print(self.vd.printOmega().decode('utf-8'))
  * 
  *     def printPathMetrics(self):             # <<<<<<<<<<<<<<
@@ -2723,7 +2690,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_10printP
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":50
+/* "PyViterbiDemodulator.pyx":51
  *         self.vd.printPathMetrics()
  * 
  *     def printPaths(self, n, s=0):             # <<<<<<<<<<<<<<
@@ -2770,7 +2737,7 @@ static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_13printP
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "printPaths") < 0)) __PYX_ERR(0, 50, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "printPaths") < 0)) __PYX_ERR(0, 51, __pyx_L3_error)
       }
     } else {
       switch (PyTuple_GET_SIZE(__pyx_args)) {
@@ -2786,7 +2753,7 @@ static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_13printP
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("printPaths", 0, 1, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 50, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("printPaths", 0, 1, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 51, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("PyViterbiDemodulator.PyViterbiDemodulator.printPaths", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -2809,18 +2776,18 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_12printP
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("printPaths", 0);
 
-  /* "PyViterbiDemodulator.pyx":51
+  /* "PyViterbiDemodulator.pyx":52
  * 
  *     def printPaths(self, n, s=0):
  *         self.vd.printPaths(n,s)             # <<<<<<<<<<<<<<
  * 
  *     def printBranchMetrics(self):
  */
-  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_n); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 51, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_PyInt_As_int(__pyx_v_s); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 51, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_n); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 52, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_As_int(__pyx_v_s); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 52, __pyx_L1_error)
   __pyx_v_self->vd->printPaths(__pyx_t_1, __pyx_t_2);
 
-  /* "PyViterbiDemodulator.pyx":50
+  /* "PyViterbiDemodulator.pyx":51
  *         self.vd.printPathMetrics()
  * 
  *     def printPaths(self, n, s=0):             # <<<<<<<<<<<<<<
@@ -2840,7 +2807,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_12printP
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":53
+/* "PyViterbiDemodulator.pyx":54
  *         self.vd.printPaths(n,s)
  * 
  *     def printBranchMetrics(self):             # <<<<<<<<<<<<<<
@@ -2866,7 +2833,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_14printB
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("printBranchMetrics", 0);
 
-  /* "PyViterbiDemodulator.pyx":54
+  /* "PyViterbiDemodulator.pyx":55
  * 
  *     def printBranchMetrics(self):
  *         self.vd.printBranchMetrics()             # <<<<<<<<<<<<<<
@@ -2875,7 +2842,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_14printB
  */
   __pyx_v_self->vd->printBranchMetrics();
 
-  /* "PyViterbiDemodulator.pyx":53
+  /* "PyViterbiDemodulator.pyx":54
  *         self.vd.printPaths(n,s)
  * 
  *     def printBranchMetrics(self):             # <<<<<<<<<<<<<<
@@ -2890,11 +2857,11 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_14printB
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":56
+/* "PyViterbiDemodulator.pyx":57
  *         self.vd.printBranchMetrics()
  * 
  *     def printOmegaVectors(self, s, e):             # <<<<<<<<<<<<<<
- *         self.vd.printOmegaVectors(s,e)
+ *         print(self.vd.printOmegaVectors(s,e).decode('utf-8'))
  * 
  */
 
@@ -2932,11 +2899,11 @@ static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_17printO
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_e)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("printOmegaVectors", 1, 2, 2, 1); __PYX_ERR(0, 56, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("printOmegaVectors", 1, 2, 2, 1); __PYX_ERR(0, 57, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "printOmegaVectors") < 0)) __PYX_ERR(0, 56, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "printOmegaVectors") < 0)) __PYX_ERR(0, 57, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
       goto __pyx_L5_argtuple_error;
@@ -2949,7 +2916,7 @@ static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_17printO
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("printOmegaVectors", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 56, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("printOmegaVectors", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 57, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("PyViterbiDemodulator.PyViterbiDemodulator.printOmegaVectors", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -2967,27 +2934,34 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_16printO
   __Pyx_RefNannyDeclarations
   int __pyx_t_1;
   int __pyx_t_2;
+  PyObject *__pyx_t_3 = NULL;
+  PyObject *__pyx_t_4 = NULL;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("printOmegaVectors", 0);
 
-  /* "PyViterbiDemodulator.pyx":57
+  /* "PyViterbiDemodulator.pyx":58
  * 
  *     def printOmegaVectors(self, s, e):
- *         self.vd.printOmegaVectors(s,e)             # <<<<<<<<<<<<<<
+ *         print(self.vd.printOmegaVectors(s,e).decode('utf-8'))             # <<<<<<<<<<<<<<
  * 
- *     def getWorkspaceIdx(self, s):
+ *     def printPulses(self, s, e):
  */
-  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_s); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 57, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_PyInt_As_int(__pyx_v_e); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 57, __pyx_L1_error)
-  __pyx_v_self->vd->printOmegaVectors(__pyx_t_1, __pyx_t_2);
+  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_s); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 58, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_As_int(__pyx_v_e); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 58, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_decode_cpp_string(__pyx_v_self->vd->printOmegaVectors(__pyx_t_1, __pyx_t_2), 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 58, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_4 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 58, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "PyViterbiDemodulator.pyx":56
+  /* "PyViterbiDemodulator.pyx":57
  *         self.vd.printBranchMetrics()
  * 
  *     def printOmegaVectors(self, s, e):             # <<<<<<<<<<<<<<
- *         self.vd.printOmegaVectors(s,e)
+ *         print(self.vd.printOmegaVectors(s,e).decode('utf-8'))
  * 
  */
 
@@ -2995,6 +2969,8 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_16printO
   __pyx_r = Py_None; __Pyx_INCREF(Py_None);
   goto __pyx_L0;
   __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_4);
   __Pyx_AddTraceback("PyViterbiDemodulator.PyViterbiDemodulator.printOmegaVectors", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
@@ -3003,8 +2979,130 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_16printO
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":59
- *         self.vd.printOmegaVectors(s,e)
+/* "PyViterbiDemodulator.pyx":60
+ *         print(self.vd.printOmegaVectors(s,e).decode('utf-8'))
+ * 
+ *     def printPulses(self, s, e):             # <<<<<<<<<<<<<<
+ *         print(self.vd.printPulses(s,e).decode('utf-8'))
+ * 
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_19printPulses(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_19printPulses(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  PyObject *__pyx_v_s = 0;
+  PyObject *__pyx_v_e = 0;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("printPulses (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_s,&__pyx_n_s_e,0};
+    PyObject* values[2] = {0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_s)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_e)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("printPulses", 1, 2, 2, 1); __PYX_ERR(0, 60, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "printPulses") < 0)) __PYX_ERR(0, 60, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 2) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+    }
+    __pyx_v_s = values[0];
+    __pyx_v_e = values[1];
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("printPulses", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 60, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("PyViterbiDemodulator.PyViterbiDemodulator.printPulses", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_18printPulses(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), __pyx_v_s, __pyx_v_e);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_18printPulses(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_s, PyObject *__pyx_v_e) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  int __pyx_t_1;
+  int __pyx_t_2;
+  PyObject *__pyx_t_3 = NULL;
+  PyObject *__pyx_t_4 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("printPulses", 0);
+
+  /* "PyViterbiDemodulator.pyx":61
+ * 
+ *     def printPulses(self, s, e):
+ *         print(self.vd.printPulses(s,e).decode('utf-8'))             # <<<<<<<<<<<<<<
+ * 
+ *     def getWorkspaceIdx(self, s):
+ */
+  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_s); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_As_int(__pyx_v_e); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_decode_cpp_string(__pyx_v_self->vd->printPulses(__pyx_t_1, __pyx_t_2), 0, PY_SSIZE_T_MAX, NULL, NULL, PyUnicode_DecodeUTF8); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 61, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_4 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 61, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+
+  /* "PyViterbiDemodulator.pyx":60
+ *         print(self.vd.printOmegaVectors(s,e).decode('utf-8'))
+ * 
+ *     def printPulses(self, s, e):             # <<<<<<<<<<<<<<
+ *         print(self.vd.printPulses(s,e).decode('utf-8'))
+ * 
+ */
+
+  /* function exit code */
+  __pyx_r = Py_None; __Pyx_INCREF(Py_None);
+  goto __pyx_L0;
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_4);
+  __Pyx_AddTraceback("PyViterbiDemodulator.PyViterbiDemodulator.printPulses", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "PyViterbiDemodulator.pyx":63
+ *         print(self.vd.printPulses(s,e).decode('utf-8'))
  * 
  *     def getWorkspaceIdx(self, s):             # <<<<<<<<<<<<<<
  *         return self.vd.getWorkspaceIdx(s)
@@ -3012,19 +3110,19 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_16printO
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_19getWorkspaceIdx(PyObject *__pyx_v_self, PyObject *__pyx_v_s); /*proto*/
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_19getWorkspaceIdx(PyObject *__pyx_v_self, PyObject *__pyx_v_s) {
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_21getWorkspaceIdx(PyObject *__pyx_v_self, PyObject *__pyx_v_s); /*proto*/
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_21getWorkspaceIdx(PyObject *__pyx_v_self, PyObject *__pyx_v_s) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("getWorkspaceIdx (wrapper)", 0);
-  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_18getWorkspaceIdx(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), ((PyObject *)__pyx_v_s));
+  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_20getWorkspaceIdx(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), ((PyObject *)__pyx_v_s));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_18getWorkspaceIdx(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_s) {
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_20getWorkspaceIdx(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_s) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   int __pyx_t_1;
@@ -3034,7 +3132,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_18getWor
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("getWorkspaceIdx", 0);
 
-  /* "PyViterbiDemodulator.pyx":60
+  /* "PyViterbiDemodulator.pyx":64
  * 
  *     def getWorkspaceIdx(self, s):
  *         return self.vd.getWorkspaceIdx(s)             # <<<<<<<<<<<<<<
@@ -3042,15 +3140,15 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_18getWor
  *     def setAllowedStartSymbolIndices(self):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_s); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 60, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_self->vd->getWorkspaceIdx(__pyx_t_1)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 60, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_s); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 64, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_self->vd->getWorkspaceIdx(__pyx_t_1)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 64, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_r = __pyx_t_2;
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "PyViterbiDemodulator.pyx":59
- *         self.vd.printOmegaVectors(s,e)
+  /* "PyViterbiDemodulator.pyx":63
+ *         print(self.vd.printPulses(s,e).decode('utf-8'))
  * 
  *     def getWorkspaceIdx(self, s):             # <<<<<<<<<<<<<<
  *         return self.vd.getWorkspaceIdx(s)
@@ -3068,7 +3166,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_18getWor
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":62
+/* "PyViterbiDemodulator.pyx":66
  *         return self.vd.getWorkspaceIdx(s)
  * 
  *     def setAllowedStartSymbolIndices(self):             # <<<<<<<<<<<<<<
@@ -3077,24 +3175,24 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_18getWor
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_21setAllowedStartSymbolIndices(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_21setAllowedStartSymbolIndices(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_23setAllowedStartSymbolIndices(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_23setAllowedStartSymbolIndices(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("setAllowedStartSymbolIndices (wrapper)", 0);
-  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_20setAllowedStartSymbolIndices(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self));
+  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_22setAllowedStartSymbolIndices(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_20setAllowedStartSymbolIndices(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self) {
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_22setAllowedStartSymbolIndices(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("setAllowedStartSymbolIndices", 0);
 
-  /* "PyViterbiDemodulator.pyx":63
+  /* "PyViterbiDemodulator.pyx":67
  * 
  *     def setAllowedStartSymbolIndices(self):
  *         return None # not yet implemented             # <<<<<<<<<<<<<<
@@ -3105,7 +3203,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_20setAll
   __pyx_r = Py_None; __Pyx_INCREF(Py_None);
   goto __pyx_L0;
 
-  /* "PyViterbiDemodulator.pyx":62
+  /* "PyViterbiDemodulator.pyx":66
  *         return self.vd.getWorkspaceIdx(s)
  * 
  *     def setAllowedStartSymbolIndices(self):             # <<<<<<<<<<<<<<
@@ -3120,7 +3218,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_20setAll
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":65
+/* "PyViterbiDemodulator.pyx":69
  *         return None # not yet implemented
  * 
  *     def setUseThreading(self, i):             # <<<<<<<<<<<<<<
@@ -3129,19 +3227,19 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_20setAll
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_23setUseThreading(PyObject *__pyx_v_self, PyObject *__pyx_v_i); /*proto*/
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_23setUseThreading(PyObject *__pyx_v_self, PyObject *__pyx_v_i) {
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_25setUseThreading(PyObject *__pyx_v_self, PyObject *__pyx_v_i); /*proto*/
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_25setUseThreading(PyObject *__pyx_v_self, PyObject *__pyx_v_i) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("setUseThreading (wrapper)", 0);
-  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_22setUseThreading(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), ((PyObject *)__pyx_v_i));
+  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_24setUseThreading(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), ((PyObject *)__pyx_v_i));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_22setUseThreading(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_i) {
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_24setUseThreading(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyObject *__pyx_v_i) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   bool __pyx_t_1;
@@ -3150,17 +3248,17 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_22setUse
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("setUseThreading", 0);
 
-  /* "PyViterbiDemodulator.pyx":66
+  /* "PyViterbiDemodulator.pyx":70
  * 
  *     def setUseThreading(self, i):
  *         self.vd.setUseThreading(i)             # <<<<<<<<<<<<<<
  * 
  *     def run(self, np.ndarray[np.complex128_t, ndim=1] y, ylength, pathlen):
  */
-  __pyx_t_1 = __Pyx_PyObject_IsTrue(__pyx_v_i); if (unlikely((__pyx_t_1 == ((bool)-1)) && PyErr_Occurred())) __PYX_ERR(0, 66, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_IsTrue(__pyx_v_i); if (unlikely((__pyx_t_1 == ((bool)-1)) && PyErr_Occurred())) __PYX_ERR(0, 70, __pyx_L1_error)
   __pyx_v_self->vd->setUseThreading(__pyx_t_1);
 
-  /* "PyViterbiDemodulator.pyx":65
+  /* "PyViterbiDemodulator.pyx":69
  *         return None # not yet implemented
  * 
  *     def setUseThreading(self, i):             # <<<<<<<<<<<<<<
@@ -3180,7 +3278,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_22setUse
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":68
+/* "PyViterbiDemodulator.pyx":72
  *         self.vd.setUseThreading(i)
  * 
  *     def run(self, np.ndarray[np.complex128_t, ndim=1] y, ylength, pathlen):             # <<<<<<<<<<<<<<
@@ -3189,8 +3287,8 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_22setUse
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_25run(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_25run(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_27run(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_27run(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_y = 0;
   PyObject *__pyx_v_ylength = 0;
   PyObject *__pyx_v_pathlen = 0;
@@ -3225,17 +3323,17 @@ static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_25run(Py
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_ylength)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("run", 1, 3, 3, 1); __PYX_ERR(0, 68, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("run", 1, 3, 3, 1); __PYX_ERR(0, 72, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_pathlen)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("run", 1, 3, 3, 2); __PYX_ERR(0, 68, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("run", 1, 3, 3, 2); __PYX_ERR(0, 72, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "run") < 0)) __PYX_ERR(0, 68, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "run") < 0)) __PYX_ERR(0, 72, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
       goto __pyx_L5_argtuple_error;
@@ -3250,14 +3348,14 @@ static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_25run(Py
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("run", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 68, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("run", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 72, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("PyViterbiDemodulator.PyViterbiDemodulator.run", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_y), __pyx_ptype_5numpy_ndarray, 1, "y", 0))) __PYX_ERR(0, 68, __pyx_L1_error)
-  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_24run(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), __pyx_v_y, __pyx_v_ylength, __pyx_v_pathlen);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_y), __pyx_ptype_5numpy_ndarray, 1, "y", 0))) __PYX_ERR(0, 72, __pyx_L1_error)
+  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_26run(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), __pyx_v_y, __pyx_v_ylength, __pyx_v_pathlen);
 
   /* function exit code */
   goto __pyx_L0;
@@ -3268,7 +3366,7 @@ static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_25run(Py
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_24run(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyArrayObject *__pyx_v_y, PyObject *__pyx_v_ylength, PyObject *__pyx_v_pathlen) {
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_26run(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyArrayObject *__pyx_v_y, PyObject *__pyx_v_ylength, PyObject *__pyx_v_pathlen) {
   __Pyx_LocalBuf_ND __pyx_pybuffernd_y;
   __Pyx_Buffer __pyx_pybuffer_y;
   PyObject *__pyx_r = NULL;
@@ -3285,22 +3383,22 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_24run(st
   __pyx_pybuffernd_y.rcbuffer = &__pyx_pybuffer_y;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_y.rcbuffer->pybuffer, (PyObject*)__pyx_v_y, &__Pyx_TypeInfo___pyx_t_double_complex, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 68, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_y.rcbuffer->pybuffer, (PyObject*)__pyx_v_y, &__Pyx_TypeInfo___pyx_t_double_complex, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 72, __pyx_L1_error)
   }
   __pyx_pybuffernd_y.diminfo[0].strides = __pyx_pybuffernd_y.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_y.diminfo[0].shape = __pyx_pybuffernd_y.rcbuffer->pybuffer.shape[0];
 
-  /* "PyViterbiDemodulator.pyx":69
+  /* "PyViterbiDemodulator.pyx":73
  * 
  *     def run(self, np.ndarray[np.complex128_t, ndim=1] y, ylength, pathlen):
  *         self.vd.run(<Ipp64fc*>y.data, ylength, pathlen)             # <<<<<<<<<<<<<<
  * 
  *     def calcBranchMetrics(self, np.ndarray[np.complex128_t, ndim=1] y, n, pathlen):
  */
-  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_ylength); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 69, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_PyInt_As_int(__pyx_v_pathlen); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 69, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_ylength); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 73, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_As_int(__pyx_v_pathlen); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 73, __pyx_L1_error)
   __pyx_v_self->vd->run(((Ipp64fc *)__pyx_v_y->data), __pyx_t_1, __pyx_t_2);
 
-  /* "PyViterbiDemodulator.pyx":68
+  /* "PyViterbiDemodulator.pyx":72
  *         self.vd.setUseThreading(i)
  * 
  *     def run(self, np.ndarray[np.complex128_t, ndim=1] y, ylength, pathlen):             # <<<<<<<<<<<<<<
@@ -3329,7 +3427,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_24run(st
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":71
+/* "PyViterbiDemodulator.pyx":75
  *         self.vd.run(<Ipp64fc*>y.data, ylength, pathlen)
  * 
  *     def calcBranchMetrics(self, np.ndarray[np.complex128_t, ndim=1] y, n, pathlen):             # <<<<<<<<<<<<<<
@@ -3338,8 +3436,8 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_24run(st
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_27calcBranchMetrics(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_27calcBranchMetrics(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_29calcBranchMetrics(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_29calcBranchMetrics(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_y = 0;
   PyObject *__pyx_v_n = 0;
   PyObject *__pyx_v_pathlen = 0;
@@ -3374,17 +3472,17 @@ static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_27calcBr
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_n)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("calcBranchMetrics", 1, 3, 3, 1); __PYX_ERR(0, 71, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("calcBranchMetrics", 1, 3, 3, 1); __PYX_ERR(0, 75, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_pathlen)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("calcBranchMetrics", 1, 3, 3, 2); __PYX_ERR(0, 71, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("calcBranchMetrics", 1, 3, 3, 2); __PYX_ERR(0, 75, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "calcBranchMetrics") < 0)) __PYX_ERR(0, 71, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "calcBranchMetrics") < 0)) __PYX_ERR(0, 75, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
       goto __pyx_L5_argtuple_error;
@@ -3399,14 +3497,14 @@ static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_27calcBr
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("calcBranchMetrics", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 71, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("calcBranchMetrics", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 75, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("PyViterbiDemodulator.PyViterbiDemodulator.calcBranchMetrics", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_y), __pyx_ptype_5numpy_ndarray, 1, "y", 0))) __PYX_ERR(0, 71, __pyx_L1_error)
-  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_26calcBranchMetrics(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), __pyx_v_y, __pyx_v_n, __pyx_v_pathlen);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_y), __pyx_ptype_5numpy_ndarray, 1, "y", 0))) __PYX_ERR(0, 75, __pyx_L1_error)
+  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_28calcBranchMetrics(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), __pyx_v_y, __pyx_v_n, __pyx_v_pathlen);
 
   /* function exit code */
   goto __pyx_L0;
@@ -3417,7 +3515,7 @@ static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_27calcBr
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_26calcBranchMetrics(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyArrayObject *__pyx_v_y, PyObject *__pyx_v_n, PyObject *__pyx_v_pathlen) {
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_28calcBranchMetrics(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, PyArrayObject *__pyx_v_y, PyObject *__pyx_v_n, PyObject *__pyx_v_pathlen) {
   __Pyx_LocalBuf_ND __pyx_pybuffernd_y;
   __Pyx_Buffer __pyx_pybuffer_y;
   PyObject *__pyx_r = NULL;
@@ -3434,22 +3532,22 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_26calcBr
   __pyx_pybuffernd_y.rcbuffer = &__pyx_pybuffer_y;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_y.rcbuffer->pybuffer, (PyObject*)__pyx_v_y, &__Pyx_TypeInfo___pyx_t_double_complex, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 71, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_y.rcbuffer->pybuffer, (PyObject*)__pyx_v_y, &__Pyx_TypeInfo___pyx_t_double_complex, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 75, __pyx_L1_error)
   }
   __pyx_pybuffernd_y.diminfo[0].strides = __pyx_pybuffernd_y.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_y.diminfo[0].shape = __pyx_pybuffernd_y.rcbuffer->pybuffer.shape[0];
 
-  /* "PyViterbiDemodulator.pyx":72
+  /* "PyViterbiDemodulator.pyx":76
  * 
  *     def calcBranchMetrics(self, np.ndarray[np.complex128_t, ndim=1] y, n, pathlen):
  *         self.vd.run(<Ipp64fc*>y.data, n, pathlen)             # <<<<<<<<<<<<<<
  * 
  *     def dumpOutput(self):
  */
-  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_n); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 72, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_PyInt_As_int(__pyx_v_pathlen); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 72, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_As_int(__pyx_v_n); if (unlikely((__pyx_t_1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 76, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_As_int(__pyx_v_pathlen); if (unlikely((__pyx_t_2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 76, __pyx_L1_error)
   __pyx_v_self->vd->run(((Ipp64fc *)__pyx_v_y->data), __pyx_t_1, __pyx_t_2);
 
-  /* "PyViterbiDemodulator.pyx":71
+  /* "PyViterbiDemodulator.pyx":75
  *         self.vd.run(<Ipp64fc*>y.data, ylength, pathlen)
  * 
  *     def calcBranchMetrics(self, np.ndarray[np.complex128_t, ndim=1] y, n, pathlen):             # <<<<<<<<<<<<<<
@@ -3478,7 +3576,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_26calcBr
   return __pyx_r;
 }
 
-/* "PyViterbiDemodulator.pyx":74
+/* "PyViterbiDemodulator.pyx":78
  *         self.vd.run(<Ipp64fc*>y.data, n, pathlen)
  * 
  *     def dumpOutput(self):             # <<<<<<<<<<<<<<
@@ -3487,24 +3585,24 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_26calcBr
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_29dumpOutput(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_29dumpOutput(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_31dumpOutput(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_31dumpOutput(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("dumpOutput (wrapper)", 0);
-  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_28dumpOutput(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self));
+  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_30dumpOutput(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_28dumpOutput(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self) {
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_30dumpOutput(struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("dumpOutput", 0);
 
-  /* "PyViterbiDemodulator.pyx":75
+  /* "PyViterbiDemodulator.pyx":79
  * 
  *     def dumpOutput(self):
  *         self.vd.dumpOutput()             # <<<<<<<<<<<<<<
@@ -3512,7 +3610,7 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_28dumpOu
  */
   __pyx_v_self->vd->dumpOutput();
 
-  /* "PyViterbiDemodulator.pyx":74
+  /* "PyViterbiDemodulator.pyx":78
  *         self.vd.run(<Ipp64fc*>y.data, n, pathlen)
  * 
  *     def dumpOutput(self):             # <<<<<<<<<<<<<<
@@ -3534,19 +3632,19 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_28dumpOu
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_31__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_31__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_33__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_33__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__reduce_cython__ (wrapper)", 0);
-  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_30__reduce_cython__(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self));
+  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_32__reduce_cython__(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_30__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self) {
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_32__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -3591,19 +3689,19 @@ static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_30__redu
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_33__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state); /*proto*/
-static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_33__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state) {
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_35__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state); /*proto*/
+static PyObject *__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_35__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state) {
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__setstate_cython__ (wrapper)", 0);
-  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_32__setstate_cython__(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), ((PyObject *)__pyx_v___pyx_state));
+  __pyx_r = __pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_34__setstate_cython__(((struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *)__pyx_v_self), ((PyObject *)__pyx_v___pyx_state));
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_32__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state) {
+static PyObject *__pyx_pf_20PyViterbiDemodulator_20PyViterbiDemodulator_34__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_20PyViterbiDemodulator_PyViterbiDemodulator *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -4946,14 +5044,15 @@ static PyMethodDef __pyx_methods_20PyViterbiDemodulator_PyViterbiDemodulator[] =
   {"printPaths", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_13printPaths, METH_VARARGS|METH_KEYWORDS, 0},
   {"printBranchMetrics", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_15printBranchMetrics, METH_NOARGS, 0},
   {"printOmegaVectors", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_17printOmegaVectors, METH_VARARGS|METH_KEYWORDS, 0},
-  {"getWorkspaceIdx", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_19getWorkspaceIdx, METH_O, 0},
-  {"setAllowedStartSymbolIndices", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_21setAllowedStartSymbolIndices, METH_NOARGS, 0},
-  {"setUseThreading", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_23setUseThreading, METH_O, 0},
-  {"run", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_25run, METH_VARARGS|METH_KEYWORDS, 0},
-  {"calcBranchMetrics", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_27calcBranchMetrics, METH_VARARGS|METH_KEYWORDS, 0},
-  {"dumpOutput", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_29dumpOutput, METH_NOARGS, 0},
-  {"__reduce_cython__", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_31__reduce_cython__, METH_NOARGS, 0},
-  {"__setstate_cython__", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_33__setstate_cython__, METH_O, 0},
+  {"printPulses", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_19printPulses, METH_VARARGS|METH_KEYWORDS, 0},
+  {"getWorkspaceIdx", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_21getWorkspaceIdx, METH_O, 0},
+  {"setAllowedStartSymbolIndices", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_23setAllowedStartSymbolIndices, METH_NOARGS, 0},
+  {"setUseThreading", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_25setUseThreading, METH_O, 0},
+  {"run", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_27run, METH_VARARGS|METH_KEYWORDS, 0},
+  {"calcBranchMetrics", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_29calcBranchMetrics, METH_VARARGS|METH_KEYWORDS, 0},
+  {"dumpOutput", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_31dumpOutput, METH_NOARGS, 0},
+  {"__reduce_cython__", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_33__reduce_cython__, METH_NOARGS, 0},
+  {"__setstate_cython__", (PyCFunction)__pyx_pw_20PyViterbiDemodulator_20PyViterbiDemodulator_35__setstate_cython__, METH_O, 0},
   {0, 0, 0, 0}
 };
 
@@ -5080,6 +5179,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_ascontiguousarray, __pyx_k_ascontiguousarray, sizeof(__pyx_k_ascontiguousarray), 0, 0, 1, 1},
   {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
   {&__pyx_n_s_data, __pyx_k_data, sizeof(__pyx_k_data), 0, 0, 1, 1},
+  {&__pyx_n_s_dtype, __pyx_k_dtype, sizeof(__pyx_k_dtype), 0, 0, 1, 1},
   {&__pyx_n_s_e, __pyx_k_e, sizeof(__pyx_k_e), 0, 0, 1, 1},
   {&__pyx_n_s_getstate, __pyx_k_getstate, sizeof(__pyx_k_getstate), 0, 0, 1, 1},
   {&__pyx_n_s_import, __pyx_k_import, sizeof(__pyx_k_import), 0, 0, 1, 1},
@@ -5112,6 +5212,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_setstate_cython, __pyx_k_setstate_cython, sizeof(__pyx_k_setstate_cython), 0, 0, 1, 1},
   {&__pyx_n_s_test, __pyx_k_test, sizeof(__pyx_k_test), 0, 0, 1, 1},
   {&__pyx_n_s_tobytes, __pyx_k_tobytes, sizeof(__pyx_k_tobytes), 0, 0, 1, 1},
+  {&__pyx_n_s_uint8, __pyx_k_uint8, sizeof(__pyx_k_uint8), 0, 0, 1, 1},
   {&__pyx_n_s_y, __pyx_k_y, sizeof(__pyx_k_y), 0, 0, 1, 1},
   {&__pyx_n_s_ylength, __pyx_k_ylength, sizeof(__pyx_k_ylength), 0, 0, 1, 1},
   {0, 0, 0, 0, 0, 0, 0}
@@ -5134,7 +5235,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 
  *         print("Attempting to init..")             # <<<<<<<<<<<<<<
  * 
- *         contiguousPretransitions = np.ascontiguousarray(in_preTransitions)
+ *         contiguousPretransitions = np.ascontiguousarray(in_preTransitions, dtype=np.uint8)
  */
   __pyx_tuple_ = PyTuple_Pack(1, __pyx_kp_u_Attempting_to_init); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 19, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple_);
@@ -6433,29 +6534,6 @@ static CYTHON_INLINE PyObject *__Pyx__GetModuleGlobalName(PyObject *name)
     return __Pyx_GetBuiltinName(name);
 }
 
-/* PyCFunctionFastCall */
-  #if CYTHON_FAST_PYCCALL
-static CYTHON_INLINE PyObject * __Pyx_PyCFunction_FastCall(PyObject *func_obj, PyObject **args, Py_ssize_t nargs) {
-    PyCFunctionObject *func = (PyCFunctionObject*)func_obj;
-    PyCFunction meth = PyCFunction_GET_FUNCTION(func);
-    PyObject *self = PyCFunction_GET_SELF(func);
-    int flags = PyCFunction_GET_FLAGS(func);
-    assert(PyCFunction_Check(func));
-    assert(METH_FASTCALL == (flags & ~(METH_CLASS | METH_STATIC | METH_COEXIST | METH_KEYWORDS | METH_STACKLESS)));
-    assert(nargs >= 0);
-    assert(nargs == 0 || args != NULL);
-    /* _PyCFunction_FastCallDict() must not be called with an exception set,
-       because it may clear it (directly or indirectly) and so the
-       caller loses its exception */
-    assert(!PyErr_Occurred());
-    if ((PY_VERSION_HEX < 0x030700A0) || unlikely(flags & METH_KEYWORDS)) {
-        return (*((__Pyx_PyCFunctionFastWithKeywords)(void*)meth)) (self, args, nargs, NULL);
-    } else {
-        return (*((__Pyx_PyCFunctionFast)(void*)meth)) (self, args, nargs);
-    }
-}
-#endif
-
 /* PyFunctionFastCall */
   #if CYTHON_FAST_PYCALL
 static PyObject* __Pyx_PyFunction_FastCallNoKw(PyCodeObject *co, PyObject **args, Py_ssize_t na,
@@ -6575,35 +6653,6 @@ done:
 #endif
 #endif
 
-/* PyObjectCall2Args */
-  static CYTHON_UNUSED PyObject* __Pyx_PyObject_Call2Args(PyObject* function, PyObject* arg1, PyObject* arg2) {
-    PyObject *args, *result = NULL;
-    #if CYTHON_FAST_PYCALL
-    if (PyFunction_Check(function)) {
-        PyObject *args[2] = {arg1, arg2};
-        return __Pyx_PyFunction_FastCall(function, args, 2);
-    }
-    #endif
-    #if CYTHON_FAST_PYCCALL
-    if (__Pyx_PyFastCFunction_Check(function)) {
-        PyObject *args[2] = {arg1, arg2};
-        return __Pyx_PyCFunction_FastCall(function, args, 2);
-    }
-    #endif
-    args = PyTuple_New(2);
-    if (unlikely(!args)) goto done;
-    Py_INCREF(arg1);
-    PyTuple_SET_ITEM(args, 0, arg1);
-    Py_INCREF(arg2);
-    PyTuple_SET_ITEM(args, 1, arg2);
-    Py_INCREF(function);
-    result = __Pyx_PyObject_Call(function, args, NULL);
-    Py_DECREF(args);
-    Py_DECREF(function);
-done:
-    return result;
-}
-
 /* PyObjectCallMethO */
   #if CYTHON_COMPILING_IN_CPYTHON
 static CYTHON_INLINE PyObject* __Pyx_PyObject_CallMethO(PyObject *func, PyObject *arg) {
@@ -6621,6 +6670,51 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_CallMethO(PyObject *func, PyObject
             "NULL result without error in PyObject_Call");
     }
     return result;
+}
+#endif
+
+/* PyObjectCallNoArg */
+  #if CYTHON_COMPILING_IN_CPYTHON
+static CYTHON_INLINE PyObject* __Pyx_PyObject_CallNoArg(PyObject *func) {
+#if CYTHON_FAST_PYCALL
+    if (PyFunction_Check(func)) {
+        return __Pyx_PyFunction_FastCall(func, NULL, 0);
+    }
+#endif
+#ifdef __Pyx_CyFunction_USED
+    if (likely(PyCFunction_Check(func) || __Pyx_CyFunction_Check(func)))
+#else
+    if (likely(PyCFunction_Check(func)))
+#endif
+    {
+        if (likely(PyCFunction_GET_FLAGS(func) & METH_NOARGS)) {
+            return __Pyx_PyObject_CallMethO(func, NULL);
+        }
+    }
+    return __Pyx_PyObject_Call(func, __pyx_empty_tuple, NULL);
+}
+#endif
+
+/* PyCFunctionFastCall */
+  #if CYTHON_FAST_PYCCALL
+static CYTHON_INLINE PyObject * __Pyx_PyCFunction_FastCall(PyObject *func_obj, PyObject **args, Py_ssize_t nargs) {
+    PyCFunctionObject *func = (PyCFunctionObject*)func_obj;
+    PyCFunction meth = PyCFunction_GET_FUNCTION(func);
+    PyObject *self = PyCFunction_GET_SELF(func);
+    int flags = PyCFunction_GET_FLAGS(func);
+    assert(PyCFunction_Check(func));
+    assert(METH_FASTCALL == (flags & ~(METH_CLASS | METH_STATIC | METH_COEXIST | METH_KEYWORDS | METH_STACKLESS)));
+    assert(nargs >= 0);
+    assert(nargs == 0 || args != NULL);
+    /* _PyCFunction_FastCallDict() must not be called with an exception set,
+       because it may clear it (directly or indirectly) and so the
+       caller loses its exception */
+    assert(!PyErr_Occurred());
+    if ((PY_VERSION_HEX < 0x030700A0) || unlikely(flags & METH_KEYWORDS)) {
+        return (*((__Pyx_PyCFunctionFastWithKeywords)(void*)meth)) (self, args, nargs, NULL);
+    } else {
+        return (*((__Pyx_PyCFunctionFast)(void*)meth)) (self, args, nargs);
+    }
 }
 #endif
 
@@ -6661,28 +6755,6 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_CallOneArg(PyObject *func, PyObjec
     result = __Pyx_PyObject_Call(func, args, NULL);
     Py_DECREF(args);
     return result;
-}
-#endif
-
-/* PyObjectCallNoArg */
-  #if CYTHON_COMPILING_IN_CPYTHON
-static CYTHON_INLINE PyObject* __Pyx_PyObject_CallNoArg(PyObject *func) {
-#if CYTHON_FAST_PYCALL
-    if (PyFunction_Check(func)) {
-        return __Pyx_PyFunction_FastCall(func, NULL, 0);
-    }
-#endif
-#ifdef __Pyx_CyFunction_USED
-    if (likely(PyCFunction_Check(func) || __Pyx_CyFunction_Check(func)))
-#else
-    if (likely(PyCFunction_Check(func)))
-#endif
-    {
-        if (likely(PyCFunction_GET_FLAGS(func) & METH_NOARGS)) {
-            return __Pyx_PyObject_CallMethO(func, NULL);
-        }
-    }
-    return __Pyx_PyObject_Call(func, __pyx_empty_tuple, NULL);
 }
 #endif
 

@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
     vd.printAlphabet();
     vd.printValidTransitions();
 	vd.printOmega();
+	vd.printPulses(60,80);
 	vd.setAllowedStartSymbolIndices();
 
 	// Test run
@@ -80,7 +81,7 @@ int main(int argc, char *argv[])
 		vd.run(y.data(), y.size(), 8000);
 	}
 
-	//vd.printOmegaVectors(64000, 64010);
+	vd.printOmegaVectors(64000, 64010);
     
     return 0;
 }

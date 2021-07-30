@@ -9,6 +9,7 @@ Created on Mon May 18 14:58:31 2020
 import numpy as np
 import scipy as sp
 import cupy as cp
+import cupyx.scipy.signal as cpsps
 
 def cp_lfilter(ftap, x):
     '''
@@ -89,4 +90,51 @@ def wola(f_tap, x, Dec, N=None, dtype=np.complex64):
     return out
                 
     
-        
+def energyDetection(ampSq, medfiltlen, snrReqLinear=4.0, noiseIndices=None, splitSignalIndices=True):
+    '''
+    Parameters
+    ----------
+    ampSq : array
+        Array of energy samples (amplitude squared values).
+    medfiltlen : scalar
+        Length of median filter (must be odd)
+    snrReqLinear : scalar, optional
+        SNR requirement for detection. The default is 4.0.
+    noiseIndices : array, optional
+        Specified indices to use to estimate noise power. The default is np.arange(100000).
+    splitSignalIndices : bool, optional
+        Boolean to specify whether to return signal indices as a list of arrays, split at every discontinuous index (difference more than 1 sample).
+
+    Returns
+    -------
+    noiseIndices : array
+        Array of indices used to calculate the meanNoise power.
+    meanNoise : scalar
+        Mean noise power.
+    reqPower : scalar
+        Mean noise power * the input snr requirement.
+    medfiltered : array
+        The median filtered output.
+    signalIndices : array
+        Array of indices which are greater than the reqPower.
+    '''
+    if noiseIndices is None:
+        noiseIndices = np.arange(100000)
+        print("Noise indices defaulting to [%d, %d]" % (noiseIndices[0],noiseIndices[-1]))
+    
+    # Medfilt in gpu as it's usually 1000x faster (not exaggeration)
+    d_ampSq = cp.array(ampSq) # move to gpu
+    d_medfiltered = cpsps.medfilt(d_ampSq, medfiltlen)
+    medfiltered = cp.asnumpy(d_medfiltered) # move back
+    
+    # Detect the energy requirements
+    sampleNoise = medfiltered[noiseIndices]
+    meanNoise = np.mean(sampleNoise)
+    reqPower = meanNoise * snrReqLinear
+    signalIndices = np.argwhere(medfiltered > reqPower)
+    if splitSignalIndices:
+        splitIndices = np.argwhere(np.diff(signalIndices)>1).flatten() + 1 # the + 1 is necessary
+        signalIndices = np.split(signalIndices, splitIndices)
+    
+    return noiseIndices, meanNoise, reqPower, medfiltered, signalIndices
+    

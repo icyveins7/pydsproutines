@@ -8,6 +8,7 @@ Created on Tue Mar 23 15:08:45 2021
 import numpy as np
 import matplotlib.pyplot as plt
 from signalCreationRoutines import *
+from spectralRoutines import *
 
 def musicAlg(x, freqlist, rows, p):
     '''
@@ -43,14 +44,24 @@ def musicAlg(x, freqlist, rows, p):
 if __name__ == '__main__':
     fs = 1e4
     length = 1*fs
-    x = np.exp(1j*2*np.pi*1000*np.arange(length)/fs) + np.exp(1j*2*np.pi*1001*np.arange(length)/fs)
+    fdiff = 0.5
+    f0 = 1000
+    x = np.exp(1j*2*np.pi*f0*np.arange(length)/fs) + np.exp(1j*2*np.pi*(f0+fdiff)*np.arange(length)/fs)
     # x = x + (np.random.randn(x.size) + np.random.randn(x.size)*1j) * 0.5
-    xfft = np.fft.fft(x)
+    # xfft = np.fft.fft(x)    
+    
+    fineFreqStep = 0.01
+    fineFreqRange = 3 # peg to the freqoffset
+    fineFreqVec = np.arange((f0+fdiff/2)-fineFreqRange,(f0+fdiff/2)+fineFreqRange + 0.1*fineFreqStep, fineFreqStep)
+    xczt = czt(x, (f0+fdiff/2)-fineFreqRange,(f0+fdiff/2)+fineFreqRange, fineFreqStep, fs)
     
     freqlist = np.arange(999,1003,0.1)
     f,u,s,vh = musicAlg(x, freqlist/fs, 5, 2) # normalize freq
     
     plt.figure()
-    plt.plot(makeFreq(len(x),fs), np.abs(xfft)/np.max(np.abs(xfft)))
-    plt.plot(freqlist, f/np.max(f))
+    # plt.plot(makeFreq(len(x),fs), np.abs(xfft)/np.max(np.abs(xfft)))
+    plt.plot(fineFreqVec, np.abs(xczt)/ np.max(np.abs(xczt)), label='CZT')
+    plt.plot(freqlist, f/np.max(f), label='MUSIC')
+    plt.vlines([f0,f0+fdiff],0,1,colors='r', linestyles='dashed',label='Actual')
+    plt.legend()
     plt.xlim([990,1010])

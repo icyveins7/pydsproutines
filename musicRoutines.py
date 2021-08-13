@@ -46,7 +46,9 @@ if __name__ == '__main__':
     length = 1*fs
     fdiff = 0.5
     f0 = 1000
-    x = np.exp(1j*2*np.pi*f0*np.arange(length)/fs) + np.exp(1j*2*np.pi*(f0+fdiff)*np.arange(length)/fs)
+    # x = np.exp(1j*2*np.pi*f0*np.arange(length)/fs) + np.exp(1j*2*np.pi*(f0+fdiff)*np.arange(length)/fs)
+    x = np.pad(np.exp(1j*2*np.pi*f0*np.arange(length)/fs), (100,0))
+    x = x + np.pad(np.exp(1j*2*np.pi*(f0+fdiff)*np.arange(length)/fs), (0,100))
     # x = x + (np.random.randn(x.size) + np.random.randn(x.size)*1j) * 0.5
     # xfft = np.fft.fft(x)    
     

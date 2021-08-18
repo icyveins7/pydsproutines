@@ -140,7 +140,7 @@ if __name__ == '__main__':
     fineFreqVec = np.arange((f0+fdiff/2)-fineFreqRange,(f0+fdiff/2)+fineFreqRange + 0.1*fineFreqStep, fineFreqStep)
     xczt = czt(x, (f0+fdiff/2)-fineFreqRange,(f0+fdiff/2)+fineFreqRange, fineFreqStep, fs)
     
-    freqlist = np.arange(999,1003,0.1)
+    freqlist = np.arange(f0-fdiff,f0+fdiff*2,0.01)
     
     # One-shot evaluation for all desired p values
     plist = np.arange(1,5)

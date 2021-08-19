@@ -11,7 +11,8 @@ from signalCreationRoutines import *
 from spectralRoutines import *
 
 #%%
-def musicAlg(x, freqlist, rows, plist, snapshotJump=None, fwdBwd=False, useSignalAsNumerator=False):
+def musicAlg(x, freqlist, rows, plist, snapshotJump=None, fwdBwd=False,
+             useSignalAsNumerator=False, averageToToeplitz=False):
     '''
     p (i.e. plist) is the dimensionality of the signal subspace. The function will return an array based on freqlist
     for every value of p in plist.
@@ -23,6 +24,8 @@ def musicAlg(x, freqlist, rows, plist, snapshotJump=None, fwdBwd=False, useSigna
     
     fwdBwd is a boolean which toggles the use of the Forward-Backward correction of the covariance matrix (default False).
     
+    averageToToeplitz is a boolean which toggles averaging of the covariance matrix along each diagonal.
+    This ensures a full rank matrix. Defaults to False.
     '''
     
     if not np.all(np.abs(freqlist) <= 1.0):
@@ -60,22 +63,20 @@ def musicAlg(x, freqlist, rows, plist, snapshotJump=None, fwdBwd=False, useSigna
         Rx = 0.5 * (Rx + J @ Rx.T @ J)
         print("Using forward-backward covariance.")
     
+    if averageToToeplitz:
+        diagIdx = np.arange(-Rx.shape[0]+1, Rx.shape[1])
+        
+        Rx_tp = np.zeros_like(Rx)
+        for k in diagIdx:
+            diagArr = np.zeros(Rx.shape[0]-np.abs(k), Rx.dtype) + np.mean(np.diag(Rx,k))
+            diagMat = np.diag(diagArr, k) # make it into a matrix again
+            Rx_tp = Rx_tp + diagMat
+            
+    
     u, s, vh = np.linalg.svd(Rx)
     
     f = np.zeros(len(freqlist))
     
-    # # DEPRECATED
-    # for i in range(len(freqlist)):
-    #     freq = freqlist[i]
-        
-    #     e = np.exp(1j*2*np.pi*freq*np.arange(rows)).reshape((1,-1)) # row, 2-d vector directly
-    #     eh = e.conj()
-        
-    #     d = eh @ u[:,p:]
-    #     breakpoint()
-    #     denom = np.sum(np.abs(d)**2)
-        
-    #     f[i] = 1/denom
    
     # Instead of iterations, generate a one-time Vandermonde matrix of eh
     ehlist = np.exp(-1j*2*np.pi*freqlist.reshape((-1,1))*np.arange(rows)) # generate the e vector for every frequency i.e. Vandermonde
@@ -147,15 +148,17 @@ if __name__ == '__main__':
     rows = 1000
     t1 = time.time()
     f, u, s, vh = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1)
+    # f_tp, u_tp, s_tp, vh_tp = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1, averageToToeplitz=True)
     f_fb, u_fb, s_fb, vh_fb = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1, fwdBwd=True)
     f_fb_ns, u_fb_ns, s_fb_ns, vh_fb_ns = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1, fwdBwd=True, useSignalAsNumerator=True)
     t2 = time.time()
     print("Took %f s." % (t2-t1))
     
-    fig,ax = plt.subplots(3,1,num="Comparison")
+    fig,ax = plt.subplots(4,1,num="Comparison")
     ax[0].set_title("Standard MUSIC, %d rows" % (rows))
-    ax[1].set_title("Forward-Backward MUSIC, %d rows" % (rows))
-    ax[2].set_title("Forward-Backward MUSIC + Signal Subspace, %d rows" % (rows))
+    ax[1].set_title("Averaged Toeplitz MUSIC, %d rows" % (rows))
+    ax[2].set_title("Forward-Backward MUSIC, %d rows" % (rows))
+    ax[3].set_title("Forward-Backward MUSIC + Signal Subspace, %d rows" % (rows))
     for i in range(len(ax)):
         # plt.plot(makeFreq(len(x),fs), np.abs(xfft)/np.max(np.abs(xfft)))
         ax[i].plot(fineFreqVec, np.abs(xczt)/ np.max(np.abs(xczt)), label='CZT')
@@ -166,13 +169,17 @@ if __name__ == '__main__':
         ax[0].legend()
         ax[0].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
         
-        ax[1].plot(freqlist, f_fb[i]/np.max(f_fb[i]), label='MUSIC, p='+str(plist[i]))
-        ax[1].legend()
-        ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
+        # ax[1].plot(freqlist, f_tp[i]/np.max(f_tp[i]), label='MUSIC, p='+str(plist[i]))
+        # ax[1].legend()
+        # ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
         
-        ax[2].plot(freqlist, f_fb_ns[i]/np.max(f_fb_ns[i]), label='MUSIC, p='+str(plist[i]))
+        ax[2].plot(freqlist, f_fb[i]/np.max(f_fb[i]), label='MUSIC, p='+str(plist[i]))
         ax[2].legend()
         ax[2].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
+        
+        ax[3].plot(freqlist, f_fb_ns[i]/np.max(f_fb_ns[i]), label='MUSIC, p='+str(plist[i]))
+        ax[3].legend()
+        ax[3].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
         
         
     plt.figure("Eigenvalues")

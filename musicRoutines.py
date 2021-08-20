@@ -6,18 +6,25 @@ Created on Tue Mar 23 15:08:45 2021
 """
 
 import numpy as np
+import scipy as sp
+import scipy.signal as sps
 import matplotlib.pyplot as plt
 from signalCreationRoutines import *
 from spectralRoutines import *
 
 #%%
 def musicAlg(x, freqlist, rows, plist, snapshotJump=None, fwdBwd=False,
-             useSignalAsNumerator=False, averageToToeplitz=False):
+             useSignalAsNumerator=False, averageToToeplitz=False, useAutoCorr=False):
     '''
     p (i.e. plist) is the dimensionality of the signal subspace. The function will return an array based on freqlist
     for every value of p in plist.
     
-    x is expected as a 1-dim array (flattened).
+    x is expected as a 1-dim array (flattened). Alternatively, if x is passed in as a dictionary,
+    each value in the dictionary is expected to be a 1-dim array; each 1-dim array is parsed into its own
+    matrix using 'snapshotJump', and then the matrices are stacked horizontally to form a large data matrix.
+    This is then used to estimate the covariance matrix. 
+    Note: the 1-dim arrays do not need to be the same length,
+    since they are processed using the snapshotJump parameter.
     
     snapshotJump is the index jump per column vector. By default this jump is equal to rows,
     i.e. each column vector is unique (matrix constructed via reshape), but may not resolve frequencies well.
@@ -26,51 +33,89 @@ def musicAlg(x, freqlist, rows, plist, snapshotJump=None, fwdBwd=False,
     
     averageToToeplitz is a boolean which toggles averaging of the covariance matrix along each diagonal.
     This ensures a full rank matrix. Defaults to False.
+    
+    useAutoCorr is a boolean which toggles the autocorrelation method of creating the covariance matrix.
+    Defaults to False.
     '''
     
     if not np.all(np.abs(freqlist) <= 1.0):
         raise ValueError("Frequency list input must be normalized.")
 
-    if snapshotJump is None: # then we snapshot via slices
-        # 1 2 3 4 5 6 ->
-        # 1 3 5
-        # 2 4 6  for example
-        x = x.reshape((-1,1)) # vectorize
-        cols = int(np.floor(len(x)/rows))
-        xslen = rows * cols
-        xs = x[:xslen] # we cut off the ending bits
-        xs = xs.reshape((cols, rows)).T
-    else: # we use the rate to populate our columns
-        # e.g. for snapshot jump = 1,
-        # 1 2 3 4 5 6 ->
-        # 1 2 3 4 5
-        # 2 3 4 5 6
-        if snapshotJump <= 0:
-            raise ValueError("snapshotJump must be at least 1.")
+    # Autocorrelation method is fundamentally different; will not allow averageToToeplitz,
+    # Forward-Backward, or snapshotJump options.
+    if useAutoCorr:
+        autocorr = sps.correlate(x, x)
+        Rx = sp.linalg.toeplitz(autocorr[len(x)-1:len(x)-1+rows] / (len(x) - np.arange(rows)))
+
+    # All other options revolve around first rearranging the input vector in a particular way
+    else:
+        if isinstance(x, dict): # If input is multiple 1-d arrays
+            # Instantiate the final mat (empty at first)
+            xs = np.zeros((rows,0), np.complex128)
+            # Iterate over every 1-d array in the dictionary
+            for xi in x.values():
+                if snapshotJump is None: # Refer to the single-array version for comments
+                    xi = xi.reshape((-1,1)) # vectorize
+                    cols = int(np.floor(len(xi)/rows))
+                    xslen = rows * cols
+                    xs_i = xi[:xslen] # we cut off the ending bits
+                    xs_i = xs_i.reshape((cols, rows)).T
+                else: # Refer to the single-array version for comments 
+                    if snapshotJump <= 0:
+                        raise ValueError("snapshotJump must be at least 1.")
+                        
+                    xi = xi.flatten() # in case it's not flat
+                    cols = (xi.size - rows) / snapshotJump # calculate the required columns
+                    xs_i = np.zeros((rows, int(cols+1)), xi.dtype)
+                    print("Matrix dim is %d, %d" % (xs.shape[0], xs.shape[1]))
+                    for i in range(xs_i.shape[1]): # fill the columns
+                        xs_i[:,i] = xi[i * snapshotJump : i * snapshotJump + rows]
+                
+                # Then, concatenate the matrix
+                xs = np.hstack((xs, xs_i))
             
-        x = x.flatten() # in case it's not flat
-        cols = (x.size - rows) / snapshotJump # calculate thee required columns
-        xs = np.zeros((rows, int(cols+1)), x.dtype)
-        print("Matrix dim is %d, %d" % (xs.shape[0], xs.shape[1]))
-        for i in range(xs.shape[1]): # fill the columns
-            xs[:,i] = x[i * snapshotJump : i * snapshotJump + rows]
             
-    Rx = (1/cols) * xs @ xs.conj().T
-    if fwdBwd:
-        J = np.eye(Rx.shape[0])
-        # Reverse row-wise to form the antidiagonal exchange matrix
-        J = J[:,::-1]
-        Rx = 0.5 * (Rx + J @ Rx.T @ J)
-        print("Using forward-backward covariance.")
-    
-    if averageToToeplitz:
-        diagIdx = np.arange(-Rx.shape[0]+1, Rx.shape[1])
+        else: # If input is just a single 1-d array
+            if snapshotJump is None: # then we snapshot via slices
+                # 1 2 3 4 5 6 ->
+                # 1 3 5
+                # 2 4 6  for example
+                x = x.reshape((-1,1)) # vectorize
+                cols = int(np.floor(len(x)/rows))
+                xslen = rows * cols
+                xs = x[:xslen] # we cut off the ending bits
+                xs = xs.reshape((cols, rows)).T
+            else: # we use the rate to populate our columns
+                # e.g. for snapshot jump = 1,
+                # 1 2 3 4 5 6 ->
+                # 1 2 3 4 5
+                # 2 3 4 5 6
+                if snapshotJump <= 0:
+                    raise ValueError("snapshotJump must be at least 1.")
+                    
+                x = x.flatten() # in case it's not flat
+                cols = (x.size - rows) / snapshotJump # calculate the required columns
+                xs = np.zeros((rows, int(cols+1)), x.dtype)
+                print("Matrix dim is %d, %d" % (xs.shape[0], xs.shape[1]))
+                for i in range(xs.shape[1]): # fill the columns
+                    xs[:,i] = x[i * snapshotJump : i * snapshotJump + rows]
+                
+        Rx = (1/cols) * xs @ xs.conj().T
+        if fwdBwd:
+            J = np.eye(Rx.shape[0])
+            # Reverse row-wise to form the antidiagonal exchange matrix
+            J = J[:,::-1]
+            Rx = 0.5 * (Rx + J @ Rx.T @ J)
+            print("Using forward-backward covariance.")
         
-        Rx_tp = np.zeros_like(Rx)
-        for k in diagIdx:
-            diagArr = np.zeros(Rx.shape[0]-np.abs(k), Rx.dtype) + np.mean(np.diag(Rx,k))
-            diagMat = np.diag(diagArr, k) # make it into a matrix again
-            Rx_tp = Rx_tp + diagMat
+        if averageToToeplitz:
+            diagIdx = np.arange(-Rx.shape[0]+1, Rx.shape[1])
+            
+            Rx_tp = np.zeros_like(Rx)
+            for k in diagIdx:
+                diagArr = np.zeros(Rx.shape[0]-np.abs(k), Rx.dtype) + np.mean(np.diag(Rx,k))
+                diagMat = np.diag(diagArr, k) # make it into a matrix again
+                Rx_tp = Rx_tp + diagMat
             
     
     u, s, vh = np.linalg.svd(Rx)
@@ -88,8 +133,8 @@ def musicAlg(x, freqlist, rows, plist, snapshotJump=None, fwdBwd=False,
         denom = np.sum(np.abs(d)**2, axis=1)
         
         if useSignalAsNumerator: # Construct the generalised inverse (we have the SVD results already)
-            sp = s[:plist]**-0.5 # Take the p eigenvalues and reciprocal + root them -> generalised inverse root eigenvalues
-            siginv = u[:,:plist] * sp # assume u = v, i.e. u^H = v^H, scale by the inverse eigenvalues
+            ssp = s[:plist]**-0.5 # Take the p eigenvalues and reciprocal + root them -> generalised inverse root eigenvalues
+            siginv = u[:,:plist] * ssp # assume u = v, i.e. u^H = v^H, scale by the inverse eigenvalues
             n = ehlist @ siginv
             numerator = np.sum(np.abs(n)**2, axis=1)
             
@@ -103,8 +148,8 @@ def musicAlg(x, freqlist, rows, plist, snapshotJump=None, fwdBwd=False,
             denom = np.sum(np.abs(d)**2, axis=1)
             
             if useSignalAsNumerator:
-                sp = s[:p]**-0.5 # Take the p eigenvalues and reciprocal + root them -> generalised inverse root eigenvalues
-                siginv = u[:,:p] * sp # assume u = v, i.e. u^H = v^H, scale by the inverse eigenvalues
+                ssp = s[:p]**-0.5 # Take the p eigenvalues and reciprocal + root them -> generalised inverse root eigenvalues
+                siginv = u[:,:p] * ssp # assume u = v, i.e. u^H = v^H, scale by the inverse eigenvalues
                 n = ehlist @ siginv
                 numerator = np.sum(np.abs(n)**2, axis=1)
                 
@@ -124,16 +169,9 @@ if __name__ == '__main__':
     # x = np.exp(1j*2*np.pi*f0*np.arange(length)/fs) + np.exp(1j*2*np.pi*(f0+fdiff)*np.arange(length)/fs)
     x = np.pad(np.exp(1j*2*np.pi*f0*np.arange(length)/fs), (padding,0))
     
-    # noisyAmp = (np.random.randn(int(length+100))*0.000001+1.0)
-    # noisyAmp = np.abs(noisyAmp)
-    noisyAmp = 1.0
-    
-    # How does it react to a non-constant amplitude tone?
-    plt.figure("Amplitude for second tone")
-    plt.plot(noisyAmp)
-    
-    x = x + noisyAmp * np.pad(np.exp(1j*2*np.pi*(f0+fdiff)*np.arange(length)/fs), (0,padding))
-    x = x + (np.random.randn(x.size) + np.random.randn(x.size)*1j) * np.sqrt(1e-1)
+    noisePwr = 1e-1
+    x = x + np.pad(np.exp(1j*2*np.pi*(f0+fdiff)*np.arange(length)/fs), (0,padding))
+    x = x + (np.random.randn(x.size) + np.random.randn(x.size)*1j) * np.sqrt(noisePwr)
     # xfft = np.fft.fft(x)    
     
     fineFreqStep = 0.01
@@ -148,17 +186,20 @@ if __name__ == '__main__':
     rows = 1000
     t1 = time.time()
     f, u, s, vh = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1)
-    # f_tp, u_tp, s_tp, vh_tp = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1, averageToToeplitz=True)
+    # f_tp, u_tp, s_tp, vh_tp = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1, averageToToeplitz=True) # Takes very long
     f_fb, u_fb, s_fb, vh_fb = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1, fwdBwd=True)
     f_fb_ns, u_fb_ns, s_fb_ns, vh_fb_ns = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1, fwdBwd=True, useSignalAsNumerator=True)
+    f_ac, u_ac, s_ac, vh_ac = musicAlg(x, freqlist/fs, rows, plist, useAutoCorr=True)
     t2 = time.time()
     print("Took %f s." % (t2-t1))
     
     fig,ax = plt.subplots(4,1,num="Comparison")
     ax[0].set_title("Standard MUSIC, %d rows" % (rows))
-    ax[1].set_title("Averaged Toeplitz MUSIC, %d rows" % (rows))
+    # ax[1].set_title("Averaged Toeplitz MUSIC, %d rows" % (rows))
+    ax[1].set_title("Auto-correlation MUSIC, %d rows" % (rows))
     ax[2].set_title("Forward-Backward MUSIC, %d rows" % (rows))
     ax[3].set_title("Forward-Backward MUSIC + Signal Subspace, %d rows" % (rows))
+    
     for i in range(len(ax)):
         # plt.plot(makeFreq(len(x),fs), np.abs(xfft)/np.max(np.abs(xfft)))
         ax[i].plot(fineFreqVec, np.abs(xczt)/ np.max(np.abs(xczt)), label='CZT')
@@ -173,6 +214,10 @@ if __name__ == '__main__':
         # ax[1].legend()
         # ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
         
+        ax[1].plot(freqlist, f_ac[i]/np.max(f_ac[i]), label='MUSIC, p='+str(plist[i]))
+        ax[1].legend()
+        ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
+        
         ax[2].plot(freqlist, f_fb[i]/np.max(f_fb[i]), label='MUSIC, p='+str(plist[i]))
         ax[2].legend()
         ax[2].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
@@ -181,9 +226,14 @@ if __name__ == '__main__':
         ax[3].legend()
         ax[3].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
         
-        
+
     plt.figure("Eigenvalues")
-    plt.plot(np.log10(s),'x-')
+    plt.plot(np.log10(s),'x-',label='Standard MUSIC')
+    # plt.plot(np.log10(s_tp),'x-',label='Averaged Toeplitz MUSIC')
+    plt.plot(np.log10(s_ac),'x-',label='Auto-correlation MUSIC')
+    plt.plot(np.log10(s_fb),'x-',label='Forward-Backward MUSIC')
+    plt.plot(np.log10(s_fb_ns),'x-',label='Forward-Backward + Signal Subspace MUSIC')
+    plt.legend()
     
     ## At 1e-4 noise:
     # Note that at rows=100, unable to resolve. But at rows = 1000, able to resolve (dependency on 'block size' despite total length being equal)
@@ -198,3 +248,65 @@ if __name__ == '__main__':
     # 1e-2 noise:
     # Now possible to resolve with rows = 1000 !!!
     # Even at 1e-1 noise!!
+    
+    ## Autocorrelation does not appear to offer any benefits; sharpens a peak at noisy regime but incorrect value, and incorrect number of peaks
+    ## For best results, rows = 1000 at noisePwr 1e-1 (ie about 10dB) with both forward-backward
+    ## and signal subspace enabled appears to be the best performing.
+    
+    #%% Experiment with separated bursts
+    numBursts = 10
+    burstLength = int(fs * 0.5)
+    burstGap = int(fs * 0.5)
+    totalLength = numBursts * burstLength + (numBursts-1) * burstGap
+    noisePwr = 1e-1
+    
+    x = np.exp(1j*2*np.pi*f0*np.arange(totalLength)/fs) + np.exp(1j*2*np.pi*(f0+fdiff)*np.arange(totalLength)/fs)
+    # Window out the bursts only
+    xwindow = np.zeros(len(x))
+    for i in range(numBursts):
+        xwindow[i*(burstLength+burstGap) : i*(burstLength+burstGap)+burstLength] = 1
+    # plt.figure()
+    # plt.plot(xwindow)
+    
+    # Create the bursty signal    
+    x = x * xwindow + (np.random.randn(len(x)) + 1j*np.random.randn(len(x))) * np.sqrt(noisePwr)
+    
+    # Slice the bursts for easier access later
+    xbursts = {}
+    for i in range(numBursts):
+        xbursts[i] = x[i*(burstLength+burstGap) : i*(burstLength+burstGap)+burstLength]
+    
+    # Create the overall czt, as well as the individual czts
+    xczt = czt(x, (f0+fdiff/2)-fineFreqRange,(f0+fdiff/2)+fineFreqRange, fineFreqStep, fs)
+    xcztbursts = np.zeros((numBursts, fineFreqVec.size), x.dtype)
+    for i in range(numBursts):
+        xcztbursts[i,:] = czt(xbursts[i],
+                              (f0+fdiff/2)-fineFreqRange,(f0+fdiff/2)+fineFreqRange, fineFreqStep, fs)
+    # Compare the MUSICs
+    bfig, bax = plt.subplots(1,1,num="Bursty Tone MUSIC")
+    bax.vlines([f0,f0+fdiff],0,1,colors='r', linestyles='dashed',label='Actual')
+
+    # MUSIC each burst individually
+    musicBursts = {}
+    p = 2
+    for i in range(numBursts):
+        f_fb_ns, u_fb_ns, s_fb_ns, vh_fb_ns = musicAlg(xbursts[i], freqlist/fs, rows, p, snapshotJump=1, fwdBwd=True, useSignalAsNumerator=True)
+        musicBursts[i] = f_fb_ns
+        bax.plot(freqlist, musicBursts[i]/np.max(musicBursts[i]), label='MUSIC, p='+str(p)+', burst ' + str(i))
+    
+    # Now MUSIC both bursts as a single process
+    f_fb_ns_stitched, u_fb_ns_stitched, s_fb_ns_stitched, vh_fb_ns_stitched = musicAlg(xbursts, freqlist/fs, rows, p, snapshotJump=1, fwdBwd=True, useSignalAsNumerator=True)
+    bax.plot(freqlist, f_fb_ns_stitched/np.max(f_fb_ns_stitched), '.-', label='MUSIC, p='+str(p)+', bursts combined')
+    
+    bax.legend()
+    
+    # Compare Full CZT against Full MUSIC
+    plt.figure()
+    plt.vlines([f0,f0+fdiff],0,1,colors='r', linestyles='dashed',label='Actual')
+    plt.plot(fineFreqVec, np.abs(xczt)/np.max(np.abs(xczt)), label="Full length CZT")
+    # for i in range(numBursts):
+    #     plt.plot(fineFreqVec, np.abs(xcztbursts[i,:])/np.max(np.abs(xcztbursts[i,:])), label="CZT of Burst " + str(i))
+    plt.plot(freqlist, f_fb_ns_stitched/np.max(f_fb_ns_stitched), label='MUSIC, p='+str(p)+', bursts combined')
+    plt.title("%d bursts" % (numBursts))
+    plt.legend()
+    

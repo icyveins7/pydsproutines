@@ -156,7 +156,7 @@ def musicAlg(x, freqlist, rows, plist, snapshotJump=None, fwdBwd=False,
 
 #############################
 class CovarianceTechnique:
-    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False):
+    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=False):
         '''
         snapshotJump is the index jump per column vector. By default this jump is equal to rows,
         i.e. each column vector is unique (matrix constructed via reshape), but may not resolve frequencies well.
@@ -173,8 +173,9 @@ class CovarianceTechnique:
         self.snapshotJump = snapshotJump
         self.fwdBwd = fwdBwd
         self.avgToToeplitz = avgToToeplitz
+        self.useEigh = useEigh
         
-    def calcRx(self, x):
+    def calcRx(self, x, findEigs=True):
         if isinstance(x, dict): # If input is multiple 1-d arrays
             # Instantiate the final mat (empty at first)
             xs = np.zeros((rows,0), np.complex128)
@@ -238,15 +239,28 @@ class CovarianceTechnique:
                 diagArr = np.zeros(Rx.shape[0]-np.abs(k), Rx.dtype) + np.mean(np.diag(Rx,k))
                 diagMat = np.diag(diagArr, k) # make it into a matrix again
                 Rx_tp = Rx_tp + diagMat
+                
+            Rx = Rx_tp
             
-    
-        u, s, vh = np.linalg.svd(Rx)
-        
-        return u, s, vh
+        # MUSIC/ESPRIT
+        if findEigs is True:
+            if self.useEigh:
+                s, u = np.linalg.eigh(Rx) # this should be equivalent (minus some numerical errors?)
+                # sort it backwards because eigh returns it in ascending order
+                s = s[::-1]
+                u = u[:,::-1]
+                vh = None # 
+            else:
+                u, s, vh = np.linalg.svd(Rx)
+            
+            return u, s, vh, Rx
+        # CAPON
+        else:
+            return Rx
     
 class MUSIC(CovarianceTechnique):
-    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False):
-        super().__init__(rows, snapshotJump, fwdBwd, avgToToeplitz)
+    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=True):
+        super().__init__(rows, snapshotJump, fwdBwd, avgToToeplitz, useEigh)
         
     def run(self, x, freqlist, plist, useSignalAsNumerator=False):
         '''
@@ -279,7 +293,7 @@ class MUSIC(CovarianceTechnique):
             Output from SVD.
 
         '''
-        u, s, vh = self.calcRx(x)
+        u, s, vh, Rx = self.calcRx(x)
         
         # Instead of iterations, generate a one-time Vandermonde matrix of eh
         ehlist = np.exp(-1j*2*np.pi*freqlist.reshape((-1,1))*np.arange(rows)) # generate the e vector for every frequency i.e. Vandermonde
@@ -314,67 +328,91 @@ class MUSIC(CovarianceTechnique):
                 f[i,:] = numerator / denom
                 
         # Return
-        return f,u,s,vh
+        return f,u,s,vh,Rx
         
+class CAPON(CovarianceTechnique):
+    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=True):
+        super().__init__(rows, snapshotJump, fwdBwd, avgToToeplitz, useEigh)
+        
+    def run(self, x, freqlist):
+        Rx = self.calcRx(x, findEigs=False)
+        invRx = np.linalg.inv(Rx)
+        
+        # Overtly, no way to split Rx so must iterate over every frequency
+        # May be possible if use SVD and then root the eigenvalues?
+
+        # Generate output
+        numerator = 1.0 # default numerator
+
+        f = np.zeros(freqlist.size, x.dtype)
+        
+        for i in range(len(freqlist)):
+            eh = np.exp(-1j*2*np.pi*freqlist[i]*np.arange(rows)).reshape((1,-1))
+            denom = eh @ invRx @ eh.conj().T
+            f[i] = numerator/denom
+
+        # Return
+        return f,Rx
         
 
 #%%
 if __name__ == '__main__':
     #%%
     plt.close("all")
-    fs = 1e4
-    length = 1.0*fs
-    fdiff = 1.5
+    fs = 1e5
+    length = 0.1*fs
+    fdiff = 5
     f0 = 999
     padding = 0
-    f_true = []
-    numTones = 3
+    f_true = [f0, f0+fdiff, f0+fdiff*2.5]
+    numTones = len(f_true)
     # Add tones
     x = np.zeros(int(length),dtype=np.complex128)
     for i in range(numTones):
-        x = x + np.pad(np.exp(1j*2*np.pi*(f0+i*fdiff)*np.arange(length)/fs), (padding,0))
-        f_true.append(f0+i*fdiff)
+        x = x + np.pad(np.exp(1j*2*np.pi*f_true[i]*np.arange(length)/fs), (padding,0))
     # Add some noise
-    noisePwr = 1e-1
+    noisePwr = 1e-5
     x = x + (np.random.randn(x.size) + np.random.randn(x.size)*1j) * np.sqrt(noisePwr)
 
     # Calculate CZT
-    fineFreqStep = 0.01
-    fineFreqRange = 3 # peg to the freqoffset
-    fineFreqVec = np.arange((f0+fdiff/2)-fineFreqRange,(f0+fdiff/2)+fineFreqRange + 0.1*fineFreqStep, fineFreqStep)
-    xczt = czt(x, (f0+fdiff/2)-fineFreqRange,(f0+fdiff/2)+fineFreqRange, fineFreqStep, fs)
+    fineFreqStep = 0.1
+    fineFreqRange = 20 # peg to the freqoffset
+    fineFreqVec = np.arange(np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange + 0.1*fineFreqStep, fineFreqStep)
+    xczt = czt(x, np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange, fineFreqStep, fs)
     
     freqlist = np.arange(np.min(f_true)-fdiff,np.max(f_true)+fdiff,0.01)
     
     # One-shot evaluation for all desired p values
     plist = np.arange(3,5)
     rows = 1000
+    music = MUSIC(rows, snapshotJump=1, useEigh=False)
     t1 = time.time()
-    f, u, s, vh = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1)
-    # f_tp, u_tp, s_tp, vh_tp = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1, averageToToeplitz=True) # Takes very long
-    f_fb, u_fb, s_fb, vh_fb = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1, fwdBwd=True)
-    f_fb_ns, u_fb_ns, s_fb_ns, vh_fb_ns = musicAlg(x, freqlist/fs, rows, plist, snapshotJump=1, fwdBwd=True, useSignalAsNumerator=True)
-    # f_ac, u_ac, s_ac, vh_ac = musicAlg(x, freqlist/fs, rows, plist, useAutoCorr=True)
+    # Standard
+    f, u, s, vh, Rx = music.run(x, freqlist/fs, plist)
+
+    # Forward-Backward
+    music.fwdBwd = True
+    f_fb, u_fb, s_fb, vh_fb, Rx_fb = music.run(x, freqlist/fs, plist)
+
+    # Forward-Backward with Signal Subspace
+    f_fb_ns, u_fb_ns, s_fb_ns, vh_fb_ns, Rx_fb_ns = music.run(x, freqlist/fs, plist, useSignalAsNumerator=True)
+
+    # Capon
+    capon = CAPON(rows, snapshotJump=1)
+    f_c, Rx_c = capon.run(x, freqlist/fs)
+    
+    # Forward-Backward Capon?
+    capon.fwdBwd = True
+    f_cfb, Rx_cfb = capon.run(x, freqlist/fs)
+
     t2 = time.time()
     print("Took %f s." % (t2-t1))
     
-    ## OOP Rework
-    music = MUSIC(rows, snapshotJump=1)
-    # Standard
-    ff, uu, ss, vvh = music.run(x, freqlist/fs, plist)
-    assert(np.all(f==ff))
-    # Forward-Backward
-    music.fwdBwd = True
-    ff_fb, uu_fb, ss_fb, vvh_fb = music.run(x, freqlist/fs, plist)
-    assert(np.all(f_fb==ff_fb))
-    # Forward-Backward with Signal Subspace
-    ff_fb_ns, uu_fb_ns, ss_fb_ns, vvh_fb_ns = music.run(x, freqlist/fs, plist, useSignalAsNumerator=True)
-    assert(np.all(ff_fb_ns==f_fb_ns))
+    
 
     fig,ax = plt.subplots(4,1,num="Comparison")
     ax[0].set_title("Standard MUSIC, %d rows" % (rows))
-    # ax[1].set_title("Averaged Toeplitz MUSIC, %d rows" % (rows))
-    ax[1].set_title("Auto-correlation MUSIC, %d rows" % (rows))
+    ax[1].set_title("CAPON, %d rows" % (rows))
     ax[2].set_title("Forward-Backward MUSIC, %d rows" % (rows))
     ax[3].set_title("Forward-Backward MUSIC + Signal Subspace, %d rows" % (rows))
     
@@ -382,19 +420,18 @@ if __name__ == '__main__':
         # plt.plot(makeFreq(len(x),fs), np.abs(xfft)/np.max(np.abs(xfft)))
         ax[i].plot(fineFreqVec, np.abs(xczt)/ np.max(np.abs(xczt)), label='CZT')
         ax[i].vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
+        
+    ax[1].plot(freqlist, np.abs(f_c)/np.max(np.abs(f_c)), label='CAPON')
+    ax[1].plot(freqlist, np.abs(f_cfb)/np.max(np.abs(f_cfb)), label='CAPON + Forward-Backward')
+    ax[1].legend()
+    ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
    
     for i in range(f.shape[0]):
         ax[0].plot(freqlist, f[i]/np.max(f[i]), label='MUSIC, p='+str(plist[i]))
         ax[0].legend()
         ax[0].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
         
-        # ax[1].plot(freqlist, f_tp[i]/np.max(f_tp[i]), label='MUSIC, p='+str(plist[i]))
-        # ax[1].legend()
-        # ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
         
-        # ax[1].plot(freqlist, f_ac[i]/np.max(f_ac[i]), label='MUSIC, p='+str(plist[i]))
-        # ax[1].legend()
-        # ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
         
         ax[2].plot(freqlist, f_fb[i]/np.max(f_fb[i]), label='MUSIC, p='+str(plist[i]))
         ax[2].legend()

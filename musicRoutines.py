@@ -174,8 +174,16 @@ class CovarianceTechnique:
         self.fwdBwd = fwdBwd
         self.avgToToeplitz = avgToToeplitz
         self.useEigh = useEigh
+        self.L = None
         
-    def calcRx(self, x, findEigs=True):
+    def setPrewhiteningMatrix(self, L):
+        self.L = L
+        
+    def preprocessSnapshots(self, x):
+        '''
+        Helper method to slice dictionary of arrays into a matrix of column vectors.
+        Used in covariance matrix generation.
+        '''
         if isinstance(x, dict): # If input is multiple 1-d arrays
             # Instantiate the final mat (empty at first)
             xs = np.zeros((rows,0), np.complex128)
@@ -224,6 +232,35 @@ class CovarianceTechnique:
                     xs[:,i] = x[i * self.snapshotJump : i * self.snapshotJump + rows]
                 
         Rx = (1/cols) * xs @ xs.conj().T
+        
+        return Rx
+        
+        
+    def estPrewhiteningMatrix(self, noise, removeUncorrelated=False):
+        # Similar to RX, we calculate covariance for (coloured) noise
+        Rn = self.preprocessSnapshots(noise)
+        
+        if removeUncorrelated:
+            u,s,vh = np.linalg.svd(Rn)
+            Rn = Rn - s[-1] * np.eye(rows) # assumes smallest eigenvalue = white noise power
+            
+        self.L = np.linalg.cholesky(Rn)
+        # Complete
+            
+            
+    def calcRx(self, x, findEigs=True):
+        '''
+        Parameters
+        ----------
+        x : 1-dim array.
+            Input column vector (will be automatically reshaped).
+        findEigs : boolean, optional
+            Toggles whether svd is called. The default is True.
+        '''
+        
+        # Get the base Rx
+        Rx = self.preprocessSnapshots(x)
+       
         if self.fwdBwd:
             J = np.eye(Rx.shape[0])
             # Reverse row-wise to form the antidiagonal exchange matrix
@@ -262,7 +299,7 @@ class MUSIC(CovarianceTechnique):
     def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=True):
         super().__init__(rows, snapshotJump, fwdBwd, avgToToeplitz, useEigh)
         
-    def run(self, x, freqlist, plist, useSignalAsNumerator=False):
+    def run(self, x, freqlist, plist, useSignalAsNumerator=False, prewhiten=False):
         '''
         Parameters
         ----------
@@ -293,7 +330,14 @@ class MUSIC(CovarianceTechnique):
             Output from SVD.
 
         '''
+        if prewhiten and self.L is None:
+            raise ValueError("Please set the pre-whitening matrix explicitly using setPrewhiteningMatrix or use estPrewhiteningMatrix to estimate it from some noise.")
+        
         u, s, vh, Rx = self.calcRx(x)
+        
+        if prewhiten:
+            Linv = np.linalg.inv(self.L)
+            Rx = Linv @ Rx @ Linv.conj().T
         
         # Instead of iterations, generate a one-time Vandermonde matrix of eh
         ehlist = np.exp(-1j*2*np.pi*freqlist.reshape((-1,1))*np.arange(rows)) # generate the e vector for every frequency i.e. Vandermonde
@@ -354,6 +398,55 @@ class CAPON(CovarianceTechnique):
         # Return
         return f,Rx
         
+class ESPRIT(CovarianceTechnique):
+    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=True):
+        super().__init__(rows, snapshotJump, fwdBwd, avgToToeplitz, useEigh)
+        
+    def run(self, x, plist):
+        u,s,vh,Rx = self.calcRx(x)
+        
+        
+        # Generate output
+        numerator = 1.0 # default numerator
+        if not hasattr(plist, '__len__'): # if only one value of p
+            sigU = u[:,:plist]
+
+            phi, residuals, rank, singularVals = np.linalg.lstsq(sigU[:rows-1,:], sigU[1:,:], rcond=None) # suppress warning with rcond specification
+            w, v = np.linalg.eig(phi)
+            normomegas = np.angle(w) # our version doesn't have minus?
+            freqs = normomegas / (2*np.pi) * fs
+            
+
+        
+        #     d = ehlist @ u[:,plist:]
+        #     denom = np.sum(np.abs(d)**2, axis=1)
+            
+        #     if useSignalAsNumerator: # Construct the generalised inverse (we have the SVD results already)
+        #         ssp = s[:plist]**-0.5 # Take the p eigenvalues and reciprocal + root them -> generalised inverse root eigenvalues
+        #         siginv = u[:,:plist] * ssp # assume u = v, i.e. u^H = v^H, scale by the inverse eigenvalues
+        #         n = ehlist @ siginv
+        #         numerator = np.sum(np.abs(n)**2, axis=1)
+                
+        #     f = numerator / denom
+            
+        # else: # for multiple values of p
+        #     f = np.zeros((len(plist), len(freqlist)))
+        #     for i in range(len(plist)):
+        #         p = plist[i]
+        #         d = ehlist @ u[:,p:]
+        #         denom = np.sum(np.abs(d)**2, axis=1)
+                
+        #         if useSignalAsNumerator:
+        #             ssp = s[:p]**-0.5 # Take the p eigenvalues and reciprocal + root them -> generalised inverse root eigenvalues
+        #             siginv = u[:,:p] * ssp # assume u = v, i.e. u^H = v^H, scale by the inverse eigenvalues
+        #             n = ehlist @ siginv
+        #             numerator = np.sum(np.abs(n)**2, axis=1)
+                    
+        #         f[i,:] = numerator / denom
+                
+        # Return
+        return freqs,u,s,vh,Rx
+        
 
 #%%
 if __name__ == '__main__':
@@ -361,26 +454,26 @@ if __name__ == '__main__':
     plt.close("all")
     fs = 1e5
     length = 0.1*fs
-    fdiff = 5
+    fdiff = 10
     f0 = 999
     padding = 0
-    f_true = [f0, f0+fdiff, f0+fdiff*2.5]
+    f_true = [f0, f0+fdiff, f0+fdiff*5]
     numTones = len(f_true)
     # Add tones
     x = np.zeros(int(length),dtype=np.complex128)
     for i in range(numTones):
-        x = x + np.pad(np.exp(1j*2*np.pi*f_true[i]*np.arange(length)/fs), (padding,0))
+        x = x + np.pad(np.exp(1j*2*np.pi*f_true[i]*np.arange(length)/fs + 1j*np.random.rand()*2*np.pi), (padding,0))
     # Add some noise
-    noisePwr = 1e-5
-    x = x + (np.random.randn(x.size) + np.random.randn(x.size)*1j) * np.sqrt(noisePwr)
+    noisePwr = 1e-1
+    xn = x + (np.random.randn(x.size) + np.random.randn(x.size)*1j) * np.sqrt(noisePwr)
 
     # Calculate CZT
     fineFreqStep = 0.1
-    fineFreqRange = 20 # peg to the freqoffset
+    fineFreqRange = 30 # peg to the freqoffset
     fineFreqVec = np.arange(np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange + 0.1*fineFreqStep, fineFreqStep)
     xczt = czt(x, np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange, fineFreqStep, fs)
     
-    freqlist = np.arange(np.min(f_true)-fdiff,np.max(f_true)+fdiff,0.01)
+    freqlist = np.arange(np.min(f_true)-fdiff*2,np.max(f_true)+fdiff*2,0.01)
     
     # One-shot evaluation for all desired p values
     plist = np.arange(3,5)
@@ -388,31 +481,39 @@ if __name__ == '__main__':
     music = MUSIC(rows, snapshotJump=1, useEigh=False)
     t1 = time.time()
     # Standard
-    f, u, s, vh, Rx = music.run(x, freqlist/fs, plist)
+    f, u, s, vh, Rx = music.run(xn, freqlist/fs, plist)
 
     # Forward-Backward
     music.fwdBwd = True
-    f_fb, u_fb, s_fb, vh_fb, Rx_fb = music.run(x, freqlist/fs, plist)
+    f_fb, u_fb, s_fb, vh_fb, Rx_fb = music.run(xn, freqlist/fs, plist)
 
     # Forward-Backward with Signal Subspace
-    f_fb_ns, u_fb_ns, s_fb_ns, vh_fb_ns, Rx_fb_ns = music.run(x, freqlist/fs, plist, useSignalAsNumerator=True)
+    f_fb_ns, u_fb_ns, s_fb_ns, vh_fb_ns, Rx_fb_ns = music.run(xn, freqlist/fs, plist, useSignalAsNumerator=True)
 
-    # Capon
-    capon = CAPON(rows, snapshotJump=1)
-    f_c, Rx_c = capon.run(x, freqlist/fs)
+    # # Capon
+    # capon = CAPON(rows, snapshotJump=1)
+    # f_c, Rx_c = capon.run(x, freqlist/fs)
     
-    # Forward-Backward Capon?
-    capon.fwdBwd = True
-    f_cfb, Rx_cfb = capon.run(x, freqlist/fs)
+    # # Forward-Backward Capon?
+    # capon.fwdBwd = True
+    # f_cfb, Rx_cfb = capon.run(x, freqlist/fs)
+    
+    # ESPRIT (improves on resolution from MUSIC, but still fails at 1e-1 with 3 tones..)
+    esprit = ESPRIT(rows, snapshotJump=1)
+    pe = numTones
+    freqse,ue,se,vhe,Rxe = esprit.run(xn, pe)
+    
+    # ESPRIT + Forward-Backward
+    esprit.fwdBwd = True
+    freqse_fb,ue_fb,se_fb,vhe_fb,Rxe_fb = esprit.run(xn, pe)
 
     t2 = time.time()
     print("Took %f s." % (t2-t1))
-    
-    
 
     fig,ax = plt.subplots(4,1,num="Comparison")
     ax[0].set_title("Standard MUSIC, %d rows" % (rows))
-    ax[1].set_title("CAPON, %d rows" % (rows))
+    # ax[1].set_title("CAPON, %d rows" % (rows))
+    ax[1].set_title("ESPRIT, %d rows" % (rows))
     ax[2].set_title("Forward-Backward MUSIC, %d rows" % (rows))
     ax[3].set_title("Forward-Backward MUSIC + Signal Subspace, %d rows" % (rows))
     
@@ -421,8 +522,15 @@ if __name__ == '__main__':
         ax[i].plot(fineFreqVec, np.abs(xczt)/ np.max(np.abs(xczt)), label='CZT')
         ax[i].vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
         
-    ax[1].plot(freqlist, np.abs(f_c)/np.max(np.abs(f_c)), label='CAPON')
-    ax[1].plot(freqlist, np.abs(f_cfb)/np.max(np.abs(f_cfb)), label='CAPON + Forward-Backward')
+    # Plot capon out of loop (usually garbage compared to music)
+    # ax[1].plot(freqlist, np.abs(f_c)/np.max(np.abs(f_c)), label='CAPON')
+    # ax[1].plot(freqlist, np.abs(f_cfb)/np.max(np.abs(f_cfb)), label='CAPON + Forward-Backward')
+    # ax[1].legend()
+    # ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
+    
+    # Plot ESPRIT out of loop
+    ax[1].vlines(freqse, 0, 1, colors='b', label='ESPRIT, p='+str(pe))
+    ax[1].vlines(freqse_fb, 0, 1, colors='g', label='ESPRIT+ForwardBackward, p='+str(pe))
     ax[1].legend()
     ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
    
@@ -448,35 +556,35 @@ if __name__ == '__main__':
     # plt.plot(np.log10(s_ac),'x-',label='Auto-correlation MUSIC')
     plt.plot(np.log10(s_fb),'x-',label='Forward-Backward MUSIC')
     plt.plot(np.log10(s_fb_ns),'x-',label='Forward-Backward + Signal Subspace MUSIC')
+    plt.plot(np.log10(se),'x-',label='ESPRIT')
+    plt.plot(np.log10(se_fb),'x-',label='Forward-Backward ESPRIT')
     plt.legend()
     
-    ## At 1e-4 noise:
-    # Note that at rows=100, unable to resolve. But at rows = 1000, able to resolve (dependency on 'block size' despite total length being equal)
-    # p=3 is now required, instead of p=2
-    ## At 1e-3 noise:
-    # Similarly, at rows = 1000, able to resolve, but clarity is diminished.
-    # Still p=3
-    ## At 1e-2 noise:
-    # No longer able to resolve with rows=1000.
-    
-    ## Now with snapshotJump = 1 (sliding window for every possible snapshot rather than unique snapshot)
-    # 1e-2 noise:
-    # Now possible to resolve with rows = 1000 !!!
-    # Even at 1e-1 noise!!
-    
-    ## Autocorrelation does not appear to offer any benefits; sharpens a peak at noisy regime but incorrect value, and incorrect number of peaks
-    ## For best results, rows = 1000 at noisePwr 1e-1 (ie about 10dB) with both forward-backward
-    ## and signal subspace enabled appears to be the best performing.
-    
     assert(False)
+    
+    #%% Experiment with filtering and pre-whitening
+    ftap = sps.firwin(100, 0.1)
+    longnoiselen = fs
+    longnoise = (np.random.randn(int(fs)) + np.random.randn(int(fs))*1j) * np.sqrt(noisePwr)
+    filterednoise = sps.lfilter(ftap,1,longnoise)
+    # Call the object method to calculate and set prewhitening matrix
+    music.estPrewhiteningMatrix(filterednoise)
+    
+    # Now call the music method with prewhitening?
+    
+    
     #%% Experiment with separated bursts
     numBursts = 10
-    burstLength = int(fs * 0.5)
-    burstGap = int(fs * 0.5)
+    burstLength = int(fs * 0.1)
+    burstGap = int(fs * 0.9)
     totalLength = numBursts * burstLength + (numBursts-1) * burstGap
     noisePwr = 1e-1
     
-    x = np.exp(1j*2*np.pi*f0*np.arange(totalLength)/fs) + np.exp(1j*2*np.pi*(f0+fdiff)*np.arange(totalLength)/fs)
+    # Add tones
+    x = np.zeros(int(totalLength),dtype=np.complex128)
+    for i in range(numTones):
+        x = x + np.exp(1j*2*np.pi*f_true[i]*np.arange(totalLength)/fs + 1j*np.random.rand()*2*np.pi)
+    
     # Window out the bursts only
     xwindow = np.zeros(len(x))
     for i in range(numBursts):
@@ -493,18 +601,18 @@ if __name__ == '__main__':
         xbursts[i] = x[i*(burstLength+burstGap) : i*(burstLength+burstGap)+burstLength]
     
     # Create the overall czt, as well as the individual czts
-    xczt = czt(x, (f0+fdiff/2)-fineFreqRange,(f0+fdiff/2)+fineFreqRange, fineFreqStep, fs)
+    xczt = czt(x, np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange, fineFreqStep, fs)
     xcztbursts = np.zeros((numBursts, fineFreqVec.size), x.dtype)
     for i in range(numBursts):
         xcztbursts[i,:] = czt(xbursts[i],
-                              (f0+fdiff/2)-fineFreqRange,(f0+fdiff/2)+fineFreqRange, fineFreqStep, fs)
+                              np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange, fineFreqStep, fs)
     # Compare the MUSICs
     bfig, bax = plt.subplots(1,1,num="Bursty Tone MUSIC")
-    bax.vlines([f0,f0+fdiff],0,1,colors='r', linestyles='dashed',label='Actual')
+    bax.vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
 
     # MUSIC each burst individually
     musicBursts = {}
-    p = 2
+    p = numTones
     for i in range(numBursts):
         f_fb_ns, u_fb_ns, s_fb_ns, vh_fb_ns = musicAlg(xbursts[i], freqlist/fs, rows, p, snapshotJump=1, fwdBwd=True, useSignalAsNumerator=True)
         musicBursts[i] = f_fb_ns
@@ -518,7 +626,7 @@ if __name__ == '__main__':
     
     # Compare Full CZT against Full MUSIC
     plt.figure()
-    plt.vlines([f0,f0+fdiff],0,1,colors='r', linestyles='dashed',label='Actual')
+    plt.vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
     plt.plot(fineFreqVec, np.abs(xczt)/np.max(np.abs(xczt)), label="Full length CZT")
     # for i in range(numBursts):
     #     plt.plot(fineFreqVec, np.abs(xcztbursts[i,:])/np.max(np.abs(xcztbursts[i,:])), label="CZT of Burst " + str(i))

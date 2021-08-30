@@ -186,20 +186,20 @@ class CovarianceTechnique:
         '''
         if isinstance(x, dict): # If input is multiple 1-d arrays
             # Instantiate the final mat (empty at first)
-            xs = np.zeros((rows,0), np.complex128)
+            xs = np.zeros((self.rows,0), np.complex128)
             # Iterate over every 1-d array in the dictionary
             for xi in x.values():
                 if self.snapshotJump is None: # Refer to the single-array version for comments
                     xi = xi.reshape((-1,1)) # vectorize
-                    cols = int(np.floor(len(xi)/rows))
-                    xslen = rows * cols
+                    cols = int(np.floor(len(xi)/self.rows))
+                    xslen = self.rows * cols
                     xs_i = xi[:xslen] # we cut off the ending bits
-                    xs_i = xs_i.reshape((cols, rows)).T
+                    xs_i = xs_i.reshape((cols, self.rows)).T
                 else: # Refer to the single-array version for comments 
     
                     xi = xi.flatten() # in case it's not flat
-                    cols = (xi.size - rows) / self.snapshotJump # calculate the required columns
-                    xs_i = np.zeros((rows, int(cols+1)), xi.dtype)
+                    cols = (xi.size - self.rows) / self.snapshotJump # calculate the required columns
+                    xs_i = np.zeros((self.rows, int(cols+1)), xi.dtype)
                     print("Matrix dim is %d, %d" % (xs.shape[0], xs.shape[1]))
                     for i in range(xs_i.shape[1]): # fill the columns
                         xs_i[:,i] = xi[i * self.snapshotJump : i * self.snapshotJump + rows]
@@ -214,10 +214,10 @@ class CovarianceTechnique:
                 # 1 3 5
                 # 2 4 6  for example
                 x = x.reshape((-1,1)) # vectorize
-                cols = int(np.floor(len(x)/rows))
-                xslen = rows * cols
+                cols = int(np.floor(len(x)/self.rows))
+                xslen = self.rows * cols
                 xs = x[:xslen] # we cut off the ending bits
-                xs = xs.reshape((cols, rows)).T
+                xs = xs.reshape((cols, self.rows)).T
             else: # we use the rate to populate our columns
                 # e.g. for snapshot jump = 1,
                 # 1 2 3 4 5 6 ->
@@ -225,12 +225,13 @@ class CovarianceTechnique:
                 # 2 3 4 5 6
                     
                 x = x.flatten() # in case it's not flat
-                cols = (x.size - rows) / self.snapshotJump # calculate the required columns
-                xs = np.zeros((rows, int(cols+1)), x.dtype)
+                cols = (x.size - self.rows) / self.snapshotJump # calculate the required columns
+                xs = np.zeros((self.rows, int(cols+1)), x.dtype)
                 print("Matrix dim is %d, %d" % (xs.shape[0], xs.shape[1]))
                 for i in range(xs.shape[1]): # fill the columns
-                    xs[:,i] = x[i * self.snapshotJump : i * self.snapshotJump + rows]
-                
+                    xs[:,i] = x[i * self.snapshotJump : i * self.snapshotJump + self.rows]
+        
+        
         Rx = (1/cols) * xs @ xs.conj().T
         
         return Rx
@@ -242,7 +243,7 @@ class CovarianceTechnique:
         
         if removeUncorrelated:
             u,s,vh = np.linalg.svd(Rn)
-            Rn = Rn - s[-1] * np.eye(rows) # assumes smallest eigenvalue = white noise power
+            Rn = Rn - s[-1] * np.eye(self.rows) # assumes smallest eigenvalue = white noise power
             
         self.L = np.linalg.cholesky(Rn)
         # Complete
@@ -340,7 +341,7 @@ class MUSIC(CovarianceTechnique):
             Rx = Linv @ Rx @ Linv.conj().T
         
         # Instead of iterations, generate a one-time Vandermonde matrix of eh
-        ehlist = np.exp(-1j*2*np.pi*freqlist.reshape((-1,1))*np.arange(rows)) # generate the e vector for every frequency i.e. Vandermonde
+        ehlist = np.exp(-1j*2*np.pi*freqlist.reshape((-1,1))*np.arange(self.rows)) # generate the e vector for every frequency i.e. Vandermonde
         
         # Generate output
         numerator = 1.0 # default numerator
@@ -391,7 +392,7 @@ class CAPON(CovarianceTechnique):
         f = np.zeros(freqlist.size, x.dtype)
         
         for i in range(len(freqlist)):
-            eh = np.exp(-1j*2*np.pi*freqlist[i]*np.arange(rows)).reshape((1,-1))
+            eh = np.exp(-1j*2*np.pi*freqlist[i]*np.arange(self.rows)).reshape((1,-1))
             denom = eh @ invRx @ eh.conj().T
             f[i] = numerator/denom
 
@@ -411,7 +412,7 @@ class ESPRIT(CovarianceTechnique):
         if not hasattr(plist, '__len__'): # if only one value of p
             sigU = u[:,:plist]
 
-            phi, residuals, rank, singularVals = np.linalg.lstsq(sigU[:rows-1,:], sigU[1:,:], rcond=None) # suppress warning with rcond specification
+            phi, residuals, rank, singularVals = np.linalg.lstsq(sigU[:self.rows-1,:], sigU[1:,:], rcond=None) # suppress warning with rcond specification
             w, v = np.linalg.eig(phi)
             normomegas = np.angle(w) # our version doesn't have minus?
             freqs = normomegas / (2*np.pi) * fs
@@ -455,9 +456,9 @@ if __name__ == '__main__':
     fs = 1e5
     length = 0.1*fs
     fdiff = 10
-    f0 = 999
+    f0 = -10
     padding = 0
-    f_true = [f0, f0+fdiff, f0+fdiff*5]
+    f_true = [f0, f0+fdiff, f0+fdiff*3.5, f0+fdiff*5]
     numTones = len(f_true)
     # Add tones
     x = np.zeros(int(length),dtype=np.complex128)
@@ -561,6 +562,26 @@ if __name__ == '__main__':
     plt.legend()
     
     assert(False)
+    
+    #%% Experiment with filtering
+    dsr = 10
+    ftap = sps.firwin(100, 1/dsr)
+    xn_filt = sps.lfilter(ftap,1,xn)
+    xn_filtds = xn[::dsr]
+    plt.figure("Filter+Downsample")
+    xnfft = np.fft.fft(xn)
+    xn_filtdsfft = np.fft.fft(xn_filtds)
+    plt.plot(makeFreq(len(xn),fs),np.abs(xnfft)/np.max(np.abs(xnfft)), label='FFT')
+    plt.plot(makeFreq(len(xn_filtds), fs/dsr), np.abs(xn_filtdsfft)/np.max(np.abs(xn_filtdsfft)), label='Filter+Downsample FFT')
+    
+    # Now run music on it
+    musicds = MUSIC(rows=200, snapshotJump=1, fwdBwd=True)
+    fds, uds, sds, vhds, Rxds = musicds.run(xn_filtds, freqlist/(fs/dsr), plist=[19])
+    for i in range(fds.shape[0]):
+        plt.plot(freqlist, fds[i]/np.max(fds[i]), label='MUSIC, p='+str(plist[i]))
+        
+    plt.vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
+    plt.legend()
     
     #%% Experiment with filtering and pre-whitening
     ftap = sps.firwin(100, 0.1)

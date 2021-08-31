@@ -260,7 +260,10 @@ class CovarianceTechnique:
         '''
         
         # Get the base Rx
+        t1 = time.time()
         Rx = self.preprocessSnapshots(x)
+        t2 = time.time()
+        print("Took %fs for matrix snapshot reshaping." % (t2-t1))
        
         if self.fwdBwd:
             J = np.eye(Rx.shape[0])
@@ -282,6 +285,7 @@ class CovarianceTechnique:
             
         # MUSIC/ESPRIT
         if findEigs is True:
+            t3 = time.time()
             if self.useEigh:
                 s, u = np.linalg.eigh(Rx) # this should be equivalent (minus some numerical errors?)
                 # sort it backwards because eigh returns it in ascending order
@@ -290,6 +294,8 @@ class CovarianceTechnique:
                 vh = None # 
             else:
                 u, s, vh = np.linalg.svd(Rx)
+            t4 = time.time()
+            print("Completed SVD/EIG in %fs." % (t4-t3))
             
             return u, s, vh, Rx
         # CAPON
@@ -456,9 +462,10 @@ if __name__ == '__main__':
     fs = 1e5
     length = 0.1*fs
     fdiff = 10
-    f0 = -10
+    f0 = -20
     padding = 0
-    f_true = [f0, f0+fdiff, f0+fdiff*3.5, f0+fdiff*5]
+    # f_true = [f0, f0+fdiff, f0+fdiff*3.5, f0+fdiff*5]
+    f_true = f0 + np.arange(4) * fdiff
     numTones = len(f_true)
     # Add tones
     x = np.zeros(int(length),dtype=np.complex128)
@@ -472,11 +479,11 @@ if __name__ == '__main__':
     fineFreqStep = 0.1
     fineFreqRange = 30 # peg to the freqoffset
     fineFreqVec = np.arange(np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange + 0.1*fineFreqStep, fineFreqStep)
-    xczt = czt(x, np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange, fineFreqStep, fs)
+    xczt = czt(xn, np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange, fineFreqStep, fs)
     
     freqlist = np.arange(np.min(f_true)-fdiff*2,np.max(f_true)+fdiff*2,0.01)
     
-    # One-shot evaluation for all desired p values
+    #%% One-shot evaluation for all desired p values
     plist = np.arange(3,5)
     rows = 1000
     music = MUSIC(rows, snapshotJump=1, useEigh=False)
@@ -569,19 +576,26 @@ if __name__ == '__main__':
     xn_filt = sps.lfilter(ftap,1,xn)
     xn_filtds = xn[::dsr]
     plt.figure("Filter+Downsample")
-    xnfft = np.fft.fft(xn)
-    xn_filtdsfft = np.fft.fft(xn_filtds)
-    plt.plot(makeFreq(len(xn),fs),np.abs(xnfft)/np.max(np.abs(xnfft)), label='FFT')
-    plt.plot(makeFreq(len(xn_filtds), fs/dsr), np.abs(xn_filtdsfft)/np.max(np.abs(xn_filtdsfft)), label='Filter+Downsample FFT')
+    plt.clf()
+    # xnfft = np.fft.fft(xn)
+    # xn_filtdsfft = np.fft.fft(xn_filtds)
+    xn_filtdsczt = czt(xn_filtds, np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange, fineFreqStep, fs/dsr)
+    plt.plot(fineFreqVec,np.abs(xczt)/np.max(np.abs(xczt)), label='CZT')
+    plt.plot(fineFreqVec, np.abs(xn_filtdsczt)/np.max(np.abs(xn_filtdsczt)), label='Filter+Downsample CZT')
     
     # Now run music on it
-    musicds = MUSIC(rows=200, snapshotJump=1, fwdBwd=True)
-    fds, uds, sds, vhds, Rxds = musicds.run(xn_filtds, freqlist/(fs/dsr), plist=[19])
+    musicds = MUSIC(rows=900, snapshotJump=1, fwdBwd=True)
+    fds, uds, sds, vhds, Rxds = musicds.run(xn_filtds, freqlist/(fs/dsr), plist=[len(f_true)])
     for i in range(fds.shape[0]):
-        plt.plot(freqlist, fds[i]/np.max(fds[i]), label='MUSIC, p='+str(plist[i]))
+        plt.plot(freqlist, fds[i]/np.max(fds[i]), label='MUSIC, p='+str(len(f_true)))
         
     plt.vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
     plt.legend()
+    plt.xlim([freqlist[0],freqlist[-1]])
+    
+    plt.figure("Filter+Downsample Eigvalues")
+    plt.clf()
+    plt.plot(np.log10(sds), 'x-')
     
     #%% Experiment with filtering and pre-whitening
     ftap = sps.firwin(100, 0.1)

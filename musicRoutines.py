@@ -202,7 +202,7 @@ class CovarianceTechnique:
                     xs_i = np.zeros((self.rows, int(cols+1)), xi.dtype)
                     print("Matrix dim is %d, %d" % (xs.shape[0], xs.shape[1]))
                     for i in range(xs_i.shape[1]): # fill the columns
-                        xs_i[:,i] = xi[i * self.snapshotJump : i * self.snapshotJump + rows]
+                        xs_i[:,i] = xi[i * self.snapshotJump : i * self.snapshotJump + self.rows]
                 
                 # Then, concatenate the matrix
                 xs = np.hstack((xs, xs_i))
@@ -296,14 +296,14 @@ class CovarianceTechnique:
                 u, s, vh = np.linalg.svd(Rx)
             t4 = time.time()
             print("Completed SVD/EIG in %fs." % (t4-t3))
-            
+
             return u, s, vh, Rx
         # CAPON
         else:
             return Rx
     
 class MUSIC(CovarianceTechnique):
-    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=True):
+    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=False):
         super().__init__(rows, snapshotJump, fwdBwd, avgToToeplitz, useEigh)
         
     def run(self, x, freqlist, plist, useSignalAsNumerator=False, prewhiten=False):
@@ -347,7 +347,10 @@ class MUSIC(CovarianceTechnique):
             Rx = Linv @ Rx @ Linv.conj().T
         
         # Instead of iterations, generate a one-time Vandermonde matrix of eh
+        t1 = time.time()
         ehlist = np.exp(-1j*2*np.pi*freqlist.reshape((-1,1))*np.arange(self.rows)) # generate the e vector for every frequency i.e. Vandermonde
+        t2 = time.time()
+        print("%fs to generate Vandermonde tone matrix." % (t2-t1))
         
         # Generate output
         numerator = 1.0 # default numerator
@@ -365,7 +368,7 @@ class MUSIC(CovarianceTechnique):
             
         else: # for multiple values of p
             f = np.zeros((len(plist), len(freqlist)))
-            for i in range(len(plist)):
+            for i in range(len(plist)):           
                 p = plist[i]
                 d = ehlist @ u[:,p:]
                 denom = np.sum(np.abs(d)**2, axis=1)
@@ -378,11 +381,14 @@ class MUSIC(CovarianceTechnique):
                     
                 f[i,:] = numerator / denom
                 
+        t3 = time.time()
+        print("%fs to generate output." % (t3-t2))
+        
         # Return
         return f,u,s,vh,Rx
         
 class CAPON(CovarianceTechnique):
-    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=True):
+    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=False):
         super().__init__(rows, snapshotJump, fwdBwd, avgToToeplitz, useEigh)
         
     def run(self, x, freqlist):
@@ -406,10 +412,10 @@ class CAPON(CovarianceTechnique):
         return f,Rx
         
 class ESPRIT(CovarianceTechnique):
-    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=True):
+    def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=False):
         super().__init__(rows, snapshotJump, fwdBwd, avgToToeplitz, useEigh)
         
-    def run(self, x, plist):
+    def run(self, x, plist, fs):
         u,s,vh,Rx = self.calcRx(x)
         
         
@@ -461,11 +467,18 @@ if __name__ == '__main__':
     plt.close("all")
     fs = 1e5
     length = 0.1*fs
-    fdiff = 10
-    f0 = -20
+    fdiff = 12
+    f0 = -30
     padding = 0
-    # f_true = [f0, f0+fdiff, f0+fdiff*3.5, f0+fdiff*5]
-    f_true = f0 + np.arange(4) * fdiff
+    # f_true = [f0, f0+fdiff, f0+fdiff*3.5, f0+fdiff*5] # Arbitrary
+    # f_true = f0 + np.arange(4) * fdiff # Uniform
+    f_true = f0 + np.arange(0,5) * fdiff # Single pentet (~12 Hz min)
+    # f_true = f0 + np.arange(0,4) * fdiff # Single quartet (~9 Hz min)
+    # f_true = f0 + np.hstack((np.arange(0,3),np.arange(14,17))) * fdiff # 2 triplets
+    # f_true = f0 + np.arange(0,3) * fdiff # Single triplet (~6 Hz min)
+    # f_true = f0 + np.hstack((np.arange(0,2),np.arange(4,6),np.arange(10,12))) * fdiff # 3 Pairs
+    # f_true = f0 + np.hstack((np.arange(0,2),np.arange(5,7))) * fdiff # 2 Pairs
+    # f_true = f0 + np.arange(0,2) * fdiff # Single pair (~3 Hz min)
     numTones = len(f_true)
     # Add tones
     x = np.zeros(int(length),dtype=np.complex128)
@@ -481,132 +494,162 @@ if __name__ == '__main__':
     fineFreqVec = np.arange(np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange + 0.1*fineFreqStep, fineFreqStep)
     xczt = czt(xn, np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange, fineFreqStep, fs)
     
-    freqlist = np.arange(np.min(f_true)-fdiff*2,np.max(f_true)+fdiff*2,0.01)
+    freqlist = np.arange(np.min(f_true)-fdiff*1,np.max(f_true)+fdiff*1,0.1)
     
     #%% One-shot evaluation for all desired p values
-    plist = np.arange(3,5)
-    rows = 1000
-    music = MUSIC(rows, snapshotJump=1, useEigh=False)
-    t1 = time.time()
-    # Standard
-    f, u, s, vh, Rx = music.run(xn, freqlist/fs, plist)
-
-    # Forward-Backward
-    music.fwdBwd = True
-    f_fb, u_fb, s_fb, vh_fb, Rx_fb = music.run(xn, freqlist/fs, plist)
-
-    # Forward-Backward with Signal Subspace
-    f_fb_ns, u_fb_ns, s_fb_ns, vh_fb_ns, Rx_fb_ns = music.run(xn, freqlist/fs, plist, useSignalAsNumerator=True)
-
-    # # Capon
-    # capon = CAPON(rows, snapshotJump=1)
-    # f_c, Rx_c = capon.run(x, freqlist/fs)
+    onlyDoFilteredVersion = True
     
-    # # Forward-Backward Capon?
-    # capon.fwdBwd = True
-    # f_cfb, Rx_cfb = capon.run(x, freqlist/fs)
+    if not onlyDoFilteredVersion:
+        plist = np.arange(len(f_true)-1,len(f_true)+1)
+        rows = 1000
+        music = MUSIC(rows, snapshotJump=1, useEigh=False)
+        t1 = time.time()
+        # Standard
+        f, u, s, vh, Rx = music.run(xn, freqlist/fs, plist)
     
-    # ESPRIT (improves on resolution from MUSIC, but still fails at 1e-1 with 3 tones..)
-    esprit = ESPRIT(rows, snapshotJump=1)
-    pe = numTones
-    freqse,ue,se,vhe,Rxe = esprit.run(xn, pe)
+        # Forward-Backward
+        music.fwdBwd = True
+        f_fb, u_fb, s_fb, vh_fb, Rx_fb = music.run(xn, freqlist/fs, plist)
     
-    # ESPRIT + Forward-Backward
-    esprit.fwdBwd = True
-    freqse_fb,ue_fb,se_fb,vhe_fb,Rxe_fb = esprit.run(xn, pe)
-
-    t2 = time.time()
-    print("Took %f s." % (t2-t1))
-
-    fig,ax = plt.subplots(4,1,num="Comparison")
-    ax[0].set_title("Standard MUSIC, %d rows" % (rows))
-    # ax[1].set_title("CAPON, %d rows" % (rows))
-    ax[1].set_title("ESPRIT, %d rows" % (rows))
-    ax[2].set_title("Forward-Backward MUSIC, %d rows" % (rows))
-    ax[3].set_title("Forward-Backward MUSIC + Signal Subspace, %d rows" % (rows))
+        # Forward-Backward with Signal Subspace
+        f_fb_ns, u_fb_ns, s_fb_ns, vh_fb_ns, Rx_fb_ns = music.run(xn, freqlist/fs, plist, useSignalAsNumerator=True)
     
-    for i in range(len(ax)):
-        # plt.plot(makeFreq(len(x),fs), np.abs(xfft)/np.max(np.abs(xfft)))
-        ax[i].plot(fineFreqVec, np.abs(xczt)/ np.max(np.abs(xczt)), label='CZT')
-        ax[i].vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
+        # # Capon
+        # capon = CAPON(rows, snapshotJump=1)
+        # f_c, Rx_c = capon.run(x, freqlist/fs)
         
-    # Plot capon out of loop (usually garbage compared to music)
-    # ax[1].plot(freqlist, np.abs(f_c)/np.max(np.abs(f_c)), label='CAPON')
-    # ax[1].plot(freqlist, np.abs(f_cfb)/np.max(np.abs(f_cfb)), label='CAPON + Forward-Backward')
-    # ax[1].legend()
-    # ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
+        # # Forward-Backward Capon?
+        # capon.fwdBwd = True
+        # f_cfb, Rx_cfb = capon.run(x, freqlist/fs)
+        
+        # ESPRIT (improves on resolution from MUSIC, but still fails at 1e-1 with 3 tones..)
+        esprit = ESPRIT(rows, snapshotJump=1)
+        pe = numTones
+        freqse,ue,se,vhe,Rxe = esprit.run(xn, pe, fs)
+        
+        # ESPRIT + Forward-Backward
+        esprit.fwdBwd = True
+        freqse_fb,ue_fb,se_fb,vhe_fb,Rxe_fb = esprit.run(xn, pe, fs)
     
-    # Plot ESPRIT out of loop
-    ax[1].vlines(freqse, 0, 1, colors='b', label='ESPRIT, p='+str(pe))
-    ax[1].vlines(freqse_fb, 0, 1, colors='g', label='ESPRIT+ForwardBackward, p='+str(pe))
-    ax[1].legend()
-    ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
-   
-    for i in range(f.shape[0]):
-        ax[0].plot(freqlist, f[i]/np.max(f[i]), label='MUSIC, p='+str(plist[i]))
-        ax[0].legend()
-        ax[0].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
+        t2 = time.time()
+        print("Took %f s." % (t2-t1))
+    
+        fig,ax = plt.subplots(4,1,num="Comparison")
+        ax[0].set_title("Standard MUSIC, %d rows" % (rows))
+        # ax[1].set_title("CAPON, %d rows" % (rows))
+        ax[1].set_title("ESPRIT, %d rows" % (rows))
+        ax[2].set_title("Forward-Backward MUSIC, %d rows" % (rows))
+        ax[3].set_title("Forward-Backward MUSIC + Signal Subspace, %d rows" % (rows))
         
+        for i in range(len(ax)):
+            # plt.plot(makeFreq(len(x),fs), np.abs(xfft)/np.max(np.abs(xfft)))
+            ax[i].plot(fineFreqVec, np.abs(xczt)/ np.max(np.abs(xczt)), label='CZT')
+            ax[i].vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
+            
+        # Plot capon out of loop (usually garbage compared to music)
+        # ax[1].plot(freqlist, np.abs(f_c)/np.max(np.abs(f_c)), label='CAPON')
+        # ax[1].plot(freqlist, np.abs(f_cfb)/np.max(np.abs(f_cfb)), label='CAPON + Forward-Backward')
+        # ax[1].legend()
+        # ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
         
-        
-        ax[2].plot(freqlist, f_fb[i]/np.max(f_fb[i]), label='MUSIC, p='+str(plist[i]))
-        ax[2].legend()
-        ax[2].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
-        
-        ax[3].plot(freqlist, f_fb_ns[i]/np.max(f_fb_ns[i]), label='MUSIC, p='+str(plist[i]))
-        ax[3].legend()
-        ax[3].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
-        
+        # Plot ESPRIT out of loop
+        ax[1].vlines(freqse, 0, 1, colors='b', label='ESPRIT, p='+str(pe))
+        ax[1].vlines(freqse_fb, 0, 1, colors='g', label='ESPRIT+ForwardBackward, p='+str(pe))
+        ax[1].legend()
+        ax[1].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
+       
+        for i in range(f.shape[0]):
+            ax[0].plot(freqlist, f[i]/np.max(f[i]), label='MUSIC, p='+str(plist[i]))
+            ax[0].legend()
+            ax[0].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
+            
+            
+            
+            ax[2].plot(freqlist, f_fb[i]/np.max(f_fb[i]), label='MUSIC, p='+str(plist[i]))
+            ax[2].legend()
+            ax[2].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
+            
+            ax[3].plot(freqlist, f_fb_ns[i]/np.max(f_fb_ns[i]), label='MUSIC, p='+str(plist[i]))
+            ax[3].legend()
+            ax[3].set_xlim([fineFreqVec[0],fineFreqVec[-1]])
+            
+    
+        plt.figure("Eigenvalues")
+        plt.plot(np.log10(s),'x-',label='Standard MUSIC')
+        # plt.plot(np.log10(s_tp),'x-',label='Averaged Toeplitz MUSIC')
+        # plt.plot(np.log10(s_ac),'x-',label='Auto-correlation MUSIC')
+        plt.plot(np.log10(s_fb),'x-',label='Forward-Backward MUSIC')
+        plt.plot(np.log10(s_fb_ns),'x-',label='Forward-Backward + Signal Subspace MUSIC')
+        plt.plot(np.log10(se),'x-',label='ESPRIT')
+        plt.plot(np.log10(se_fb),'x-',label='Forward-Backward ESPRIT')
+        plt.legend()
 
-    plt.figure("Eigenvalues")
-    plt.plot(np.log10(s),'x-',label='Standard MUSIC')
-    # plt.plot(np.log10(s_tp),'x-',label='Averaged Toeplitz MUSIC')
-    # plt.plot(np.log10(s_ac),'x-',label='Auto-correlation MUSIC')
-    plt.plot(np.log10(s_fb),'x-',label='Forward-Backward MUSIC')
-    plt.plot(np.log10(s_fb_ns),'x-',label='Forward-Backward + Signal Subspace MUSIC')
-    plt.plot(np.log10(se),'x-',label='ESPRIT')
-    plt.plot(np.log10(se_fb),'x-',label='Forward-Backward ESPRIT')
-    plt.legend()
-    
-    assert(False)
-    
     #%% Experiment with filtering
+    alsoPrewhiten = False
+    
     dsr = 10
     ftap = sps.firwin(100, 1/dsr)
     xn_filt = sps.lfilter(ftap,1,xn)
     xn_filtds = xn[::dsr]
-    plt.figure("Filter+Downsample")
-    plt.clf()
-    # xnfft = np.fft.fft(xn)
-    # xn_filtdsfft = np.fft.fft(xn_filtds)
+    
+    figds, axds = plt.subplots(2,1,num="Filter+Downsample")
+
     xn_filtdsczt = czt(xn_filtds, np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange, fineFreqStep, fs/dsr)
-    plt.plot(fineFreqVec,np.abs(xczt)/np.max(np.abs(xczt)), label='CZT')
-    plt.plot(fineFreqVec, np.abs(xn_filtdsczt)/np.max(np.abs(xn_filtdsczt)), label='Filter+Downsample CZT')
+    # ax[0].plot(fineFreqVec,np.abs(xczt)/np.max(np.abs(xczt)), label='CZT')
+    axds[0].plot(fineFreqVec, np.abs(xn_filtdsczt)/np.max(np.abs(xn_filtdsczt)), label='Filter+Downsample CZT')
     
     # Now run music on it
-    musicds = MUSIC(rows=900, snapshotJump=1, fwdBwd=True)
-    fds, uds, sds, vhds, Rxds = musicds.run(xn_filtds, freqlist/(fs/dsr), plist=[len(f_true)])
-    for i in range(fds.shape[0]):
-        plt.plot(freqlist, fds[i]/np.max(fds[i]), label='MUSIC, p='+str(len(f_true)))
+    dsrows = 900
+    plist =  [len(f_true)] # [len(f_true), int(dsrows/2)] # although there's another knee in the eigenvalues, not worth using
+    musicds = MUSIC(dsrows, snapshotJump=1, fwdBwd=True)
+    fds, uds, sds, vhds, Rxds = musicds.run(xn_filtds, freqlist/(fs/dsr), plist, useSignalAsNumerator=True)
+    for i in range(len(plist)):
+        axds[0].plot(freqlist, fds[i]/np.max(fds[i]), label='MUSIC, p='+str(plist[i]))
         
-    plt.vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
-    plt.legend()
-    plt.xlim([freqlist[0],freqlist[-1]])
+    # Actually, no reason to ignore the other downsample phases
+    xn_filtdsdict = {}
+    for i in range(dsr):
+        xn_filtdsdict[i] = xn[i::dsr]
+        
+    fdsd, udsd, sdsd, vhdsd, Rxdsd = musicds.run(xn_filtdsdict, freqlist/(fs/dsr), plist, useSignalAsNumerator=True)
+    for i in range(len(plist)):
+        axds[0].plot(freqlist, fdsd[i]/np.max(fdsd[i]), label='MUSIC, all downsample phases, p='+str(plist[i]))
+    # It's just plain better now, obviously
     
-    plt.figure("Filter+Downsample Eigvalues")
-    plt.clf()
-    plt.plot(np.log10(sds), 'x-')
+    # # Esprit as well for good measure (but this is really bad now, maybe because different downsample phases are not rotationally invariant?)
+    # espritds = ESPRIT(dsrows, snapshotJump=1)
+    # freqseds,ueds,seds,vheds,Rxeds = espritds.run(xn_filtdsdict, plist[0], fs/dsr)
+    # axds[0].vlines(freqseds, 0, 1, colors='k', label='ESPRIT')
+        
+    axds[0].vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
+    axds[0].legend()
+    axds[0].set_xlim([freqlist[0],freqlist[-1]])
     
-    #%% Experiment with filtering and pre-whitening
-    ftap = sps.firwin(100, 0.1)
-    longnoiselen = fs
-    longnoise = (np.random.randn(int(fs)) + np.random.randn(int(fs))*1j) * np.sqrt(noisePwr)
-    filterednoise = sps.lfilter(ftap,1,longnoise)
-    # Call the object method to calculate and set prewhitening matrix
-    music.estPrewhiteningMatrix(filterednoise)
+
+    axds[1].plot(np.log10(sds), 'x-', label='Not prewhitened')
+    axds[1].set_title("Eigenvalues")
     
-    # Now call the music method with prewhitening?
     
+    
+    #%% Experiment with filtering and pre-whitening (insignificant due to downsample=>quite white already)
+    if alsoPrewhiten:
+        longnoiselen = int(0.1*fs)
+        longnoise = (np.random.randn(longnoiselen) + np.random.randn(longnoiselen)*1j) * np.sqrt(noisePwr)
+        filterednoise = sps.lfilter(ftap,1,longnoise)
+        filtnoisedict = {i: filterednoise[i::dsr] for i in range(dsr)}
+        # Call the object method to calculate and set prewhitening matrix
+        musicds.estPrewhiteningMatrix(filtnoisedict)
+        
+        # Now call the music method with prewhitening?
+        fdsdpw, udsdpw, sdsdpw, vhdsdpw, Rxdsdpw = musicds.run(xn_filtdsdict, freqlist/(fs/dsr), plist, useSignalAsNumerator=True, prewhiten=True)
+        for i in range(len(plist)):
+            axds[0].plot(freqlist, fdsdpw[i]/np.max(fdsd[i]), label='MUSIC, all downsample phases+prewhiten, p='+str(plist[i]))
+        axds[0].legend()
+            
+        axds[1].plot(np.log10(sdsdpw), 'x-', label='Prewhitened')
+        axds[1].legend()
+        
+    assert(False)
     
     #%% Experiment with separated bursts
     numBursts = 10

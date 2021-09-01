@@ -466,24 +466,28 @@ if __name__ == '__main__':
     #%%
     plt.close("all")
     fs = 1e5
-    length = 0.1*fs
-    fdiff = 12
-    f0 = -30
-    padding = 0
+    length = 0.1*fs # at 0.1s, 20Hz sinc span
+    fdiff = 18
+    f0 = -40
+    padding = 1000
     # f_true = [f0, f0+fdiff, f0+fdiff*3.5, f0+fdiff*5] # Arbitrary
     # f_true = f0 + np.arange(4) * fdiff # Uniform
-    f_true = f0 + np.arange(0,5) * fdiff # Single pentet (~12 Hz min)
+    # f_true = f0 + np.arange(0,10) * fdiff # Single many-tet (is it possible to resolve if we are beyond the sinc spacing?)
+    f_true = f0 + np.arange(0,7) * fdiff # Single septet (~18 Hz min?)
+    # f_true = f0 + np.arange(0,6) * fdiff # Single sextet (~15 Hz min ? hard to say at this point)
+    # f_true = f0 + np.arange(0,5) * fdiff # Single quintet (~12 Hz min)
     # f_true = f0 + np.arange(0,4) * fdiff # Single quartet (~9 Hz min)
     # f_true = f0 + np.hstack((np.arange(0,3),np.arange(14,17))) * fdiff # 2 triplets
     # f_true = f0 + np.arange(0,3) * fdiff # Single triplet (~6 Hz min)
     # f_true = f0 + np.hstack((np.arange(0,2),np.arange(4,6),np.arange(10,12))) * fdiff # 3 Pairs
     # f_true = f0 + np.hstack((np.arange(0,2),np.arange(5,7))) * fdiff # 2 Pairs
     # f_true = f0 + np.arange(0,2) * fdiff # Single pair (~3 Hz min)
+    # f_true = [f0] # Single tone
     numTones = len(f_true)
     # Add tones
-    x = np.zeros(int(length),dtype=np.complex128)
+    x = np.zeros(int(length + padding),dtype=np.complex128)
     for i in range(numTones):
-        x = x + np.pad(np.exp(1j*2*np.pi*f_true[i]*np.arange(length)/fs + 1j*np.random.rand()*2*np.pi), (padding,0))
+        x = x + np.pad(np.exp(1j*2*np.pi*f_true[i]*np.arange(length)/fs + 1j*np.random.rand()*2*np.pi), (0,padding))
     # Add some noise
     noisePwr = 1e-1
     xn = x + (np.random.randn(x.size) + np.random.randn(x.size)*1j) * np.sqrt(noisePwr)
@@ -587,10 +591,10 @@ if __name__ == '__main__':
     #%% Experiment with filtering
     alsoPrewhiten = False
     
-    dsr = 10
-    ftap = sps.firwin(100, 1/dsr)
+    dsr = 100
+    ftap = sps.firwin(1000, 1/dsr)
     xn_filt = sps.lfilter(ftap,1,xn)
-    xn_filtds = xn[::dsr]
+    xn_filtds = xn_filt[int(len(ftap)/2):int(len(ftap)/2+length):dsr]
     
     figds, axds = plt.subplots(2,1,num="Filter+Downsample")
 
@@ -599,7 +603,7 @@ if __name__ == '__main__':
     axds[0].plot(fineFreqVec, np.abs(xn_filtdsczt)/np.max(np.abs(xn_filtdsczt)), label='Filter+Downsample CZT')
     
     # Now run music on it
-    dsrows = 900
+    dsrows = 90
     plist =  [len(f_true)] # [len(f_true), int(dsrows/2)] # although there's another knee in the eigenvalues, not worth using
     musicds = MUSIC(dsrows, snapshotJump=1, fwdBwd=True)
     fds, uds, sds, vhds, Rxds = musicds.run(xn_filtds, freqlist/(fs/dsr), plist, useSignalAsNumerator=True)
@@ -609,11 +613,17 @@ if __name__ == '__main__':
     # Actually, no reason to ignore the other downsample phases
     xn_filtdsdict = {}
     for i in range(dsr):
-        xn_filtdsdict[i] = xn[i::dsr]
+        xn_filtdsdict[i] = xn_filt[i::dsr]
         
     fdsd, udsd, sdsd, vhdsd, Rxdsd = musicds.run(xn_filtdsdict, freqlist/(fs/dsr), plist, useSignalAsNumerator=True)
     for i in range(len(plist)):
         axds[0].plot(freqlist, fdsd[i]/np.max(fdsd[i]), label='MUSIC, all downsample phases, p='+str(plist[i]))
+        
+        # Detect peaks simply
+        peakinds, peakprops = sps.find_peaks(fdsd[i])
+        axds[0].vlines(freqlist[peakinds], 0,1, colors='k', label='Detected, total '+str(len(peakinds)))
+        minarg = np.argmin(fdsd[i,peakinds])
+        print("Lowest peak is at %g Hz, norm val = %f" % (freqlist[peakinds[minarg]], fdsd[i,peakinds[minarg]]))
     # It's just plain better now, obviously
     
     # # Esprit as well for good measure (but this is really bad now, maybe because different downsample phases are not rotationally invariant?)

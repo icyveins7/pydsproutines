@@ -200,7 +200,6 @@ class CovarianceTechnique:
                     xi = xi.flatten() # in case it's not flat
                     cols = (xi.size - self.rows) / self.snapshotJump # calculate the required columns
                     xs_i = np.zeros((self.rows, int(cols+1)), xi.dtype)
-                    print("Matrix dim is %d, %d" % (xs.shape[0], xs.shape[1]))
                     for i in range(xs_i.shape[1]): # fill the columns
                         xs_i[:,i] = xi[i * self.snapshotJump : i * self.snapshotJump + self.rows]
                 
@@ -227,11 +226,11 @@ class CovarianceTechnique:
                 x = x.flatten() # in case it's not flat
                 cols = (x.size - self.rows) / self.snapshotJump # calculate the required columns
                 xs = np.zeros((self.rows, int(cols+1)), x.dtype)
-                print("Matrix dim is %d, %d" % (xs.shape[0], xs.shape[1]))
+                
                 for i in range(xs.shape[1]): # fill the columns
                     xs[:,i] = x[i * self.snapshotJump : i * self.snapshotJump + self.rows]
         
-        
+        # print("Matrix dim is %d, %d" % (xs.shape[0], xs.shape[1]))
         Rx = (1/cols) * xs @ xs.conj().T
         
         return Rx
@@ -263,14 +262,14 @@ class CovarianceTechnique:
         t1 = time.time()
         Rx = self.preprocessSnapshots(x)
         t2 = time.time()
-        print("Took %fs for matrix snapshot reshaping." % (t2-t1))
+        # print("Took %fs for matrix snapshot reshaping." % (t2-t1))
        
         if self.fwdBwd:
             J = np.eye(Rx.shape[0])
             # Reverse row-wise to form the antidiagonal exchange matrix
             J = J[:,::-1]
             Rx = 0.5 * (Rx + J @ Rx.T @ J)
-            print("Using forward-backward covariance.")
+            # print("Using forward-backward covariance.")
         
         if self.avgToToeplitz:
             diagIdx = np.arange(-Rx.shape[0]+1, Rx.shape[1])
@@ -295,7 +294,7 @@ class CovarianceTechnique:
             else:
                 u, s, vh = np.linalg.svd(Rx)
             t4 = time.time()
-            print("Completed SVD/EIG in %fs." % (t4-t3))
+            # print("Completed SVD/EIG in %fs." % (t4-t3))
 
             return u, s, vh, Rx
         # CAPON
@@ -350,7 +349,7 @@ class MUSIC(CovarianceTechnique):
         t1 = time.time()
         ehlist = np.exp(-1j*2*np.pi*freqlist.reshape((-1,1))*np.arange(self.rows)) # generate the e vector for every frequency i.e. Vandermonde
         t2 = time.time()
-        print("%fs to generate Vandermonde tone matrix." % (t2-t1))
+        # print("%fs to generate Vandermonde tone matrix." % (t2-t1))
         
         # Generate output
         numerator = 1.0 # default numerator
@@ -382,7 +381,7 @@ class MUSIC(CovarianceTechnique):
                 f[i,:] = numerator / denom
                 
         t3 = time.time()
-        print("%fs to generate output." % (t3-t2))
+        # print("%fs to generate output." % (t3-t2))
         
         # Return
         return f,u,s,vh,Rx
@@ -467,19 +466,19 @@ if __name__ == '__main__':
     plt.close("all")
     fs = 1e5
     length = 0.1*fs # at 0.1s, 20Hz sinc span
-    fdiff = 18
+    fdiff = 7
     f0 = -40
-    padding = 1000
+    padding = 10000
     # f_true = [f0, f0+fdiff, f0+fdiff*3.5, f0+fdiff*5] # Arbitrary
     # f_true = f0 + np.arange(4) * fdiff # Uniform
     # f_true = f0 + np.arange(0,10) * fdiff # Single many-tet (is it possible to resolve if we are beyond the sinc spacing?)
-    f_true = f0 + np.arange(0,7) * fdiff # Single septet (~18 Hz min?)
+    # f_true = f0 + np.arange(0,7) * fdiff # Single septet (~18 Hz min?)
     # f_true = f0 + np.arange(0,6) * fdiff # Single sextet (~15 Hz min ? hard to say at this point)
     # f_true = f0 + np.arange(0,5) * fdiff # Single quintet (~12 Hz min)
     # f_true = f0 + np.arange(0,4) * fdiff # Single quartet (~9 Hz min)
     # f_true = f0 + np.hstack((np.arange(0,3),np.arange(14,17))) * fdiff # 2 triplets
     # f_true = f0 + np.arange(0,3) * fdiff # Single triplet (~6 Hz min)
-    # f_true = f0 + np.hstack((np.arange(0,2),np.arange(4,6),np.arange(10,12))) * fdiff # 3 Pairs
+    f_true = f0 + np.hstack((np.arange(0,2),np.arange(5,7),np.arange(10,12))) * fdiff # 3 Pairs
     # f_true = f0 + np.hstack((np.arange(0,2),np.arange(5,7))) * fdiff # 2 Pairs
     # f_true = f0 + np.arange(0,2) * fdiff # Single pair (~3 Hz min)
     # f_true = [f0] # Single tone
@@ -498,7 +497,7 @@ if __name__ == '__main__':
     fineFreqVec = np.arange(np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange + 0.1*fineFreqStep, fineFreqStep)
     xczt = czt(xn, np.min(f_true)-fineFreqRange,np.max(f_true)+fineFreqRange, fineFreqStep, fs)
     
-    freqlist = np.arange(np.min(f_true)-fdiff*1,np.max(f_true)+fdiff*1,0.1)
+    freqlist = np.arange(np.min(f_true)-fdiff*1,np.max(f_true)+fdiff*1,0.01)
     
     #%% One-shot evaluation for all desired p values
     onlyDoFilteredVersion = True
@@ -603,19 +602,19 @@ if __name__ == '__main__':
     axds[0].plot(fineFreqVec, np.abs(xn_filtdsczt)/np.max(np.abs(xn_filtdsczt)), label='Filter+Downsample CZT')
     
     # Now run music on it
-    dsrows = 90
+    dsrows = 95
     plist =  [len(f_true)] # [len(f_true), int(dsrows/2)] # although there's another knee in the eigenvalues, not worth using
     musicds = MUSIC(dsrows, snapshotJump=1, fwdBwd=True)
-    fds, uds, sds, vhds, Rxds = musicds.run(xn_filtds, freqlist/(fs/dsr), plist, useSignalAsNumerator=True)
+    fds, uds, sds, vhds, Rxds = musicds.run(xn_filtds, freqlist/(fs/dsr), plist, useSignalAsNumerator=False)
     for i in range(len(plist)):
         axds[0].plot(freqlist, fds[i]/np.max(fds[i]), label='MUSIC, p='+str(plist[i]))
         
     # Actually, no reason to ignore the other downsample phases
     xn_filtdsdict = {}
     for i in range(dsr):
-        xn_filtdsdict[i] = xn_filt[i::dsr]
+        xn_filtdsdict[i] = xn_filt[i+int(len(ftap)/2):i+int(len(ftap)/2+length):dsr]
         
-    fdsd, udsd, sdsd, vhdsd, Rxdsd = musicds.run(xn_filtdsdict, freqlist/(fs/dsr), plist, useSignalAsNumerator=True)
+    fdsd, udsd, sdsd, vhdsd, Rxdsd = musicds.run(xn_filtdsdict, freqlist/(fs/dsr), plist, useSignalAsNumerator=False)
     for i in range(len(plist)):
         axds[0].plot(freqlist, fdsd[i]/np.max(fdsd[i]), label='MUSIC, all downsample phases, p='+str(plist[i]))
         
@@ -634,12 +633,100 @@ if __name__ == '__main__':
     axds[0].vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
     axds[0].legend()
     axds[0].set_xlim([freqlist[0],freqlist[-1]])
-    
-
-    axds[1].plot(np.log10(sds), 'x-', label='Not prewhitened')
-    axds[1].set_title("Eigenvalues")
+    axds[0].set_title("FB")
     
     
+    ## Run it all again with signalAsNumerator on
+    axds[1].plot(fineFreqVec, np.abs(xn_filtdsczt)/np.max(np.abs(xn_filtdsczt)), label='Filter+Downsample CZT')
+    
+    fds, uds, sds, vhds, Rxds = musicds.run(xn_filtds, freqlist/(fs/dsr), plist, useSignalAsNumerator=True)
+    for i in range(len(plist)):
+        axds[1].plot(freqlist, fds[i]/np.max(fds[i]), label='MUSIC, p='+str(plist[i]))
+        
+    fdsd, udsd, sdsd, vhdsd, Rxdsd = musicds.run(xn_filtdsdict, freqlist/(fs/dsr), plist, useSignalAsNumerator=True)
+    for i in range(len(plist)):
+        axds[1].plot(freqlist, fdsd[i]/np.max(fdsd[i]), label='MUSIC, all downsample phases, p='+str(plist[i]))
+        
+        # Detect peaks simply
+        peakinds, peakprops = sps.find_peaks(fdsd[i])
+        axds[1].vlines(freqlist[peakinds], 0,1, colors='k', label='Detected, total '+str(len(peakinds)))
+        minarg = np.argmin(fdsd[i,peakinds])
+        print("Lowest peak is at %g Hz, norm val = %f" % (freqlist[peakinds[minarg]], fdsd[i,peakinds[minarg]]))
+    # It's just plain better now, obviously
+    
+    # # Esprit as well for good measure (but this is really bad now, maybe because different downsample phases are not rotationally invariant?)
+    # espritds = ESPRIT(dsrows, snapshotJump=1)
+    # freqseds,ueds,seds,vheds,Rxeds = espritds.run(xn_filtdsdict, plist[0], fs/dsr)
+    # axds[0].vlines(freqseds, 0, 1, colors='k', label='ESPRIT')
+        
+    axds[1].vlines(f_true,0,1,colors='r', linestyles='dashed',label='Actual')
+    axds[1].legend()
+    axds[1].set_xlim([freqlist[0],freqlist[-1]])
+    axds[1].set_title("FB+SignalSubspace")
+    
+    figeig, axeig = plt.subplots(1,1,num="Eigenvalues")
+    axeig.plot(np.log10(sds), 'x-', label='Not prewhitened')
+    
+    assert(False)
+    
+    #%% Statistical Analysis on Filtered Method
+    numRuns = 1000
+    solutions = np.zeros((numRuns,numTones), np.float64)
+    solutions_SS = np.zeros_like(solutions)
+    plist = len(f_true)
+    
+    xtrue = np.zeros((numTones, int(length + padding)),dtype=np.complex128)
+    for i in range(numTones):
+        xtrue[i,:] = np.pad(np.exp(1j*2*np.pi*f_true[i]*np.arange(length)/fs), (0,padding))
+    
+    for l in range(numRuns):
+        if (l % 10 == 0):
+            print("Run %d / %d " % (l, numRuns))
+        # Generate new signal (results are phase-dependent!)
+        x = np.zeros(int(length + padding),dtype=np.complex128)
+        for i in range(numTones):
+            x = x + xtrue[i,:] * np.exp(1j*np.random.rand()*2*np.pi)
+        # Generate new noise
+        xn = x + (np.random.randn(x.size) + np.random.randn(x.size)*1j) * np.sqrt(noisePwr)
+        
+        # Filter
+        xn_filt = sps.lfilter(ftap,1,xn)
+        xn_filtdsdict = {}
+        for i in range(dsr):
+            xn_filtdsdict[i] = xn_filt[i+int(len(ftap)/2):i+int(len(ftap)/2+length):dsr]
+            
+        # Run music
+        fdsd, udsd, sdsd, vhdsd, Rxdsd = musicds.run(xn_filtdsdict, freqlist/(fs/dsr), plist, useSignalAsNumerator=False)
+        fdsd_ss, udsd_ss, sdsd_ss, vhdsd_ss, Rxdsd_ss = musicds.run(xn_filtdsdict, freqlist/(fs/dsr), plist, useSignalAsNumerator=True)
+        
+        # Find peaks (no signal subspace)
+        peakinds, peakprops = sps.find_peaks(fdsd)
+        foundfreqs = np.sort(freqlist[peakinds])
+        for k in range(len(f_true)):
+            # Find the estimated peak closest to a given true freq (for now this is necessary due to extraneous peaks)
+            minarg = np.argmin(np.abs(foundfreqs - f_true[k]))
+            solutions[l,k] = foundfreqs[minarg]
+            
+        # Find peaks (signal subspace method)
+        peakinds, peakprops = sps.find_peaks(fdsd_ss)
+        foundfreqs = np.sort(freqlist[peakinds])
+        for k in range(len(f_true)):
+            # Find the estimated peak closest to a given true freq (for now this is necessary due to extraneous peaks)
+            minarg = np.argmin(np.abs(foundfreqs - f_true[k]))
+            solutions_SS[l,k] = foundfreqs[minarg]  
+    
+    # Plot results
+    for i in range(len(f_true)):
+        plt.figure()
+        binvals, _, _ = plt.hist(solutions[:,i], bins=np.arange(f_true[i]-fdiff,f_true[i]+fdiff,0.05), density=True, alpha=0.5, label='FB')
+        binvals2, _, _ = plt.hist(solutions_SS[:,i], bins=np.arange(f_true[i]-fdiff,f_true[i]+fdiff,0.05), density=True, alpha=0.5, label='FB+SignalSubspace')
+        plt.vlines(f_true[i], 0, np.max(binvals), colors='r', label='True value')
+        plt.legend()
+    
+    # Not much difference between the 2 at 7 tones, 18Hz (SS had more outliers)
+    # Not much difference at 4 tones, 9 Hz (no SS had more outliers)
+    # Outliers probably due to inability to resolve (i.e. only found n-1/n tones for example)
+    # Conclusion: insignificant differences? or have to adaptively choose
     
     #%% Experiment with filtering and pre-whitening (insignificant due to downsample=>quite white already)
     if alsoPrewhiten:
@@ -656,9 +743,19 @@ if __name__ == '__main__':
             axds[0].plot(freqlist, fdsdpw[i]/np.max(fdsd[i]), label='MUSIC, all downsample phases+prewhiten, p='+str(plist[i]))
         axds[0].legend()
             
-        axds[1].plot(np.log10(sdsdpw), 'x-', label='Prewhitened')
-        axds[1].legend()
+        axeig.plot(np.log10(sdsdpw), 'x-', label='Prewhitened')
+        axeig.legend()
         
+    #%% Experiment with second filtering on a cluster
+    dsr2 = 25
+    ftap2 = sps.firwin(100, 1/dsr2)
+    xn_filt2 = sps.lfilter(ftap2,1,np.pad(xn_filt[::dsr],(0,100)))
+    xn_filtds2 = xn_filt2[int(len(ftap2)/2):int(len(ftap2)/2+length):dsr2]
+    
+    xn_filtdsczt2 = czt(xn_filtds2, -20, 20, fineFreqStep, fs/dsr/dsr2)
+    plt.figure()
+    plt.plot(np.arange(-20,20+fineFreqStep/2,fineFreqStep), np.abs(xn_filtdsczt2))
+    
     assert(False)
     
     #%% Experiment with separated bursts

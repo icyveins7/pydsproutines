@@ -385,6 +385,29 @@ class MUSIC(CovarianceTechnique):
         
         # Return
         return f,u,s,vh,Rx
+    
+    @staticmethod
+    def pickPeaks(f, p, height=0):
+        '''
+        Returns the top 'p' peaks from the pseudo-spectrum. A minimum height is specifiable.
+        '''
+        # Find peaks normally first
+        peakinds, props = sps.find_peaks(f, height=height)
+        ph = props['peak_heights']
+        sortinds = np.argsort(ph)[::-1] # we want the descending
+        peakinds = peakinds[sortinds] # sort the indices descending
+        ph = ph[sortinds]
+        
+        # Slice to the top p values (for a given p, there should only be p peaks at most)
+        if peakinds.size > p:
+            peakinds = peakinds[:p]
+            ph = ph[:p]
+        
+        # Return
+        return peakinds, ph
+        
+        
+        
         
 class CAPON(CovarianceTechnique):
     def __init__(self, rows, snapshotJump=None, fwdBwd=False, avgToToeplitz=False, useEigh=False):
@@ -466,7 +489,7 @@ if __name__ == '__main__':
     plt.close("all")
     fs = 1e5
     length = 0.1*fs # at 0.1s, 20Hz sinc span
-    fdiff = 7
+    fdiff = 6
     f0 = -40
     padding = 10000
     # f_true = [f0, f0+fdiff, f0+fdiff*3.5, f0+fdiff*5] # Arbitrary
@@ -619,7 +642,8 @@ if __name__ == '__main__':
         axds[0].plot(freqlist, fdsd[i]/np.max(fdsd[i]), label='MUSIC, all downsample phases, p='+str(plist[i]))
         
         # Detect peaks simply
-        peakinds, peakprops = sps.find_peaks(fdsd[i])
+        peakinds, peakheights = musicds.pickPeaks(fdsd[i], plist[i])
+        # peakinds, peakprops = sps.find_peaks(fdsd[i])
         axds[0].vlines(freqlist[peakinds], 0,1, colors='k', label='Detected, total '+str(len(peakinds)))
         minarg = np.argmin(fdsd[i,peakinds])
         print("Lowest peak is at %g Hz, norm val = %f" % (freqlist[peakinds[minarg]], fdsd[i,peakinds[minarg]]))
@@ -648,7 +672,8 @@ if __name__ == '__main__':
         axds[1].plot(freqlist, fdsd[i]/np.max(fdsd[i]), label='MUSIC, all downsample phases, p='+str(plist[i]))
         
         # Detect peaks simply
-        peakinds, peakprops = sps.find_peaks(fdsd[i])
+        peakinds, peakheights = musicds.pickPeaks(fdsd[i], plist[i])
+        # peakinds, peakprops = sps.find_peaks(fdsd[i])
         axds[1].vlines(freqlist[peakinds], 0,1, colors='k', label='Detected, total '+str(len(peakinds)))
         minarg = np.argmin(fdsd[i,peakinds])
         print("Lowest peak is at %g Hz, norm val = %f" % (freqlist[peakinds[minarg]], fdsd[i,peakinds[minarg]]))
@@ -722,6 +747,12 @@ if __name__ == '__main__':
         binvals2, _, _ = plt.hist(solutions_SS[:,i], bins=np.arange(f_true[i]-fdiff,f_true[i]+fdiff,0.05), density=True, alpha=0.5, label='FB+SignalSubspace')
         plt.vlines(f_true[i], 0, np.max(binvals), colors='r', label='True value')
         plt.legend()
+        
+    # Plot mean results
+    plt.figure("Mean statistics")
+    plt.vlines(f_true, 0, 1, colors='r', label='True')
+    plt.vlines(np.mean(solutions_SS, axis=0), 0, 1, colors='g', label='MUSIC+SS mean')
+    plt.legend()
     
     # Not much difference between the 2 at 7 tones, 18Hz (SS had more outliers)
     # Not much difference at 4 tones, 9 Hz (no SS had more outliers)
@@ -749,12 +780,32 @@ if __name__ == '__main__':
     #%% Experiment with second filtering on a cluster
     dsr2 = 25
     ftap2 = sps.firwin(100, 1/dsr2)
-    xn_filt2 = sps.lfilter(ftap2,1,np.pad(xn_filt[::dsr],(0,100)))
-    xn_filtds2 = xn_filt2[int(len(ftap2)/2):int(len(ftap2)/2+length):dsr2]
+    
+    # we are going to capture all of the first downsample phases -> second downsample phases
+    # e.g. dsr1 = 100, dsr2 = 25
+    # there are 100 valid versions of the first downsample
+    # each version is filtered and downsampled on the second time, making 25 versions
+    # in total there are 100*25 slices after the second downsample
+    xn_filtds2dict = {} 
+    for i in range(dsr): # slice along first downsample
+        xn_filt2 = sps.lfilter(ftap2,1,np.pad(xn_filt[i::dsr],(0,100)))
+        for k in range(dsr2): # slice along the second downsample
+            xn_filtds2 = xn_filt2[k+int(len(ftap2)/2):k+int(len(ftap2)/2+length):dsr2]
+            
+            xn_filtds2dict[i*dsr2 + k] = xn_filtds2
     
     xn_filtdsczt2 = czt(xn_filtds2, -20, 20, fineFreqStep, fs/dsr/dsr2)
     plt.figure()
-    plt.plot(np.arange(-20,20+fineFreqStep/2,fineFreqStep), np.abs(xn_filtdsczt2))
+    dsr2freqlist = np.arange(-20,20+fineFreqStep/2,fineFreqStep)
+    plt.plot(dsr2freqlist, np.abs(xn_filtdsczt2)/np.max(np.abs(xn_filtdsczt2)))
+    
+    # run music on the giant dictionary
+    dsr2plist = np.arange(2,5) # we don't expect many when we slice
+    musicds2 = MUSIC(9,1,fwdBwd=True)
+    fds2, uds2, sds2, vhds2, Rxds2 = musicds2.run(xn_filtds2dict, dsr2freqlist/(fs/dsr/dsr2), dsr2plist, useSignalAsNumerator=True)
+    for i in range(dsr2plist.size):
+        plt.plot(dsr2freqlist, fds2[i,:]/np.max(fds2[i,:]), label='MUSIC, p='+str(dsr2plist[i]))
+    plt.legend()
     
     assert(False)
     

@@ -51,6 +51,7 @@ def pgPlotDeltaFuncs(fig, x, h, color='r', symbol=None, name=None):
         
 def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
     '''
+    PYQTGRAPH surface plotter.
     Adds a new window with a surface plot and a grid item.
     
     x: 1-d array
@@ -84,6 +85,31 @@ def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
     w.addItem(p)
     
     return w, g, p
+
+def plotSurface(xm, ym, z, cmap='coolwarm'):
+    '''
+    Matplotlib Surface Plotter.
+    
+    Parameters
+    ----------
+    xm : 2-d array
+        Meshgrid of x
+    ym : 2-d array
+        Meshgrid of y
+    z : 2-d array
+        Function values.
+    cmap : optional
+        Matplotlib colormapping. The default is 'coolwarm'.
+
+    Returns
+    -------
+    Matplotlib Figure and Axes objects.
+    '''
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.plot_surface(xm,ym,z,cmap=cmap)
+    
+    return fig, ax
 
 def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None):
     '''
@@ -188,3 +214,20 @@ def plotTrajectory2d(r_x, r_xdot=None, r_xfmt='b.', quiver_scale=None, ax=None):
     ax.axis('equal')
     
     return ax
+
+# def plotToggle(event, p, fig):
+#     if event.key == 'a': # Default to turning everything on
+#         for i in p:
+#             if hasattr(i,'__len__'): # A collection of lines
+#                 for k in i:
+#                     k.set_visible()
+#             else: # Just a single plot item, like imshow
+#                 i.set_visible()
+#     elif event.key == 't': # Swap one at a time
+#         for i in p:
+#             if hasattr(i,'__len__'): # A collection of lines
+#                 for k in i:
+#                     k.set_visible(not k.get_visible())
+#             else: # Just a single plot item, like imshow
+#                 i.set_visible(not i.get_visible())
+        

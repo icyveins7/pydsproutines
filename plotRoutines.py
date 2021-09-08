@@ -53,6 +53,10 @@ def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
     '''
     Adds a new window with a surface plot and a grid item.
     
+    x: 1-d array
+    y: 1-d array
+    z: 2-d array (usually created by function on xm, ym; xm & ym are outputs from np.meshgrid(x,y))
+    
     Returns
     w = view widget item
     g = grid item

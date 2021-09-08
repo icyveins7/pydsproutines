@@ -72,8 +72,10 @@ def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
     g = gl.GLGridItem()
     
     if autoscale == True:
-        sx = np.max(np.abs(x))
-        sy = np.max(np.abs(y))
+        sx = np.abs(np.max(x)-np.min(x))
+        sy = np.abs(np.max(y)-np.min(y))
+        # sx = np.max(np.abs(x)).astype(np.float64)
+        # sy = np.max(np.abs(y)).astype(np.float64)
         g.scale(sx,sy,1)
         
         w.setCameraPosition(distance=np.max([sx,sy]) * 2)
@@ -81,7 +83,7 @@ def pgPlotSurface(x, y, z, shader='normalColor', autoscale=True, title=None):
     g.setDepthValue(10)  # draw grid after surfaces since they may be translucent
     w.addItem(g)
     
-    p = gl.GLSurfacePlotItem(x=x, y=y, z=z, shader=shader)
+    p = gl.GLSurfacePlotItem(x=x.astype(np.float64), y=y.astype(np.float64), z=z, shader=shader)
     w.addItem(p)
     
     return w, g, p

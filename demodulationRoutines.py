@@ -6,7 +6,9 @@ Created on Fri Jun 19 16:21:35 2020
 """
 
 import numpy as np
+from numba import jit
 
+@jit(nopython=True)
 def demodulateCP2FSK(syms, h, up, sIdx):
     m = np.array([[-1],
                   [+1]]) # these map to [0, 1] bits

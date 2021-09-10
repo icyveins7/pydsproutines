@@ -217,19 +217,45 @@ def plotTrajectory2d(r_x, r_xdot=None, r_xfmt='b.', quiver_scale=None, ax=None):
     
     return ax
 
-# def plotToggle(event, p, fig):
-#     if event.key == 'a': # Default to turning everything on
-#         for i in p:
-#             if hasattr(i,'__len__'): # A collection of lines
-#                 for k in i:
-#                     k.set_visible()
-#             else: # Just a single plot item, like imshow
-#                 i.set_visible()
-#     elif event.key == 't': # Swap one at a time
-#         for i in p:
-#             if hasattr(i,'__len__'): # A collection of lines
-#                 for k in i:
-#                     k.set_visible(not k.get_visible())
-#             else: # Just a single plot item, like imshow
-#                 i.set_visible(not i.get_visible())
+def mplBtnToggle(p, fig):
+    '''
+    Binds 'a' to reset and show all plots.
+    Binds 't' to toggle one plot at a time.
+    
+    Parameters
+    ----------
+    p : List of plot items.
+        Example: 
+            line = ax.plot(np.sin(np.arange(0,10,0.01)))
+            line2 = ax.plot(2*np.sin(np.arange(0,10,0.01)))
+            p = [line,line2]
+    fig : Figure object.
+        Returned from 
+        fig = plt.figure() and similar calls.
+
+    Returns
+    -------
+    None.
+
+    '''
+    # One line flattener
+    pl = []
+    _ = [pl.extend(b) if hasattr(b,'__len__') else pl.append(b) for b in p] # result is irrelevant, pl is extended in place
+    
+    def btnToggle(event):
+        if event.key == 'a': # Default to turning everything on
+            for i in pl:
+                i.set_visible(True)
+        elif event.key == 't': # Swap one at a time
+            if all([i.get_visible() for i in pl]):
+                for i in pl:
+                    i.set_visible(False)
+                pl[0].set_visible(True)
+            else:
+                for i in pl:
+                    i.set_visible(not i.get_visible())
+        fig.canvas.draw()
         
+    # Connect the button
+    fig.canvas.mpl_connect('key_press_event', btnToggle)
+    

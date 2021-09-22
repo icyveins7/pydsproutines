@@ -9,6 +9,7 @@ Created on Thu Sep 16 12:41:04 2021
 import dash
 from dash import dcc
 from dash import html
+from dash import dash_table
 import plotly.express as px
 from plotly.offline import plot
 import pandas as pd
@@ -38,6 +39,8 @@ fig.update_layout(
     font_color=colors['text']
 )
 
+longfig.update_yaxes(fixedrange=True)
+
 app.layout = html.Div(style={'backgroundColor': colors['background']}, children=[
     html.H1(
         children='Hello Dash',
@@ -66,7 +69,19 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
         style={'display':'inline-block',
                'width':800,
                'margin':0}
+    ),
+    
+    dash_table.DataTable(
+        id='table',
+        columns=[{"name": i, "id": i} for i in df.columns],
+        data=df.to_dict('records'),
+        style_header={'backgroundColor': colors['background']},
+        style_cell={
+            'backgroundColor': colors['background'],
+            'color': colors['text']
+        }
     )
+    
 ])
 
 if __name__ == '__main__':

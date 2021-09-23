@@ -9,8 +9,12 @@ import numpy as np
 import scipy.signal as sps
 import scipy as sp
 
-def makeSRC4(t,T):
-    X = 2 * t/T - 4.0
+def makeSRC4(t,Tb):
+    '''
+    t: array of time values
+    Tb: baud period
+    '''
+    X = 2 * t/Tb - 4.0
     with np.errstate(divide='ignore', invalid='ignore'):
         g = np.sinc(X)/(1.0-X**2)
     
@@ -43,11 +47,17 @@ def makeSRC4_clipped(t,T,k=1.0):
     
     return g
 
-def makeScaledSRC4(up,T,a=0.5):
-    t = np.arange(4 * up)/up
+def makeScaledSRC4(up,a=0.5):
+    '''
+    Most use-cases for the pulse-shape require the integral over the pulse to be 0.5;
+    for discrete samples this is equivalent to sum(g) = a = 0.5. This function should return
+    the pulse at this required scaling factor, but the tuning is supplied as the argument
+    'a' if desired.
+    '''
+    t = np.arange(4 * up)/up # this is in normalized symbol timing ie assume Tb = 1.0
     
-    qa = sp.integrate.quad(makeSRC4, 0, 4, T)
+    qa = sp.integrate.quad(makeSRC4, 0, 4, 1.0)
     
-    g = makeSRC4(t, T) / (qa[0] / a)
+    g = makeSRC4(t, 1.0) / (qa[0] / a) / up
     
     return g

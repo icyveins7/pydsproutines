@@ -172,7 +172,7 @@ def makePulsedCPFSKsyms(bits, baud, g=np.ones(8)/16, m=2, h=0.5, up=8, phase=0.0
 
     sig = np.exp(1j*css)
     
-    return sig, fs, data
+    return sig, fs, data, css
     
 def propagateSignal(sig, time, fs, freq=None, tone=None):
     # to handle single scalar time shift

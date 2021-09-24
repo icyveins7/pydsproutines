@@ -69,7 +69,7 @@ class FolderReader:
         self.fidx = end
         
         fps = self.filepaths[start:end]
-        alldata = multiBinRead(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
+        alldata = multiBinReadThreaded(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
         return alldata, fps
     
 class SortedFolderReader(FolderReader):

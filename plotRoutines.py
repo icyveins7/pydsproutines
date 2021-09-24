@@ -179,9 +179,12 @@ def pgPlotPhasorVsTime(complexData, color=(1.0,1.0,1.0,1.0), start=0, end=200, s
     
     return view
 
-def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=None):    
-    fig = plt.figure(windowTitle)
-    ax = fig.add_subplot(111)
+def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None):    
+    if ax is None: # hurray for python scoping allowing this
+        fig = plt.figure(windowTitle)
+        ax = fig.add_subplot(111)
+    else:
+        fig = None
     
     for i in range(len(dataList)):
         spec = 20*np.log10(np.abs(np.fft.fft(dataList[i])))

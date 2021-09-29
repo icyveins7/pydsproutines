@@ -88,6 +88,23 @@ class SortedFolderReader(FolderReader):
             assert(np.all(np.diff(self.filetimes)==1))
             
     def get(self, numFiles, start=None):
+        '''
+        Parameters
+        ----------
+        numFiles : int
+            Number of files to open & concatenate.
+        start : int, optional
+            File index (starting from 0 for the first file). The default is None (=0).
+
+        Returns
+        -------
+        alldata : array
+            Data.
+        fps : list of strings
+            Filepaths.
+        fts : list of ints.
+            File times.
+        '''
         alldata, fps = super().get(numFiles, start)
         fts = self.filetimes[self.fidx-numFiles:self.fidx]
         return alldata, fps, fts

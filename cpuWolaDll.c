@@ -171,6 +171,8 @@ extern DLL_EXPORT int cpuWola(Ipp32fc *y, Ipp32f *f_tap, int fftlen, int Dec, in
 
 	free(ThreadList);
 	free(thread_data_array);
+	
+	return 0;
 }
 
 

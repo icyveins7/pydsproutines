@@ -2,6 +2,7 @@ import numpy as np
 import ctypes as ct
 import os
 os.environ['PATH'] = os.environ['PATH'] + os.pathsep + os.path.dirname(os.path.realpath(__file__))
+os.add_dll_directory(os.path.join(os.environ['IPPROOT'], 'redist','intel64'))
 
 def cpu_threaded_wola(y, f_tap, fftlen, Dec, NUM_THREADS=4):
     '''

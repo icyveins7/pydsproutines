@@ -194,9 +194,9 @@ def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=
             ax.plot(makeFreq(len(spec), fs[i]), spec)
         
     if labels is not None:
-        plt.legend(labels)
+        ax.legend(labels)
     
-    plt.title(title)
+    ax.set_title(title)
     
     return fig, ax
 

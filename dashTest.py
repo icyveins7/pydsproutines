@@ -10,10 +10,13 @@ import dash
 from dash import dcc
 from dash import html
 from dash import dash_table
+from dash.dependencies import Input, Output
 import plotly.express as px
 from plotly.offline import plot
 import pandas as pd
 import numpy as np
+
+import datetime as dt
 
 app = dash.Dash(__name__)
 
@@ -80,9 +83,41 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
             'backgroundColor': colors['background'],
             'color': colors['text']
         }
+    ),
+    
+    html.Div(
+        id='update-text',
+        style = {'color': colors['text']}
+    ),
+    
+    html.Div(
+        id='update-text-slow',
+        style = {'color': colors['text']}
+    ),
+    
+    dcc.Interval(
+        id='interval-component',
+        interval=500,  # in ms
+        n_intervals=0
+    ),
+    
+    dcc.Interval(
+        id='slow-interval-component',
+        interval=5000, # in ms
+        n_intervals=0
     )
     
 ])
+
+@app.callback(Output('update-text-slow', 'children'),
+              Input('slow-interval-component', 'n_intervals'))
+def update_text(n):
+    return [html.Span('(Slow) Time Now: %.6f\nIntervals: %d' % (dt.datetime.utcnow().timestamp(), n))]
+
+@app.callback(Output('update-text', 'children'),
+              Input('interval-component', 'n_intervals'))
+def update_text(n):
+    return [html.Span('Time Now: %.6f\nIntervals: %d' % (dt.datetime.utcnow().timestamp(), n))]
 
 if __name__ == '__main__':
     app.run_server(debug=True)

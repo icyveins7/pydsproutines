@@ -8,8 +8,10 @@ Created on Mon May 18 14:58:31 2020
 
 import numpy as np
 import scipy as sp
+import scipy.signal as sps
 import cupy as cp
 import cupyx.scipy.signal as cpsps
+import cpuWola as cpw
 
 def cp_lfilter(ftap, x):
     '''
@@ -88,8 +90,40 @@ def wola(f_tap, x, Dec, N=None, dtype=np.complex64):
             out[nprime][idx2flip] = -out[nprime][idx2flip]
             
     return out
-                
+
+#%%
+class Channeliser:
+    """
+    Wrapper for WOLA output, with internal memory to account for filter delay;
+    similar to lfilter's 'zi' argument which specifies delay.
     
+    Instead, we pad the input vectors at the front and copy the ending
+    samples after every filter invocation.
+    
+    Internally uses the cpuWola dll.
+    """
+    def __init__(self, numTaps, numChannels, Dec, NUM_THREADS=4):
+        self.f_tap = sps.firwin(numTaps, 1.0/Dec).astype(np.float32)
+        self.numChannels = int(numChannels)
+        self.Dec = int(Dec)
+        self.NUM_THREADS = int(NUM_THREADS)
+        
+        self.reset()
+        self.jump = int(self.f_tap.size / self.Dec)
+        
+    def reset(self):
+        self.delay = np.zeros(self.f_tap.size, dtype=np.complex64)
+        
+    def channelise(self, x):
+        y = np.hstack((self.delay, x))
+        channels, _ = cpw.cpu_threaded_wola(y, self.f_tap, self.numChannels, self.Dec, NUM_THREADS=self.NUM_THREADS)
+        self.delay[:] = x[-self.delay.size:] # copy the ending samples into delay
+        
+        return channels[self.jump:,:] # only return the valid parts ie skip the delay/Dec samples
+        
+    
+
+#%%
 def energyDetection(ampSq, medfiltlen, snrReqLinear=4.0, noiseIndices=None, splitSignalIndices=True):
     '''
     Parameters

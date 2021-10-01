@@ -50,14 +50,19 @@ def multiBinReadThreaded(filenames, numSamps, in_dtype=np.int16, out_dtype=np.co
 class FolderReader:
     def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64):
         self.folderpath = folderpath
-        self.filenames = fnmatch.filter(os.listdir(self.folderpath), "*"+extension)
-        self.filepaths = [os.path.join(self.folderpath, i) for i in self.filenames]
+        self.extension = extension
+        self.refreshFilelists()
         
         self.numSampsPerFile = numSampsPerFile
         self.in_dtype = in_dtype
         self.out_dtype = out_dtype
         
-        self.fidx = 0
+        self.reset()
+        
+    def refreshFilelists(self):
+        self.filenames = fnmatch.filter(os.listdir(self.folderpath), "*"+self.extension)
+        self.filepaths = [os.path.join(self.folderpath, i) for i in self.filenames]
+        self.reset() # cannot ensure file indexing after list is reset
         
     def reset(self):
         self.fidx = 0

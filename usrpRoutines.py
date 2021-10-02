@@ -71,6 +71,8 @@ class FolderReader:
         if start is None:
             start = self.fidx
         end = start + numFiles
+        if end > len(self.filepaths):
+            raise ValueError("Insufficient files remaining.")
         self.fidx = end
         
         fps = self.filepaths[start:end]

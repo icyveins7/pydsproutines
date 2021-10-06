@@ -11,6 +11,7 @@ from dash import dcc
 from dash import html
 from dash import dash_table
 from dash.dependencies import Input, Output
+import dash_bootstrap_components as dbc
 import plotly.express as px
 from plotly.offline import plot
 import pandas as pd
@@ -18,12 +19,12 @@ import numpy as np
 
 import datetime as dt
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SPACELAB])
 
-colors = {
-    'background': '#111111',
-    'text': '#7FDBFF'
-}
+# colors = {
+#     'background': '#111111',
+#     'text': '#7FDBFF'
+# }
 
 df = pd.DataFrame({
     "Fruit": ["Apples", "Oranges", "Bananas", "Apples", "Oranges", "Bananas"],
@@ -36,63 +37,75 @@ fig = px.bar(df, x="Fruit", y="Amount", color="City", barmode="group")
 longdata = np.random.randn(1000000)
 longfig = px.line(x=np.arange(longdata.size),y=longdata)
 
-fig.update_layout(
-    plot_bgcolor=colors['background'],
-    paper_bgcolor=colors['background'],
-    font_color=colors['text']
-)
+# fig.update_layout(
+#     plot_bgcolor=colors['background'],
+#     paper_bgcolor=colors['background'],
+#     font_color=colors['text']
+# )
 
 longfig.update_yaxes(fixedrange=True)
 
-app.layout = html.Div(style={'backgroundColor': colors['background']}, children=[
+# use dbc layouts?
+row = dbc.Row(
+    [
+     # Column 1
+    dbc.Col(dbc.Card(
+        dbc.CardBody(
+            dcc.Graph(
+                id='example-graph-2',
+                figure=fig
+            )    
+        )
+    )),
+    # Column 2
+    dbc.Col(dbc.Card(
+        dbc.CardBody(
+            dcc.Graph(
+                id='example-graph-3',
+                figure=longfig  
+            )    
+        )    
+    ))
+    
+    
+    ]
+)
+
+app.layout = html.Div(children=[
     html.H1(
         children='Hello Dash',
         style={
             'textAlign': 'center',
-            'color': colors['text']
+            # 'color': colors['text']
         }
     ),
 
     html.Div(children='Dash: A web application framework for Python.', style={
         'textAlign': 'center',
-        'color': colors['text']
+        # 'color': colors['text']
     }),
-
-    dcc.Graph(
-        id='example-graph-2',
-        figure=fig,
-        style={'display':'inline-block',
-               'width':500,
-               'margin':0}
-    ),
     
-    dcc.Graph(
-        id='example-graph-3',
-        figure=longfig,
-        style={'display':'inline-block',
-               'width':800,
-               'margin':0}
-    ),
+    row,
     
     dash_table.DataTable(
         id='table',
         columns=[{"name": i, "id": i} for i in df.columns],
         data=df.to_dict('records'),
-        style_header={'backgroundColor': colors['background']},
-        style_cell={
-            'backgroundColor': colors['background'],
-            'color': colors['text']
-        }
+        # style_header={'backgroundColor': colors['background']},
+        # style_cell={
+        #     'backgroundColor': colors['background'],
+        #     'color': colors['text']
+        # }
     ),
     
     html.Div(
         id='update-text',
-        style = {'color': colors['text']}
+        # style = {'color': colors['text']}
     ),
     
     html.Div(
         id='update-text-slow',
-        style = {'color': colors['text']}
+        # style = {'color': colors['text']}
     ),
     
     dcc.Interval(

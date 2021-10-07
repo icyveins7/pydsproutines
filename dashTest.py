@@ -32,18 +32,32 @@ df = pd.DataFrame({
     "City": ["SF", "SF", "SF", "Montreal", "Montreal", "Montreal"]
 })
 
+df2 = pd.DataFrame({
+    "Other": ["Some", "Data"],
+    "Table": ["More", "Data"],
+    })
+
 fig = px.bar(df, x="Fruit", y="Amount", color="City", barmode="group")
 
 longdata = np.random.randn(1000000)
 longfig = px.line(x=np.arange(longdata.size),y=longdata)
-
-# fig.update_layout(
-#     plot_bgcolor=colors['background'],
-#     paper_bgcolor=colors['background'],
-#     font_color=colors['text']
-# )
-
 longfig.update_yaxes(fixedrange=True)
+
+table1 = dash_table.DataTable(
+    id='table',
+    columns=[{"name": i, "id": i} for i in df.columns],
+    data=df.to_dict('records'),
+)
+
+table2 = dash_table.DataTable(
+    id='table2',
+    columns=[{"name": i, "id": i} for i in df2.columns],
+    data=df2.to_dict('records'),
+)
+
+# use tabs for each table?
+
+
 
 # use dbc layouts?
 row = dbc.Row(
@@ -71,7 +85,27 @@ row = dbc.Row(
     ]
 )
 
+navbar = dbc.NavbarSimple(
+    children=[
+        dbc.NavItem(dbc.NavLink("Page 1", href="#")),
+        dbc.DropdownMenu(
+            children=[
+                dbc.DropdownMenuItem("More pages", header=True),
+                dbc.DropdownMenuItem("Page 2", href="#"),
+                dbc.DropdownMenuItem("Page 3", href="#"),
+            ],
+            nav=True,
+            in_navbar=True,
+            label="More",
+        ),
+    ],
+    brand="NavbarSimple",
+    brand_href="#"
+)
+
 app.layout = html.Div(children=[
+    navbar,
+    
     html.H1(
         children='Hello Dash',
         style={
@@ -87,15 +121,12 @@ app.layout = html.Div(children=[
     
     row,
     
-    dash_table.DataTable(
-        id='table',
-        columns=[{"name": i, "id": i} for i in df.columns],
-        data=df.to_dict('records'),
-        # style_header={'backgroundColor': colors['background']},
-        # style_cell={
-        #     'backgroundColor': colors['background'],
-        #     'color': colors['text']
-        # }
+    dbc.Tabs(
+        [
+            dbc.Tab(table1, label="Tab 1"),
+            dbc.Tab(table2, label="Tab 2")
+         
+        ]
     ),
     
     html.Div(

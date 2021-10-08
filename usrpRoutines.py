@@ -9,6 +9,9 @@ import numpy as np
 import concurrent.futures
 import os
 import fnmatch
+import matplotlib.pyplot as plt
+from signalCreationRoutines import *
+import scipy.signal as sps
 
 #%% Readers for complex data.
 
@@ -78,6 +81,33 @@ class FolderReader:
         fps = self.filepaths[start:end]
         alldata = multiBinReadThreaded(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
         return alldata, fps
+    
+    def fastCheck(self, numFiles=None, start=0, plotSpecgram=True, plots=False, fs=None, viewskip=1):
+        if numFiles is None:
+            numFiles = len(self.filepaths) - start
+        
+        alldata, *_ = self.get(numFiles, start)
+        
+        # Run some diagnostics
+        maxreal = np.max(np.real(alldata))
+        minreal = np.min(np.real(alldata))
+        maximag = np.max(np.imag(alldata))
+        minimag = np.min(np.imag(alldata))
+        print("Max/min real: %d,%d\nMax/min imag: %d,%d" % (int(maxreal),int(minreal),int(maximag),int(minimag)))
+        
+        # Plot some simple things if requested
+        if fs is None:
+            fs = self.numSampsPerFile
+        
+        if plots:    
+            fig, ax = plt.subplots(2,1)
+            ax[0].plot(np.arange(alldata.size)[::viewskip]/fs, np.abs(alldata)[::viewskip])
+            ax[1].plot(makeFreq(alldata.size, fs)[::viewskip], 20*np.log10(np.abs(np.fft.fft(alldata)))[::viewskip])
+        
+        if plotSpecgram:
+            plt.figure()
+            plt.specgram(alldata, NFFT=1024, Fs=fs)
+            
     
 class SortedFolderReader(FolderReader):
     def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64, ensure_incremental=True):

@@ -97,6 +97,7 @@ class FolderReader:
         
         # Plot some simple things if requested
         if fs is None:
+            print("Setting fs to sampsPerFile = %d" % (self.numSampsPerFile))
             fs = self.numSampsPerFile
         
         if plots:    

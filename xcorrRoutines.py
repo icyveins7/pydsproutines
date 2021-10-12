@@ -511,6 +511,101 @@ void group_xcorr_kernel(const complex<float>* d_rx,
 }
 ''','group_xcorr_kernel')
 
+group_xcorr_kernelv2 = cp.RawKernel(r'''
+#include <cupy/complex.cuh>
+extern "C" __global__
+void group_xcorr_kernelv2(const complex<float>* d_rx,
+                        const complex<float>* d_y, const int ylen, const float yNormSq,
+                        const complex<float>* d_freqMat, const int numFreqs,
+                        const int* d_gIdx, // this has length ylen
+                        const int* d_shifts, const int numShifts, const int numShiftsPerBlk,
+                        float* d_xc, int* d_freqinds){
+                                        
+    // allocate shared memory
+    extern __shared__ double s[];
+    
+    complex<float> *s_y = (complex<float>*)s; // (ylen) complex floats
+    complex<float> *s_rx = (complex<float>*)&s_y[ylen]; // (ylen) complex floats
+    int *s_gIdx = (int*)&s_rx[ylen]; // (ylen) ints
+    float *s_absVals = (float*)&s_gIdx[ylen]; // (numFreqs) real floats
+    /* Tally: (ylen*2)*32fc + (numFreqs)*32f + (ylen)*32s */
+    
+    // load shared memory
+    for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
+        s_y[t] = d_y[t];
+        s_gIdx[t] = d_gIdx[t];
+    }
+    // nothing to load for s_rx, it's a workspace
+    
+    __syncthreads();
+                     
+    // loop over the shifts for this block
+    int shift, shiftIdx;
+    float rxNormSq;
+    complex<float> val;
+    int maxIdx;
+    float maxVal;
+    
+    for (int blkShift = 0; blkShift < numShiftsPerBlk; blkShift++){
+        shiftIdx = blockIdx.x * numShiftsPerBlk + blkShift;
+        shift = d_shifts[shiftIdx];
+        
+        // load the values from d_rx appropriately
+        for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
+            s_rx[t] = d_rx[shift + s_gIdx[t]];
+        }
+        
+        __syncthreads(); // sync before calculating normSq otherwise some array values not written yet
+        
+        // each thread just calculates the rxNormSq for itself
+        rxNormSq = 0;
+        for (int i = 0; i < ylen; i++){
+            rxNormSq = fmaf(abs(s_rx[i]), abs(s_rx[i]), rxNormSq);
+        }
+        
+        __syncthreads(); // must sync before multiplying or else some threads will have wrong normSq
+        
+        // multiply y in-place
+        for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
+            s_rx[t] = s_rx[t] * s_y[t];
+        }
+        
+        // now each thread calculates the dot product with an appropriate frequency vector
+        // i.e. thread (t): frequency index, loops over (i): index of rx
+        for (int t = threadIdx.x; t < numFreqs; t = t + blockDim.x){
+            val = 0;
+            for (int i = 0; i < ylen; i++){
+                val = val + d_freqMat[t*ylen + i] * s_rx[i];
+            }
+            // when val is complete, write it to shared mem array for storage first
+            s_absVals[t] = abs(val); // cast to float when writing
+        }
+        
+        __syncthreads(); // wait for all absVals to be written
+                            
+        // use the first thread to scan for the maximum
+        if (threadIdx.x == 0){
+            maxIdx = 0;
+            maxVal = s_absVals[0];
+            for (int i = 1; i < numFreqs; i++){
+                if (s_absVals[i] > maxVal){
+                    maxIdx = i;
+                    maxVal = s_absVals[i];
+                }
+            }
+            
+            // and write directly to the global mem
+            d_freqinds[shiftIdx] = maxIdx;
+            d_xc[shiftIdx] = maxVal * maxVal / rxNormSq / yNormSq;
+            // d_xc[shiftIdx] = rxNormSq; // cheating debug statement
+
+        }
+        
+    }
+    
+}
+''','group_xcorr_kernelv2')
+
 
 class GroupXcorrGPU(GroupXcorr):
     def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray, freqs: np.ndarray, fs: int):
@@ -518,7 +613,7 @@ class GroupXcorrGPU(GroupXcorr):
         
         self.d_yconcat = cp.array(self.yconcat, cp.complex64)
         self.d_yconcatNormSq = cp.array(self.yconcatNormSq)
-        self.d_freqMat = cp.array(self.freqMat)
+        self.d_freqMat = cp.array(self.freqMat, cp.complex64)
         self.d_freqs = cp.array(self.freqs)
         
     def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None):
@@ -555,7 +650,7 @@ class GroupXcorrGPU(GroupXcorr):
         
         return xc, freqpeaks
     
-    def xcorrKernel(self, rx, shifts, numShiftsPerBlk=2):
+    def xcorrKernel(self, rx, shifts, numShiftsPerBlk=2, verbTiming=False):
         '''
         Experimental. Uses kernel (not fully optimized, but faster than the xcorr call).
         '''
@@ -576,10 +671,18 @@ class GroupXcorrGPU(GroupXcorr):
         d_rx = cp.array(rx, dtype=cp.complex64)
         d_shifts = cp.array(shifts, dtype=cp.int32)
         
-        smReq = int(2*ylen*8 + numFreqs*2*4 + ylen*4)
+        # smReq = int(2*ylen*8 + numFreqs*2*4 + ylen*4)
+        # if(smReq > 48000): # Maximum 48000 shared memory bytes
+        #     print("y + rx workspace (32fc) total: %d bytes." % (ylen*2*8))
+        #     print("nFreqs + interrim workspace (32f) total: %d bytes." % (numFreqs*2*4))
+        #     print("gIdx (32s) total: %d bytes." % (ylen*4))
+        #     raise MemoryError("Shared memory requested exceeded 48kB.")
+        
+        # For v2, less SM required
+        smReq = int(2*ylen*8 + numFreqs*4 + ylen*4)
         if(smReq > 48000): # Maximum 48000 shared memory bytes
             print("y + rx workspace (32fc) total: %d bytes." % (ylen*2*8))
-            print("nFreqs + interrim workspace (32f) total: %d bytes." % (numFreqs*2*4))
+            print("interrim workspace (32f) total: %d bytes." % (numFreqs*4))
             print("gIdx (32s) total: %d bytes." % (ylen*4))
             raise MemoryError("Shared memory requested exceeded 48kB.")
         
@@ -591,10 +694,19 @@ class GroupXcorrGPU(GroupXcorr):
         NUM_BLOCKS = int(np.round(shifts.size / numShiftsPerBlk))
         
         tg2 = time.time()
-        group_xcorr_kernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+        # group_xcorr_kernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+        #                    (d_rx, 
+        #                     self.d_yconcat, ylen, self.yconcatNormSq.astype(np.float32),
+        #                     d_nFreqs, numFreqs,
+        #                     d_gIdx, 
+        #                     d_shifts, int(shifts.size), int(numShiftsPerBlk),
+        #                     d_xc, d_freqinds),
+        #                    shared_mem=smReq)
+        
+        group_xcorr_kernelv2((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
                            (d_rx, 
                             self.d_yconcat, ylen, self.yconcatNormSq.astype(np.float32),
-                            d_nFreqs, numFreqs,
+                            self.d_freqMat, numFreqs,
                             d_gIdx, 
                             d_shifts, int(shifts.size), int(numShiftsPerBlk),
                             d_xc, d_freqinds),
@@ -607,9 +719,11 @@ class GroupXcorrGPU(GroupXcorr):
         freqinds = cp.asnumpy(d_freqinds)
     
         tg4 = time.time()
-        print("Prep time(includes transfers): %fs " %(tg2-tg1))
-        print("Kernel runtime: %fs" % (tg3-tg2))
-        print("Output conversion to CPU: %fs" % (tg4-tg3))
+        
+        if verbTiming:
+            print("Prep time(includes transfers): %fs " %(tg2-tg1))
+            print("Kernel runtime: %fs" % (tg3-tg2))
+            print("Output conversion to CPU: %fs" % (tg4-tg3))
     
         return xc, freqinds
           

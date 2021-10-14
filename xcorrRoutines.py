@@ -184,7 +184,7 @@ def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absRes
             for i in range(len(shifts)):
                 s = shifts[i]
                 pdt = rx[s:s+len(cutout)] * cutout.conj()
-                pdtfft = sp.fft(pdt)
+                pdtfft = sp.fft.fft(pdt)
                 imax = np.argmax(np.abs(pdtfft))
                 freqlist[i] = imax
                 pmax = pdtfft[imax]
@@ -204,7 +204,7 @@ def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absRes
             for i in range(len(shifts)):
                 s = shifts[i]
                 pdt = rx[s:s+len(cutout)] * cutout.conj()
-                pdtfft = sp.fft(pdt)
+                pdtfft = sp.fft.fft(pdt)
                 pdtfftsq = np.abs(pdtfft**2.0)
     
                 rxNormPartSq = np.linalg.norm(rx[s:s+len(cutout)])**2.0

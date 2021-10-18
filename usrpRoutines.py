@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from signalCreationRoutines import *
 import scipy.signal as sps
 import shutil
+import psutil
 
 #%% Readers for complex data.
 
@@ -63,6 +64,11 @@ class FolderReader:
         
         self.reset()
         
+        # Calculate memory footprint
+        oneElement = np.array([0],dtype=self.out_dtype)
+        self.sizeof = oneElement.nbytes
+        self.maxsizeof = int(8e9) # in bytes, maximum usage
+        
     def refreshFilelists(self):
         self.filenames = fnmatch.filter(os.listdir(self.folderpath), "*"+self.extension)
         self.filepaths = [os.path.join(self.folderpath, i) for i in self.filenames]
@@ -71,9 +77,9 @@ class FolderReader:
     def reset(self):
         self.fidx = 0
         
-    def get(self, numFiles, start=None):
-        if start is None:
-            start = self.fidx
+    def get(self, numFiles=None, start=None):
+        numFiles, start = self._getbounds(numFiles,start)
+        
         end = start + numFiles
         if end > len(self.filepaths):
             raise ValueError("Insufficient files remaining.")
@@ -82,6 +88,16 @@ class FolderReader:
         fps = self.filepaths[start:end]
         alldata = multiBinReadThreaded(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
         return alldata, fps
+    
+    def _getbounds(self, numFiles, start):
+        if start is None:
+            start = self.fidx
+        if numFiles is None:
+            numFiles = len(self.filepaths) - start
+            print("Attempting to read entire folder.. %d files.." % (numFiles))
+            if numFiles * self.numSampsPerFile * self.sizeof > self.maxsizeof:
+                raise MemoryError("Memory requested exceeds internal limit of %d bytes (self.maxsizeof). Please modify this at your own discretion." % (self.maxsizeof))
+        return numFiles, start
     
     def fastCheck(self, numFiles=None, start=0, plotSpecgram=True, plots=False, fs=None, viewskip=1):
         if numFiles is None:
@@ -126,7 +142,7 @@ class SortedFolderReader(FolderReader):
         if ensure_incremental:
             assert(np.all(np.diff(self.filetimes)==1))
             
-    def get(self, numFiles, start=None):
+    def get(self, numFiles=None, start=None):
         '''
         Parameters
         ----------
@@ -144,6 +160,7 @@ class SortedFolderReader(FolderReader):
         fts : list of ints.
             File times.
         '''
+        numFiles,start = self._getbounds(numFiles, start)
         alldata, fps = super().get(numFiles, start)
         fts = self.filetimes[self.fidx-numFiles:self.fidx]
         return alldata, fps, fts

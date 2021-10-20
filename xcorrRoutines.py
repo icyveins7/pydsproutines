@@ -235,6 +235,20 @@ def fineFreqTimeSearch(x_aligned, y_aligned, fineRes, freqfound, freqRes, fs, td
     
     The best fine frequency will be searched first (assumes that the sample-aligned arrays are correctly time-aligned).
     Then, using the new value for the fine frequency alignment, the two arrays are then sub-sample time aligned.
+    
+    Convention is for positive values to mean that y_aligned to be LATER than x_aligned i.e. timediff = tau_y - tau_x
+    Example: 
+        for positive tau, x_aligned = x(t), y_aligned = x(t-tau), then timediff will return tau.
+        for positive tau, x_aligned = x(t), y_aligned = x(t+tau), then timediff will return -tau.
+    
+    Usually coupled with a standard sample-wise xcorr from fastXcorr functions above. In that scenario, a selected signal
+    named 'cutout' will have a certain (sample period * num samples) delay against another 'rx' array. After selecting
+    y_aligned from the 'rx' array and using this function, the total time difference should be 'delay + timediff'.
+    
+    Example pseudocode: 
+        result = fastXcorr(...)
+        td = np.argmax(result) * T
+        td = td + timediff
     '''
     
     if len(fineRes) > 0:

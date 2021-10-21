@@ -90,7 +90,7 @@ def calcFOA(r_x, r_xdot, t_x, t_xdot, freq=30e6):
 
     return foa
 
-def createTriangularSpacedPoints(numPts: int, dist: float=1.0,  startPt: np.ndarray=np.array([0,0])):
+def createTriangularSpacedPoints(numPts: int, dist: float=1.0,  startPt: np.ndarray=np.array([0,0]), make3d=False):
     '''
     Spawns locations in a set, beginning with startPt. Each location is spaced 
     'dist' apart from any other location, e.g.
@@ -162,6 +162,9 @@ def createTriangularSpacedPoints(numPts: int, dist: float=1.0,  startPt: np.ndar
     # swap to array for cleanliness
     ptList = np.array(ptList)
     ptList = ptList + startPt # move the origin
+    
+    if make3d:
+        ptList = np.pad(ptList, ((0,0),(0,1))) # make into 3-d
 
     return ptList
             

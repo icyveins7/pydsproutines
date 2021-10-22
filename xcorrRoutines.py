@@ -7,9 +7,11 @@ Created on Sat Mar  7 17:03:53 2020
 
 import numpy as np
 import scipy as sp
+import scipy.signal as sps
 import time
 from spectralRoutines import czt
 from signalCreationRoutines import makeFreq
+from musicRoutines import MUSIC
 
 try:
     import cupy as cp
@@ -107,7 +109,38 @@ try:
 except:
     print("Failed to load cupy?")
         
+
+def musicXcorr(cutout, rx, f_search, ftap, fs, dsr, plist, musicrows=130, shifts=None):
+    # Preconjugate
+    cutoutconj = cutout.conj()
+    # First create the music object
+    music = MUSIC(musicrows, snapshotJump=1, fwdBwd=True)
+    # Calculate the downsampled fs
+    fs_ds = fs/dsr
+    
+    # Loop over shifts as usual
+    if shifts is None:
+        shifts = np.arange(len(rx)-len(cutout)+1)
+    
+    resultsgrid = {p: np.zeros((len(shifts), len(f_search))) for p in plist}
         
+    for i in range(len(shifts)):
+        s = shifts[i]
+        rxslice = rx[s:s+len(cutout)]
+        pdt = rxslice * cutoutconj
+        # Filter the product
+        pdtfilt = sps.lfilter(ftap,1,pdt)
+        # Create a dictionary of the downsampled arrays for all phases
+        pdtfiltdsdict = {k: pdtfilt[int(len(ftap)/2)+k::dsr] for k in range(dsr)}
+        # Run the music algo on it
+        f, u, s, vh, Rx = music.run(pdtfiltdsdict, f_search/fs_ds, plist, useSignalAsNumerator=True)
+        for k in range(len(plist)):
+            p = plist[k]
+            resultsgrid[p][i,:] = f[k,:] # results dictionary is labelled by p-val as key, with 'CAF'-like matrix as value
+    
+
+    return resultsgrid
+
 
 def cztXcorr(cutout, rx, f_searchMin, f_searchMax, fs, cztStep=0.1, outputCAF=False, shifts=None):
     # Create the freq array
@@ -127,7 +160,7 @@ def cztXcorr(cutout, rx, f_searchMin, f_searchMax, fs, cztStep=0.1, outputCAF=Fa
             rxslice = rx[s:s+len(cutout)]
             rxNormPartSq = np.linalg.norm(rxslice)**2
             pdt = rxslice * cutoutconj
-            pdtczt = czt(pdt, f_search[0],f_search[-1], cztStep, fs)
+            pdtczt = czt(pdt, f_search[0],f_search[-1]+cztStep/2, cztStep, fs)
             result[i,:] = np.abs(pdtczt)**2.0 / rxNormPartSq / cutoutNormSq
             
         return result, f_search

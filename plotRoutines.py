@@ -113,7 +113,7 @@ def plotSurface(xm, ym, z, cmap='coolwarm'):
     
     return fig, ax
 
-def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None):
+def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None):
     '''
     This is a useful tool to overlay heatmaps onto normal scatter plots,
     in the mathematical x-y axis (unlike the conventional image axis which has y-axis flipped).
@@ -121,6 +121,7 @@ def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None):
     heatmap: 2-D array containing the data.
     x0,y0 : coordinates of bottom-left most point.
     width, height: scale of the heatmap.
+    imgLvls: list_like, passed to img.setLevels(), specifies colour limits to values
     '''
     if window is None:
         window = pg.plot()
@@ -129,6 +130,8 @@ def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None):
     img = pg.ImageItem(heatmap)
     img.setRect(QRectF(x0,y0,width,height))
     img.setZValue(-100) # to ensure it's behind everything else
+    if imgLvls is not None:
+        img.setLevels(imgLvls)
     
     # pick one to turn into an actual colormap
     # cm2use = pg.ColorMap(*zip(*Gradients["bipolar"]["ticks"])) # from pyqtgraph gradients

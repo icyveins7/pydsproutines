@@ -8,7 +8,7 @@ Created on Sat Mar  7 17:03:53 2020
 import numpy as np
 import scipy as sp
 import time
-
+from spectralRoutines import czt
 from signalCreationRoutines import makeFreq
 
 try:
@@ -109,6 +109,32 @@ except:
         
         
 
+def cztXcorr(cutout, rx, f_searchMin, f_searchMax, fs, cztStep=0.1, outputCAF=False, shifts=None):
+    # Create the freq array
+    f_search = np.arange(f_searchMin, f_searchMax, cztStep)
+    if shifts is None:
+        shifts = np.arange(len(rx)-len(cutout)+1)
+    
+    # common numbers in all consequent methods
+    cutoutNorm = np.linalg.norm(cutout)
+    cutoutNormSq = cutoutNorm**2.0
+    
+    if outputCAF:
+        result = np.zeros((len(shifts), f_search.size))
+        cutoutconj = cutout.conj()    
+        for i in np.arange(len(shifts)):
+            s = shifts[i]
+            rxslice = rx[s:s+len(cutout)]
+            rxNormPartSq = np.linalg.norm(rxslice)**2
+            pdt = rxslice * cutoutconj
+            pdtczt = czt(pdt, f_search[0],f_search[-1], cztStep, fs)
+            result[i,:] = np.abs(pdtczt)**2.0 / rxNormPartSq / cutoutNormSq
+            
+        return result, f_search
+        
+    else:
+        raise NotImplementedError("To do..")
+    
 
 def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absResult=True):
     """

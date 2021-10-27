@@ -480,6 +480,68 @@ class GroupXcorr:
             
         return xc, freqpeaks
     
+    
+class GroupXcorrCZT:
+    def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray,
+                 f1: float, f2: float, binWidth: float, fs: int, autoConj: bool=True):
+        
+        assert(starts.size == lengths.size)
+        self.starts = starts
+        self.lengths = lengths
+        self.numGroups = self.starts.size # easy referencing
+        self.fs = fs
+        # CZT parameters
+        self.f1 = f1
+        self.f2 = f2
+        self.binWidth = binWidth
+        
+        # Generate the stacked matrix of groups of y, padded to longest length
+        self.maxLength = np.max(self.lengths)
+        self.ystack = np.zeros((self.numGroups, self.maxLength), y.dtype)
+        for i in range(self.numGroups):
+            self.ystack[i,:self.lengths[i]] = y[starts[i]:starts[i]+lengths[i]]
+        if autoConj:
+            self.ystack = self.ystack.conj()
+        
+        self.ystackNormSq = np.linalg.norm(self.ystack.flatten())**2
+        
+    def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None):
+        # We are returning CAF for this (for now?)
+        if shifts is None:
+            shifts = np.arange(len(rx)-(self.starts[-1]+self.lengths[-1])+1)
+        else:
+            assert(shifts[-1] + self.starts[-1] + self.lengths[-1] < rx.size) # make sure it can access it
+            
+        xc = np.zeros((shifts.size, int((self.f2-self.f1)/self.binWidth + 1)))
+        # Pre-calculate the phases for each group
+        cztFreq = np.arange(self.f1, self.f2+self.binWidth/2, self.binWidth)
+        groupPhases = np.exp(1j*2*np.pi*cztFreq*self.starts.reshape((-1,1))/self.fs)
+        
+        for i in np.arange(shifts.size):
+            shift = shifts[i]
+            
+            pdtcztPhased = np.zeros((self.numGroups,cztFreq.size), np.complex128)
+            rxgroupNormSqCollect = np.zeros(self.numGroups)
+            
+            for g in np.arange(self.numGroups):
+                ygroup = self.ystack[g,:]
+                rxgroup = rx[shift+self.starts[g] : shift+self.starts[g]+self.lengths[g]]
+                rxgroupNormSqCollect[g] = np.linalg.norm(rxgroup)**2
+                pdt = ygroup * rxgroup
+                # Run the czt on the pdt now
+                pdtczt = czt(pdt, self.f1, self.f2+self.binWidth/2, self.binWidth, self.fs)
+                # Shift the czt by a phase
+                pdtcztPhased[g,:] = pdtczt * groupPhases[g,:]
+            
+            # Now sum coherently across the groups
+            pdtcztCombined = np.sum(pdtcztPhased, axis=0)
+            rxgroupNormSq = np.sum(rxgroupNormSqCollect)
+            
+            xc[i,:] = np.abs(pdtcztCombined)**2 / rxgroupNormSq / self.ystackNormSq
+            
+        return xc, cztFreq
+                
+        
 
 #%%
 group_xcorr_kernel = cp.RawKernel(r'''

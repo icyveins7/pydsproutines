@@ -49,6 +49,39 @@ def czt(x, f1, f2, binWidth, fs):
     
     return g
 
+# Simple class to keep the FFT of the chirp filter to alleviate computations
+class CZTCached:
+    def __init__(self, xlength, f1, f2, binWidth, fs):
+        self.k = int((f2-f1)/binWidth + 1)
+        self.m = xlength
+        self.nfft = self.m + self.k
+        foundGoodPrimes = False
+        while not foundGoodPrimes:
+            self.nfft = self.nfft + 1
+            if np.max(sympy.primefactors(self.nfft)) <= 7: # change depending on highest tolerable radix
+                foundGoodPrimes = True
+        
+        kk = np.arange(-self.m+1,np.max([self.k-1,self.m-1])+1)
+        kk2 = kk**2.0 / 2.0
+        self.ww = np.exp(-1j * 2 * np.pi * (f2-f1+binWidth)/(self.k*fs) * kk2)
+        chirpfilter = 1 / self.ww[:self.k-1+self.m]
+        self.fv = np.fft.fft( chirpfilter, self.nfft )
+        
+        nn = np.arange(self.m)
+        self.aa = np.exp(1j * 2 * np.pi * f1/fs * -nn) * self.ww[self.m+nn-1]
+        
+    def run(self, x):
+        y = x * self.aa
+        fy = np.fft.fft(y, self.nfft)
+        fy = fy * self.fv
+        g = np.fft.ifft(fy)
+        
+        g = g[self.m-1:self.m+self.k-1] * self.ww[self.m-1:self.m+self.k-1]
+        
+        return g
+
+
+#%%
 def dft(x, freqs, fs):
     '''
 

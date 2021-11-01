@@ -9,7 +9,7 @@ import numpy as np
 import scipy as sp
 import scipy.signal as sps
 import time
-from spectralRoutines import czt
+from spectralRoutines import czt, CZTCached
 from signalCreationRoutines import makeFreq
 from musicRoutines import MUSIC
 
@@ -505,6 +505,9 @@ class GroupXcorrCZT:
         
         self.ystackNormSq = np.linalg.norm(self.ystack.flatten())**2
         
+        # Create a CZT object for some optimization
+        self.cztc = CZTCached(self.maxLength, f1, f2, binWidth, fs)
+        
     def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None):
         # We are returning CAF for this (for now?)
         if shifts is None:
@@ -528,8 +531,10 @@ class GroupXcorrCZT:
                 rxgroup = rx[shift+self.starts[g] : shift+self.starts[g]+self.lengths[g]]
                 rxgroupNormSqCollect[g] = np.linalg.norm(rxgroup)**2
                 pdt = ygroup * rxgroup
-                # Run the czt on the pdt now
-                pdtczt = czt(pdt, self.f1, self.f2+self.binWidth/2, self.binWidth, self.fs)
+                # # Run the czt on the pdt now
+                # pdtczt = czt(pdt, self.f1, self.f2+self.binWidth/2, self.binWidth, self.fs)
+                # Use the cached CZT object
+                pdtczt = self.cztc.run(pdt)
                 # Shift the czt by a phase
                 pdtcztPhased[g,:] = pdtczt * groupPhases[g,:]
             

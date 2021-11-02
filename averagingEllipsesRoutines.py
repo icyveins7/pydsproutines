@@ -48,7 +48,7 @@ def averageEllipses_Berkeley(ellipse_mu, ellipse_cov):
     numerator = np.zeros((2,2))
     for n in np.arange(num_ellipse):
         ellipse_weight = cov_Davis @ np.linalg.inv(ellipse_cov[n,:,:]) # normalised inverse-variance weightage
-        numerator = numerator + ellipse_weight * ((ellipse_mu[n]-mu_weightedMean).T @ (ellipse_mu[n]-mu_weightedMean))
+        numerator = numerator + ellipse_weight * ((ellipse_mu[n]-mu_weightedMean) @ (ellipse_mu[n]-mu_weightedMean).T)
     
     cov_Berkeley = numerator*num_ellipse/(num_ellipse-1)/num_ellipse
     

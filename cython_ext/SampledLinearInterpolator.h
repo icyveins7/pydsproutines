@@ -6,7 +6,7 @@
 
 class SampledLinearInterpolator_64f
 {
-	private:
+	protected:
 		int len;
 		double T;
 	
@@ -29,7 +29,7 @@ class SampledLinearInterpolator_64f
 		{
 			xx.resize(len);
 			yy.resize(len);
-			grads.resize(len-1);
+	 		grads.resize(len-1);
 			ippsCopy_64f(x, xx.data(), xx.size());
 			ippsCopy_64f(y, yy.data(), yy.size());
 			calcGrads(); // call the pre-calculation
@@ -43,3 +43,34 @@ class SampledLinearInterpolator_64f
 
 		
 };
+
+class ConstAmpSigLerp_64f : public SampledLinearInterpolator_64f
+{
+	private:
+		double amp;
+		double fc;
+		ippe::vector<Ipp64f> tmtau;
+		ippe::vector<Ipp64f> ampvec;
+		ippe::vector<Ipp64f> phasevec;
+		
+		// Submethods
+		void calcCarrierFreq_TauPhase(const double *tau, int anslen, double *phase);
+	
+	public:
+		ConstAmpSigLerp_64f(double *timevec, double *phasevec, int in_len, double in_T,
+							double in_amp, double in_fc)
+			: SampledLinearInterpolator_64f{timevec, phasevec, in_len, in_T},
+			amp{in_amp}, fc{in_fc}
+		{
+			
+		}
+		~ConstAmpSigLerp_64f()
+		{
+		}
+		
+		// Main calling function
+		void propagate(const double *t, const double *tau, const double phi, int anslen, Ipp64fc *x);
+		
+		
+};
+

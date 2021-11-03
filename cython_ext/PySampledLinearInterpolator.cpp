@@ -1163,6 +1163,7 @@ static CYTHON_INLINE __pyx_t_double_complex __pyx_t_double_complex_from_parts(do
 
 /*--- Type declarations ---*/
 struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f;
+struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f;
 
 /* "C:/Python/Python39/Envs/main/lib/site-packages/numpy/__init__.pxd":729
  * ctypedef npy_longdouble longdouble_t
@@ -1201,7 +1202,7 @@ typedef npy_clongdouble __pyx_t_5numpy_clongdouble_t;
 typedef npy_cdouble __pyx_t_5numpy_complex_t;
 
 /* "PySampledLinearInterpolator.pyx":15
- * from SampledLinearInterpolator cimport SampledLinearInterpolator_64f
+ * from SampledLinearInterpolator cimport SampledLinearInterpolator_64f, ConstAmpSigLerp_64f, Ipp64fc
  * 
  * cdef class PySampledLinearInterpolator_64f:             # <<<<<<<<<<<<<<
  *     cdef SampledLinearInterpolator_64f* sli
@@ -1210,6 +1211,19 @@ typedef npy_cdouble __pyx_t_5numpy_complex_t;
 struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f {
   PyObject_HEAD
   SampledLinearInterpolator_64f *sli;
+};
+
+
+/* "PySampledLinearInterpolator.pyx":33
+ *         return yq
+ * 
+ * cdef class PyConstAmpSigLerp_64f:             # <<<<<<<<<<<<<<
+ *     cdef ConstAmpSigLerp_64f* sig
+ * 
+ */
+struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f {
+  PyObject_HEAD
+  ConstAmpSigLerp_64f *sig;
 };
 
 
@@ -1783,6 +1797,7 @@ static PyTypeObject *__pyx_ptype_5numpy_ufunc = 0;
 
 /* Module declarations from 'PySampledLinearInterpolator' */
 static PyTypeObject *__pyx_ptype_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f = 0;
+static PyTypeObject *__pyx_ptype_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f = 0;
 static __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t = { "float64_t", NULL, sizeof(__pyx_t_5numpy_float64_t), { 0 }, 0, 'R', 0, 0 };
 #define __Pyx_MODULE_NAME "PySampledLinearInterpolator"
 extern int __pyx_module_is_main_PySampledLinearInterpolator;
@@ -1792,9 +1807,14 @@ int __pyx_module_is_main_PySampledLinearInterpolator = 0;
 static PyObject *__pyx_builtin_TypeError;
 static PyObject *__pyx_builtin_ImportError;
 static const char __pyx_k_T[] = "T";
+static const char __pyx_k_t[] = "t";
 static const char __pyx_k_x[] = "x";
 static const char __pyx_k_y[] = "y";
+static const char __pyx_k_fc[] = "fc";
 static const char __pyx_k_np[] = "np";
+static const char __pyx_k_amp[] = "amp";
+static const char __pyx_k_phi[] = "phi";
+static const char __pyx_k_tau[] = "tau";
 static const char __pyx_k_main[] = "__main__";
 static const char __pyx_k_name[] = "__name__";
 static const char __pyx_k_size[] = "size";
@@ -1804,24 +1824,32 @@ static const char __pyx_k_zeros[] = "zeros";
 static const char __pyx_k_import[] = "__import__";
 static const char __pyx_k_reduce[] = "__reduce__";
 static const char __pyx_k_float64[] = "float64";
+static const char __pyx_k_timevec[] = "timevec";
 static const char __pyx_k_getstate[] = "__getstate__";
+static const char __pyx_k_phasevec[] = "phasevec";
 static const char __pyx_k_setstate[] = "__setstate__";
 static const char __pyx_k_TypeError[] = "TypeError";
 static const char __pyx_k_reduce_ex[] = "__reduce_ex__";
+static const char __pyx_k_complex128[] = "complex128";
 static const char __pyx_k_ImportError[] = "ImportError";
 static const char __pyx_k_reduce_cython[] = "__reduce_cython__";
 static const char __pyx_k_setstate_cython[] = "__setstate_cython__";
 static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
+static const char __pyx_k_PyConstAmpSigLerp_64f[] = "PyConstAmpSigLerp_64f";
 static const char __pyx_k_Created_on_Tue_Nov_2_19_04_03_2[] = "\nCreated on Tue Nov  2 19:04:03 2021\n\n@author: Seo\n";
 static const char __pyx_k_PySampledLinearInterpolator_64f[] = "PySampledLinearInterpolator_64f";
 static const char __pyx_k_numpy_core_multiarray_failed_to[] = "numpy.core.multiarray failed to import";
 static const char __pyx_k_no_default___reduce___due_to_non[] = "no default __reduce__ due to non-trivial __cinit__";
 static const char __pyx_k_numpy_core_umath_failed_to_impor[] = "numpy.core.umath failed to import";
 static PyObject *__pyx_n_s_ImportError;
+static PyObject *__pyx_n_s_PyConstAmpSigLerp_64f;
 static PyObject *__pyx_n_s_PySampledLinearInterpolator_64f;
 static PyObject *__pyx_n_s_T;
 static PyObject *__pyx_n_s_TypeError;
+static PyObject *__pyx_n_s_amp;
 static PyObject *__pyx_n_s_cline_in_traceback;
+static PyObject *__pyx_n_s_complex128;
+static PyObject *__pyx_n_s_fc;
 static PyObject *__pyx_n_s_float64;
 static PyObject *__pyx_n_s_getstate;
 static PyObject *__pyx_n_s_import;
@@ -1832,13 +1860,18 @@ static PyObject *__pyx_n_s_np;
 static PyObject *__pyx_n_s_numpy;
 static PyObject *__pyx_kp_u_numpy_core_multiarray_failed_to;
 static PyObject *__pyx_kp_u_numpy_core_umath_failed_to_impor;
+static PyObject *__pyx_n_s_phasevec;
+static PyObject *__pyx_n_s_phi;
 static PyObject *__pyx_n_s_reduce;
 static PyObject *__pyx_n_s_reduce_cython;
 static PyObject *__pyx_n_s_reduce_ex;
 static PyObject *__pyx_n_s_setstate;
 static PyObject *__pyx_n_s_setstate_cython;
 static PyObject *__pyx_n_s_size;
+static PyObject *__pyx_n_s_t;
+static PyObject *__pyx_n_s_tau;
 static PyObject *__pyx_n_s_test;
+static PyObject *__pyx_n_s_timevec;
 static PyObject *__pyx_n_s_x;
 static PyObject *__pyx_n_s_y;
 static PyObject *__pyx_n_s_zeros;
@@ -1847,11 +1880,19 @@ static void __pyx_pf_27PySampledLinearInterpolator_31PySampledLinearInterpolator
 static PyObject *__pyx_pf_27PySampledLinearInterpolator_31PySampledLinearInterpolator_64f_4lerp(struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f *__pyx_v_self, PyArrayObject *__pyx_v_xq); /* proto */
 static PyObject *__pyx_pf_27PySampledLinearInterpolator_31PySampledLinearInterpolator_64f_6__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_27PySampledLinearInterpolator_31PySampledLinearInterpolator_64f_8__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
+static int __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f___cinit__(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, PyArrayObject *__pyx_v_timevec, PyArrayObject *__pyx_v_phasevec, double __pyx_v_T, double __pyx_v_amp, double __pyx_v_fc); /* proto */
+static void __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_2__dealloc__(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_4propagate(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, PyArrayObject *__pyx_v_t, PyArrayObject *__pyx_v_tau, double __pyx_v_phi); /* proto */
+static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_6__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self); /* proto */
+static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_8__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
 static PyObject *__pyx_tp_new_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f(PyTypeObject *t, PyObject *a, PyObject *k); /*proto*/
+static PyObject *__pyx_tp_new_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f(PyTypeObject *t, PyObject *a, PyObject *k); /*proto*/
 static PyObject *__pyx_tuple_;
 static PyObject *__pyx_tuple__2;
 static PyObject *__pyx_tuple__3;
 static PyObject *__pyx_tuple__4;
+static PyObject *__pyx_tuple__5;
+static PyObject *__pyx_tuple__6;
 /* Late includes */
 
 /* "PySampledLinearInterpolator.pyx":18
@@ -2245,6 +2286,8 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_31PySampledLinearInterpo
  *         self.sli.lerp(<double*>xq.data, <double*>yq.data, xq.size)
  * 
  *         return yq             # <<<<<<<<<<<<<<
+ * 
+ * cdef class PyConstAmpSigLerp_64f:
  */
   __Pyx_XDECREF(__pyx_r);
   __Pyx_INCREF(((PyObject *)__pyx_v_yq));
@@ -2392,6 +2435,679 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_31PySampledLinearInterpo
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
   __Pyx_AddTraceback("PySampledLinearInterpolator.PySampledLinearInterpolator_64f.__setstate_cython__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "PySampledLinearInterpolator.pyx":36
+ *     cdef ConstAmpSigLerp_64f* sig
+ * 
+ *     def __cinit__(self, np.ndarray[np.float64_t, ndim=1] timevec,             # <<<<<<<<<<<<<<
+ *                         np.ndarray[np.float64_t, ndim=1] phasevec,
+ *                         double T, double amp, double fc):
+ */
+
+/* Python wrapper */
+static int __pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_1__cinit__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static int __pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_1__cinit__(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  PyArrayObject *__pyx_v_timevec = 0;
+  PyArrayObject *__pyx_v_phasevec = 0;
+  double __pyx_v_T;
+  double __pyx_v_amp;
+  double __pyx_v_fc;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  int __pyx_r;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__cinit__ (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_timevec,&__pyx_n_s_phasevec,&__pyx_n_s_T,&__pyx_n_s_amp,&__pyx_n_s_fc,0};
+    PyObject* values[5] = {0,0,0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        CYTHON_FALLTHROUGH;
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_timevec)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_phasevec)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("__cinit__", 1, 5, 5, 1); __PYX_ERR(1, 36, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_T)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("__cinit__", 1, 5, 5, 2); __PYX_ERR(1, 36, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_amp)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("__cinit__", 1, 5, 5, 3); __PYX_ERR(1, 36, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  4:
+        if (likely((values[4] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_fc)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("__cinit__", 1, 5, 5, 4); __PYX_ERR(1, 36, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "__cinit__") < 0)) __PYX_ERR(1, 36, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 5) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+      values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+    }
+    __pyx_v_timevec = ((PyArrayObject *)values[0]);
+    __pyx_v_phasevec = ((PyArrayObject *)values[1]);
+    __pyx_v_T = __pyx_PyFloat_AsDouble(values[2]); if (unlikely((__pyx_v_T == (double)-1) && PyErr_Occurred())) __PYX_ERR(1, 38, __pyx_L3_error)
+    __pyx_v_amp = __pyx_PyFloat_AsDouble(values[3]); if (unlikely((__pyx_v_amp == (double)-1) && PyErr_Occurred())) __PYX_ERR(1, 38, __pyx_L3_error)
+    __pyx_v_fc = __pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_fc == (double)-1) && PyErr_Occurred())) __PYX_ERR(1, 38, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("__cinit__", 1, 5, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 36, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("PySampledLinearInterpolator.PyConstAmpSigLerp_64f.__cinit__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return -1;
+  __pyx_L4_argument_unpacking_done:;
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_timevec), __pyx_ptype_5numpy_ndarray, 1, "timevec", 0))) __PYX_ERR(1, 36, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_phasevec), __pyx_ptype_5numpy_ndarray, 1, "phasevec", 0))) __PYX_ERR(1, 37, __pyx_L1_error)
+  __pyx_r = __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f___cinit__(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *)__pyx_v_self), __pyx_v_timevec, __pyx_v_phasevec, __pyx_v_T, __pyx_v_amp, __pyx_v_fc);
+
+  /* function exit code */
+  goto __pyx_L0;
+  __pyx_L1_error:;
+  __pyx_r = -1;
+  __pyx_L0:;
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static int __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f___cinit__(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, PyArrayObject *__pyx_v_timevec, PyArrayObject *__pyx_v_phasevec, double __pyx_v_T, double __pyx_v_amp, double __pyx_v_fc) {
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_phasevec;
+  __Pyx_Buffer __pyx_pybuffer_phasevec;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_timevec;
+  __Pyx_Buffer __pyx_pybuffer_timevec;
+  int __pyx_r;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  PyObject *__pyx_t_2 = NULL;
+  PyObject *__pyx_t_3 = NULL;
+  int __pyx_t_4;
+  int __pyx_t_5;
+  ConstAmpSigLerp_64f *__pyx_t_6;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__cinit__", 0);
+  __pyx_pybuffer_timevec.pybuffer.buf = NULL;
+  __pyx_pybuffer_timevec.refcount = 0;
+  __pyx_pybuffernd_timevec.data = NULL;
+  __pyx_pybuffernd_timevec.rcbuffer = &__pyx_pybuffer_timevec;
+  __pyx_pybuffer_phasevec.pybuffer.buf = NULL;
+  __pyx_pybuffer_phasevec.refcount = 0;
+  __pyx_pybuffernd_phasevec.data = NULL;
+  __pyx_pybuffernd_phasevec.rcbuffer = &__pyx_pybuffer_phasevec;
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_timevec.rcbuffer->pybuffer, (PyObject*)__pyx_v_timevec, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 36, __pyx_L1_error)
+  }
+  __pyx_pybuffernd_timevec.diminfo[0].strides = __pyx_pybuffernd_timevec.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_timevec.diminfo[0].shape = __pyx_pybuffernd_timevec.rcbuffer->pybuffer.shape[0];
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_phasevec.rcbuffer->pybuffer, (PyObject*)__pyx_v_phasevec, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 36, __pyx_L1_error)
+  }
+  __pyx_pybuffernd_phasevec.diminfo[0].strides = __pyx_pybuffernd_phasevec.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_phasevec.diminfo[0].shape = __pyx_pybuffernd_phasevec.rcbuffer->pybuffer.shape[0];
+
+  /* "PySampledLinearInterpolator.pyx":40
+ *                         double T, double amp, double fc):
+ * 
+ *         assert(timevec.size == phasevec.size)             # <<<<<<<<<<<<<<
+ *         self.sig = new ConstAmpSigLerp_64f(<double*>timevec.data, <double*>phasevec.data,
+ *                                             <int>timevec.size, T, amp, fc)
+ */
+  #ifndef CYTHON_WITHOUT_ASSERTIONS
+  if (unlikely(!Py_OptimizeFlag)) {
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_timevec), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 40, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_phasevec), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 40, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_2);
+    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 40, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 40, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+    if (unlikely(!__pyx_t_4)) {
+      PyErr_SetNone(PyExc_AssertionError);
+      __PYX_ERR(1, 40, __pyx_L1_error)
+    }
+  }
+  #endif
+
+  /* "PySampledLinearInterpolator.pyx":42
+ *         assert(timevec.size == phasevec.size)
+ *         self.sig = new ConstAmpSigLerp_64f(<double*>timevec.data, <double*>phasevec.data,
+ *                                             <int>timevec.size, T, amp, fc)             # <<<<<<<<<<<<<<
+ * 
+ *     def __dealloc__(self):
+ */
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_timevec), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 42, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_5 = __Pyx_PyInt_As_int(__pyx_t_3); if (unlikely((__pyx_t_5 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 42, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+
+  /* "PySampledLinearInterpolator.pyx":41
+ * 
+ *         assert(timevec.size == phasevec.size)
+ *         self.sig = new ConstAmpSigLerp_64f(<double*>timevec.data, <double*>phasevec.data,             # <<<<<<<<<<<<<<
+ *                                             <int>timevec.size, T, amp, fc)
+ * 
+ */
+  try {
+    __pyx_t_6 = new ConstAmpSigLerp_64f(((double *)__pyx_v_timevec->data), ((double *)__pyx_v_phasevec->data), ((int)__pyx_t_5), __pyx_v_T, __pyx_v_amp, __pyx_v_fc);
+  } catch(...) {
+    __Pyx_CppExn2PyErr();
+    __PYX_ERR(1, 41, __pyx_L1_error)
+  }
+  __pyx_v_self->sig = __pyx_t_6;
+
+  /* "PySampledLinearInterpolator.pyx":36
+ *     cdef ConstAmpSigLerp_64f* sig
+ * 
+ *     def __cinit__(self, np.ndarray[np.float64_t, ndim=1] timevec,             # <<<<<<<<<<<<<<
+ *                         np.ndarray[np.float64_t, ndim=1] phasevec,
+ *                         double T, double amp, double fc):
+ */
+
+  /* function exit code */
+  __pyx_r = 0;
+  goto __pyx_L0;
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_3);
+  { PyObject *__pyx_type, *__pyx_value, *__pyx_tb;
+    __Pyx_PyThreadState_declare
+    __Pyx_PyThreadState_assign
+    __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_phasevec.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_timevec.rcbuffer->pybuffer);
+  __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
+  __Pyx_AddTraceback("PySampledLinearInterpolator.PyConstAmpSigLerp_64f.__cinit__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = -1;
+  goto __pyx_L2;
+  __pyx_L0:;
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_phasevec.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_timevec.rcbuffer->pybuffer);
+  __pyx_L2:;
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "PySampledLinearInterpolator.pyx":44
+ *                                             <int>timevec.size, T, amp, fc)
+ * 
+ *     def __dealloc__(self):             # <<<<<<<<<<<<<<
+ *         del self.sig
+ * 
+ */
+
+/* Python wrapper */
+static void __pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_3__dealloc__(PyObject *__pyx_v_self); /*proto*/
+static void __pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_3__dealloc__(PyObject *__pyx_v_self) {
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__dealloc__ (wrapper)", 0);
+  __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_2__dealloc__(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+}
+
+static void __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_2__dealloc__(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self) {
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__dealloc__", 0);
+
+  /* "PySampledLinearInterpolator.pyx":45
+ * 
+ *     def __dealloc__(self):
+ *         del self.sig             # <<<<<<<<<<<<<<
+ * 
+ *     def propagate(self, np.ndarray[np.float64_t, ndim=1] t,
+ */
+  delete __pyx_v_self->sig;
+
+  /* "PySampledLinearInterpolator.pyx":44
+ *                                             <int>timevec.size, T, amp, fc)
+ * 
+ *     def __dealloc__(self):             # <<<<<<<<<<<<<<
+ *         del self.sig
+ * 
+ */
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+}
+
+/* "PySampledLinearInterpolator.pyx":47
+ *         del self.sig
+ * 
+ *     def propagate(self, np.ndarray[np.float64_t, ndim=1] t,             # <<<<<<<<<<<<<<
+ *                         np.ndarray[np.float64_t, ndim=1] tau,
+ *                         double phi):
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_5propagate(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_5propagate(PyObject *__pyx_v_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  PyArrayObject *__pyx_v_t = 0;
+  PyArrayObject *__pyx_v_tau = 0;
+  double __pyx_v_phi;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("propagate (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_t,&__pyx_n_s_tau,&__pyx_n_s_phi,0};
+    PyObject* values[3] = {0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_t)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_tau)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("propagate", 1, 3, 3, 1); __PYX_ERR(1, 47, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_phi)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("propagate", 1, 3, 3, 2); __PYX_ERR(1, 47, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "propagate") < 0)) __PYX_ERR(1, 47, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+    }
+    __pyx_v_t = ((PyArrayObject *)values[0]);
+    __pyx_v_tau = ((PyArrayObject *)values[1]);
+    __pyx_v_phi = __pyx_PyFloat_AsDouble(values[2]); if (unlikely((__pyx_v_phi == (double)-1) && PyErr_Occurred())) __PYX_ERR(1, 49, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("propagate", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 47, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("PySampledLinearInterpolator.PyConstAmpSigLerp_64f.propagate", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_t), __pyx_ptype_5numpy_ndarray, 1, "t", 0))) __PYX_ERR(1, 47, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_tau), __pyx_ptype_5numpy_ndarray, 1, "tau", 0))) __PYX_ERR(1, 48, __pyx_L1_error)
+  __pyx_r = __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_4propagate(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *)__pyx_v_self), __pyx_v_t, __pyx_v_tau, __pyx_v_phi);
+
+  /* function exit code */
+  goto __pyx_L0;
+  __pyx_L1_error:;
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_4propagate(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, PyArrayObject *__pyx_v_t, PyArrayObject *__pyx_v_tau, double __pyx_v_phi) {
+  PyArrayObject *__pyx_v_x = 0;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_t;
+  __Pyx_Buffer __pyx_pybuffer_t;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_tau;
+  __Pyx_Buffer __pyx_pybuffer_tau;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  PyObject *__pyx_t_2 = NULL;
+  PyObject *__pyx_t_3 = NULL;
+  int __pyx_t_4;
+  PyObject *__pyx_t_5 = NULL;
+  PyObject *__pyx_t_6 = NULL;
+  int __pyx_t_7;
+  PyObject *__pyx_t_8 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("propagate", 0);
+  __pyx_pybuffer_t.pybuffer.buf = NULL;
+  __pyx_pybuffer_t.refcount = 0;
+  __pyx_pybuffernd_t.data = NULL;
+  __pyx_pybuffernd_t.rcbuffer = &__pyx_pybuffer_t;
+  __pyx_pybuffer_tau.pybuffer.buf = NULL;
+  __pyx_pybuffer_tau.refcount = 0;
+  __pyx_pybuffernd_tau.data = NULL;
+  __pyx_pybuffernd_tau.rcbuffer = &__pyx_pybuffer_tau;
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_t.rcbuffer->pybuffer, (PyObject*)__pyx_v_t, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 47, __pyx_L1_error)
+  }
+  __pyx_pybuffernd_t.diminfo[0].strides = __pyx_pybuffernd_t.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_t.diminfo[0].shape = __pyx_pybuffernd_t.rcbuffer->pybuffer.shape[0];
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tau.rcbuffer->pybuffer, (PyObject*)__pyx_v_tau, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 47, __pyx_L1_error)
+  }
+  __pyx_pybuffernd_tau.diminfo[0].strides = __pyx_pybuffernd_tau.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_tau.diminfo[0].shape = __pyx_pybuffernd_tau.rcbuffer->pybuffer.shape[0];
+
+  /* "PySampledLinearInterpolator.pyx":51
+ *                         double phi):
+ * 
+ *         assert(t.size == tau.size)             # <<<<<<<<<<<<<<
+ *         cdef np.ndarray x = np.zeros(t.size, np.complex128)
+ *         self.sig.propagate(<double*>t.data, <double*>tau.data, phi, t.size, <Ipp64fc*>x.data)
+ */
+  #ifndef CYTHON_WITHOUT_ASSERTIONS
+  if (unlikely(!Py_OptimizeFlag)) {
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 51, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tau), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 51, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_2);
+    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 51, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 51, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+    if (unlikely(!__pyx_t_4)) {
+      PyErr_SetNone(PyExc_AssertionError);
+      __PYX_ERR(1, 51, __pyx_L1_error)
+    }
+  }
+  #endif
+
+  /* "PySampledLinearInterpolator.pyx":52
+ * 
+ *         assert(t.size == tau.size)
+ *         cdef np.ndarray x = np.zeros(t.size, np.complex128)             # <<<<<<<<<<<<<<
+ *         self.sig.propagate(<double*>t.data, <double*>tau.data, phi, t.size, <Ipp64fc*>x.data)
+ * 
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 52, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 52, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 52, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 52, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_complex128); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 52, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_6);
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __pyx_t_5 = NULL;
+  __pyx_t_7 = 0;
+  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_1))) {
+    __pyx_t_5 = PyMethod_GET_SELF(__pyx_t_1);
+    if (likely(__pyx_t_5)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_1);
+      __Pyx_INCREF(__pyx_t_5);
+      __Pyx_INCREF(function);
+      __Pyx_DECREF_SET(__pyx_t_1, function);
+      __pyx_t_7 = 1;
+    }
+  }
+  #if CYTHON_FAST_PYCALL
+  if (PyFunction_Check(__pyx_t_1)) {
+    PyObject *__pyx_temp[3] = {__pyx_t_5, __pyx_t_2, __pyx_t_6};
+    __pyx_t_3 = __Pyx_PyFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 52, __pyx_L1_error)
+    __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __Pyx_GOTREF(__pyx_t_3);
+    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+  } else
+  #endif
+  #if CYTHON_FAST_PYCCALL
+  if (__Pyx_PyFastCFunction_Check(__pyx_t_1)) {
+    PyObject *__pyx_temp[3] = {__pyx_t_5, __pyx_t_2, __pyx_t_6};
+    __pyx_t_3 = __Pyx_PyCFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 52, __pyx_L1_error)
+    __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __Pyx_GOTREF(__pyx_t_3);
+    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+  } else
+  #endif
+  {
+    __pyx_t_8 = PyTuple_New(2+__pyx_t_7); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 52, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_8);
+    if (__pyx_t_5) {
+      __Pyx_GIVEREF(__pyx_t_5); PyTuple_SET_ITEM(__pyx_t_8, 0, __pyx_t_5); __pyx_t_5 = NULL;
+    }
+    __Pyx_GIVEREF(__pyx_t_2);
+    PyTuple_SET_ITEM(__pyx_t_8, 0+__pyx_t_7, __pyx_t_2);
+    __Pyx_GIVEREF(__pyx_t_6);
+    PyTuple_SET_ITEM(__pyx_t_8, 1+__pyx_t_7, __pyx_t_6);
+    __pyx_t_2 = 0;
+    __pyx_t_6 = 0;
+    __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_8, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 52, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_3);
+    __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
+  }
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(1, 52, __pyx_L1_error)
+  __pyx_v_x = ((PyArrayObject *)__pyx_t_3);
+  __pyx_t_3 = 0;
+
+  /* "PySampledLinearInterpolator.pyx":53
+ *         assert(t.size == tau.size)
+ *         cdef np.ndarray x = np.zeros(t.size, np.complex128)
+ *         self.sig.propagate(<double*>t.data, <double*>tau.data, phi, t.size, <Ipp64fc*>x.data)             # <<<<<<<<<<<<<<
+ * 
+ *         return x
+ */
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 53, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_3); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 53, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_v_self->sig->propagate(((double *)__pyx_v_t->data), ((double *)__pyx_v_tau->data), __pyx_v_phi, __pyx_t_7, ((Ipp64fc *)__pyx_v_x->data));
+
+  /* "PySampledLinearInterpolator.pyx":55
+ *         self.sig.propagate(<double*>t.data, <double*>tau.data, phi, t.size, <Ipp64fc*>x.data)
+ * 
+ *         return x             # <<<<<<<<<<<<<<
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __Pyx_INCREF(((PyObject *)__pyx_v_x));
+  __pyx_r = ((PyObject *)__pyx_v_x);
+  goto __pyx_L0;
+
+  /* "PySampledLinearInterpolator.pyx":47
+ *         del self.sig
+ * 
+ *     def propagate(self, np.ndarray[np.float64_t, ndim=1] t,             # <<<<<<<<<<<<<<
+ *                         np.ndarray[np.float64_t, ndim=1] tau,
+ *                         double phi):
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_5);
+  __Pyx_XDECREF(__pyx_t_6);
+  __Pyx_XDECREF(__pyx_t_8);
+  { PyObject *__pyx_type, *__pyx_value, *__pyx_tb;
+    __Pyx_PyThreadState_declare
+    __Pyx_PyThreadState_assign
+    __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_t.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_tau.rcbuffer->pybuffer);
+  __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
+  __Pyx_AddTraceback("PySampledLinearInterpolator.PyConstAmpSigLerp_64f.propagate", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  goto __pyx_L2;
+  __pyx_L0:;
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_t.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_tau.rcbuffer->pybuffer);
+  __pyx_L2:;
+  __Pyx_XDECREF((PyObject *)__pyx_v_x);
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "(tree fragment)":1
+ * def __reduce_cython__(self):             # <<<<<<<<<<<<<<
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")
+ * def __setstate_cython__(self, __pyx_state):
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_7__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused); /*proto*/
+static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_7__reduce_cython__(PyObject *__pyx_v_self, CYTHON_UNUSED PyObject *unused) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__reduce_cython__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_6__reduce_cython__(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *)__pyx_v_self));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_6__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__reduce_cython__", 0);
+
+  /* "(tree fragment)":2
+ * def __reduce_cython__(self):
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")             # <<<<<<<<<<<<<<
+ * def __setstate_cython__(self, __pyx_state):
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")
+ */
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple__3, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 2, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_Raise(__pyx_t_1, 0, 0, 0);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __PYX_ERR(0, 2, __pyx_L1_error)
+
+  /* "(tree fragment)":1
+ * def __reduce_cython__(self):             # <<<<<<<<<<<<<<
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")
+ * def __setstate_cython__(self, __pyx_state):
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("PySampledLinearInterpolator.PyConstAmpSigLerp_64f.__reduce_cython__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "(tree fragment)":3
+ * def __reduce_cython__(self):
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")
+ * def __setstate_cython__(self, __pyx_state):             # <<<<<<<<<<<<<<
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_9__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state); /*proto*/
+static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_9__setstate_cython__(PyObject *__pyx_v_self, PyObject *__pyx_v___pyx_state) {
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("__setstate_cython__ (wrapper)", 0);
+  __pyx_r = __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_8__setstate_cython__(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *)__pyx_v_self), ((PyObject *)__pyx_v___pyx_state));
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_8__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("__setstate_cython__", 0);
+
+  /* "(tree fragment)":4
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")
+ * def __setstate_cython__(self, __pyx_state):
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")             # <<<<<<<<<<<<<<
+ */
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_builtin_TypeError, __pyx_tuple__4, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_Raise(__pyx_t_1, 0, 0, 0);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __PYX_ERR(0, 4, __pyx_L1_error)
+
+  /* "(tree fragment)":3
+ * def __reduce_cython__(self):
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")
+ * def __setstate_cython__(self, __pyx_state):             # <<<<<<<<<<<<<<
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_AddTraceback("PySampledLinearInterpolator.PyConstAmpSigLerp_64f.__setstate_cython__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
@@ -2930,7 +3646,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
  * 
  * cdef inline int import_umath() except -1:
  */
-      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__3, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(2, 947, __pyx_L5_except_error)
+      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__5, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(2, 947, __pyx_L5_except_error)
       __Pyx_GOTREF(__pyx_t_8);
       __Pyx_Raise(__pyx_t_8, 0, 0, 0);
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
@@ -3062,7 +3778,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
  * 
  * cdef inline int import_ufunc() except -1:
  */
-      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__4, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(2, 953, __pyx_L5_except_error)
+      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__6, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(2, 953, __pyx_L5_except_error)
       __Pyx_GOTREF(__pyx_t_8);
       __Pyx_Raise(__pyx_t_8, 0, 0, 0);
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
@@ -3194,7 +3910,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
  * 
  * cdef extern from *:
  */
-      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__4, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(2, 959, __pyx_L5_except_error)
+      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__6, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(2, 959, __pyx_L5_except_error)
       __Pyx_GOTREF(__pyx_t_8);
       __Pyx_Raise(__pyx_t_8, 0, 0, 0);
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
@@ -3523,6 +4239,114 @@ static PyTypeObject __pyx_type_27PySampledLinearInterpolator_PySampledLinearInte
   #endif
 };
 
+static PyObject *__pyx_tp_new_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f(PyTypeObject *t, PyObject *a, PyObject *k) {
+  PyObject *o;
+  if (likely((t->tp_flags & Py_TPFLAGS_IS_ABSTRACT) == 0)) {
+    o = (*t->tp_alloc)(t, 0);
+  } else {
+    o = (PyObject *) PyBaseObject_Type.tp_new(t, __pyx_empty_tuple, 0);
+  }
+  if (unlikely(!o)) return 0;
+  if (unlikely(__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_1__cinit__(o, a, k) < 0)) goto bad;
+  return o;
+  bad:
+  Py_DECREF(o); o = 0;
+  return NULL;
+}
+
+static void __pyx_tp_dealloc_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f(PyObject *o) {
+  #if CYTHON_USE_TP_FINALIZE
+  if (unlikely(PyType_HasFeature(Py_TYPE(o), Py_TPFLAGS_HAVE_FINALIZE) && Py_TYPE(o)->tp_finalize) && (!PyType_IS_GC(Py_TYPE(o)) || !_PyGC_FINALIZED(o))) {
+    if (PyObject_CallFinalizerFromDealloc(o)) return;
+  }
+  #endif
+  {
+    PyObject *etype, *eval, *etb;
+    PyErr_Fetch(&etype, &eval, &etb);
+    __Pyx_SET_REFCNT(o, Py_REFCNT(o) + 1);
+    __pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_3__dealloc__(o);
+    __Pyx_SET_REFCNT(o, Py_REFCNT(o) - 1);
+    PyErr_Restore(etype, eval, etb);
+  }
+  (*Py_TYPE(o)->tp_free)(o);
+}
+
+static PyMethodDef __pyx_methods_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f[] = {
+  {"propagate", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_5propagate, METH_VARARGS|METH_KEYWORDS, 0},
+  {"__reduce_cython__", (PyCFunction)__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_7__reduce_cython__, METH_NOARGS, 0},
+  {"__setstate_cython__", (PyCFunction)__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_9__setstate_cython__, METH_O, 0},
+  {0, 0, 0, 0}
+};
+
+static PyTypeObject __pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f = {
+  PyVarObject_HEAD_INIT(0, 0)
+  "PySampledLinearInterpolator.PyConstAmpSigLerp_64f", /*tp_name*/
+  sizeof(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f), /*tp_basicsize*/
+  0, /*tp_itemsize*/
+  __pyx_tp_dealloc_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f, /*tp_dealloc*/
+  #if PY_VERSION_HEX < 0x030800b4
+  0, /*tp_print*/
+  #endif
+  #if PY_VERSION_HEX >= 0x030800b4
+  0, /*tp_vectorcall_offset*/
+  #endif
+  0, /*tp_getattr*/
+  0, /*tp_setattr*/
+  #if PY_MAJOR_VERSION < 3
+  0, /*tp_compare*/
+  #endif
+  #if PY_MAJOR_VERSION >= 3
+  0, /*tp_as_async*/
+  #endif
+  0, /*tp_repr*/
+  0, /*tp_as_number*/
+  0, /*tp_as_sequence*/
+  0, /*tp_as_mapping*/
+  0, /*tp_hash*/
+  0, /*tp_call*/
+  0, /*tp_str*/
+  0, /*tp_getattro*/
+  0, /*tp_setattro*/
+  0, /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_VERSION_TAG|Py_TPFLAGS_CHECKTYPES|Py_TPFLAGS_HAVE_NEWBUFFER|Py_TPFLAGS_BASETYPE, /*tp_flags*/
+  0, /*tp_doc*/
+  0, /*tp_traverse*/
+  0, /*tp_clear*/
+  0, /*tp_richcompare*/
+  0, /*tp_weaklistoffset*/
+  0, /*tp_iter*/
+  0, /*tp_iternext*/
+  __pyx_methods_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f, /*tp_methods*/
+  0, /*tp_members*/
+  0, /*tp_getset*/
+  0, /*tp_base*/
+  0, /*tp_dict*/
+  0, /*tp_descr_get*/
+  0, /*tp_descr_set*/
+  0, /*tp_dictoffset*/
+  0, /*tp_init*/
+  0, /*tp_alloc*/
+  __pyx_tp_new_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f, /*tp_new*/
+  0, /*tp_free*/
+  0, /*tp_is_gc*/
+  0, /*tp_bases*/
+  0, /*tp_mro*/
+  0, /*tp_cache*/
+  0, /*tp_subclasses*/
+  0, /*tp_weaklist*/
+  0, /*tp_del*/
+  0, /*tp_version_tag*/
+  #if PY_VERSION_HEX >= 0x030400a1
+  0, /*tp_finalize*/
+  #endif
+  #if PY_VERSION_HEX >= 0x030800b1
+  0, /*tp_vectorcall*/
+  #endif
+  #if PY_VERSION_HEX >= 0x030800b4 && PY_VERSION_HEX < 0x03090000
+  0, /*tp_print*/
+  #endif
+};
+
 static PyMethodDef __pyx_methods[] = {
   {0, 0, 0, 0}
 };
@@ -3570,10 +4394,14 @@ static struct PyModuleDef __pyx_moduledef = {
 
 static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_ImportError, __pyx_k_ImportError, sizeof(__pyx_k_ImportError), 0, 0, 1, 1},
+  {&__pyx_n_s_PyConstAmpSigLerp_64f, __pyx_k_PyConstAmpSigLerp_64f, sizeof(__pyx_k_PyConstAmpSigLerp_64f), 0, 0, 1, 1},
   {&__pyx_n_s_PySampledLinearInterpolator_64f, __pyx_k_PySampledLinearInterpolator_64f, sizeof(__pyx_k_PySampledLinearInterpolator_64f), 0, 0, 1, 1},
   {&__pyx_n_s_T, __pyx_k_T, sizeof(__pyx_k_T), 0, 0, 1, 1},
   {&__pyx_n_s_TypeError, __pyx_k_TypeError, sizeof(__pyx_k_TypeError), 0, 0, 1, 1},
+  {&__pyx_n_s_amp, __pyx_k_amp, sizeof(__pyx_k_amp), 0, 0, 1, 1},
   {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
+  {&__pyx_n_s_complex128, __pyx_k_complex128, sizeof(__pyx_k_complex128), 0, 0, 1, 1},
+  {&__pyx_n_s_fc, __pyx_k_fc, sizeof(__pyx_k_fc), 0, 0, 1, 1},
   {&__pyx_n_s_float64, __pyx_k_float64, sizeof(__pyx_k_float64), 0, 0, 1, 1},
   {&__pyx_n_s_getstate, __pyx_k_getstate, sizeof(__pyx_k_getstate), 0, 0, 1, 1},
   {&__pyx_n_s_import, __pyx_k_import, sizeof(__pyx_k_import), 0, 0, 1, 1},
@@ -3584,13 +4412,18 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_numpy, __pyx_k_numpy, sizeof(__pyx_k_numpy), 0, 0, 1, 1},
   {&__pyx_kp_u_numpy_core_multiarray_failed_to, __pyx_k_numpy_core_multiarray_failed_to, sizeof(__pyx_k_numpy_core_multiarray_failed_to), 0, 1, 0, 0},
   {&__pyx_kp_u_numpy_core_umath_failed_to_impor, __pyx_k_numpy_core_umath_failed_to_impor, sizeof(__pyx_k_numpy_core_umath_failed_to_impor), 0, 1, 0, 0},
+  {&__pyx_n_s_phasevec, __pyx_k_phasevec, sizeof(__pyx_k_phasevec), 0, 0, 1, 1},
+  {&__pyx_n_s_phi, __pyx_k_phi, sizeof(__pyx_k_phi), 0, 0, 1, 1},
   {&__pyx_n_s_reduce, __pyx_k_reduce, sizeof(__pyx_k_reduce), 0, 0, 1, 1},
   {&__pyx_n_s_reduce_cython, __pyx_k_reduce_cython, sizeof(__pyx_k_reduce_cython), 0, 0, 1, 1},
   {&__pyx_n_s_reduce_ex, __pyx_k_reduce_ex, sizeof(__pyx_k_reduce_ex), 0, 0, 1, 1},
   {&__pyx_n_s_setstate, __pyx_k_setstate, sizeof(__pyx_k_setstate), 0, 0, 1, 1},
   {&__pyx_n_s_setstate_cython, __pyx_k_setstate_cython, sizeof(__pyx_k_setstate_cython), 0, 0, 1, 1},
   {&__pyx_n_s_size, __pyx_k_size, sizeof(__pyx_k_size), 0, 0, 1, 1},
+  {&__pyx_n_s_t, __pyx_k_t, sizeof(__pyx_k_t), 0, 0, 1, 1},
+  {&__pyx_n_s_tau, __pyx_k_tau, sizeof(__pyx_k_tau), 0, 0, 1, 1},
   {&__pyx_n_s_test, __pyx_k_test, sizeof(__pyx_k_test), 0, 0, 1, 1},
+  {&__pyx_n_s_timevec, __pyx_k_timevec, sizeof(__pyx_k_timevec), 0, 0, 1, 1},
   {&__pyx_n_s_x, __pyx_k_x, sizeof(__pyx_k_x), 0, 0, 1, 1},
   {&__pyx_n_s_y, __pyx_k_y, sizeof(__pyx_k_y), 0, 0, 1, 1},
   {&__pyx_n_s_zeros, __pyx_k_zeros, sizeof(__pyx_k_zeros), 0, 0, 1, 1},
@@ -3627,6 +4460,25 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
 
+  /* "(tree fragment)":2
+ * def __reduce_cython__(self):
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")             # <<<<<<<<<<<<<<
+ * def __setstate_cython__(self, __pyx_state):
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")
+ */
+  __pyx_tuple__3 = PyTuple_Pack(1, __pyx_kp_s_no_default___reduce___due_to_non); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 2, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__3);
+  __Pyx_GIVEREF(__pyx_tuple__3);
+
+  /* "(tree fragment)":4
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")
+ * def __setstate_cython__(self, __pyx_state):
+ *     raise TypeError("no default __reduce__ due to non-trivial __cinit__")             # <<<<<<<<<<<<<<
+ */
+  __pyx_tuple__4 = PyTuple_Pack(1, __pyx_kp_s_no_default___reduce___due_to_non); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(0, 4, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__4);
+  __Pyx_GIVEREF(__pyx_tuple__4);
+
   /* "C:/Python/Python39/Envs/main/lib/site-packages/numpy/__init__.pxd":947
  *         __pyx_import_array()
  *     except Exception:
@@ -3634,9 +4486,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 
  * cdef inline int import_umath() except -1:
  */
-  __pyx_tuple__3 = PyTuple_Pack(1, __pyx_kp_u_numpy_core_multiarray_failed_to); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(2, 947, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__3);
-  __Pyx_GIVEREF(__pyx_tuple__3);
+  __pyx_tuple__5 = PyTuple_Pack(1, __pyx_kp_u_numpy_core_multiarray_failed_to); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(2, 947, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__5);
+  __Pyx_GIVEREF(__pyx_tuple__5);
 
   /* "C:/Python/Python39/Envs/main/lib/site-packages/numpy/__init__.pxd":953
  *         _import_umath()
@@ -3645,9 +4497,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 
  * cdef inline int import_ufunc() except -1:
  */
-  __pyx_tuple__4 = PyTuple_Pack(1, __pyx_kp_u_numpy_core_umath_failed_to_impor); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(2, 953, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__4);
-  __Pyx_GIVEREF(__pyx_tuple__4);
+  __pyx_tuple__6 = PyTuple_Pack(1, __pyx_kp_u_numpy_core_umath_failed_to_impor); if (unlikely(!__pyx_tuple__6)) __PYX_ERR(2, 953, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__6);
+  __Pyx_GIVEREF(__pyx_tuple__6);
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -3711,6 +4563,16 @@ static int __Pyx_modinit_type_init_code(void) {
   if (PyObject_SetAttr(__pyx_m, __pyx_n_s_PySampledLinearInterpolator_64f, (PyObject *)&__pyx_type_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f) < 0) __PYX_ERR(1, 15, __pyx_L1_error)
   if (__Pyx_setup_reduce((PyObject*)&__pyx_type_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f) < 0) __PYX_ERR(1, 15, __pyx_L1_error)
   __pyx_ptype_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f = &__pyx_type_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f;
+  if (PyType_Ready(&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f) < 0) __PYX_ERR(1, 33, __pyx_L1_error)
+  #if PY_VERSION_HEX < 0x030800B1
+  __pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f.tp_print = 0;
+  #endif
+  if ((CYTHON_USE_TYPE_SLOTS && CYTHON_USE_PYTYPE_LOOKUP) && likely(!__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f.tp_dictoffset && __pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f.tp_getattro == PyObject_GenericGetAttr)) {
+    __pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f.tp_getattro = __Pyx_PyObject_GenericGetAttr;
+  }
+  if (PyObject_SetAttr(__pyx_m, __pyx_n_s_PyConstAmpSigLerp_64f, (PyObject *)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f) < 0) __PYX_ERR(1, 33, __pyx_L1_error)
+  if (__Pyx_setup_reduce((PyObject*)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f) < 0) __PYX_ERR(1, 33, __pyx_L1_error)
+  __pyx_ptype_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f = &__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f;
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;

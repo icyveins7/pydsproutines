@@ -17,7 +17,7 @@ cdef class PySampledLinearInterpolator_64f:
     
     def __cinit__(self, np.ndarray[np.float64_t, ndim=1] x, np.ndarray[np.float64_t, ndim=1] y, double T):
         
-        print("Attempting to init..")
+        # print("Attempting to init..")
         assert(x.size == y.size)
         self.sli = new SampledLinearInterpolator_64f(<double*>x.data, <double*>y.data, <int>x.size, T)
         

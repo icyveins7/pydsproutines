@@ -2,6 +2,10 @@
 
 void SampledLinearInterpolator_64f::calcGrads()
 {
+    // TODO: test this to check
+//    ippsSub_64f(&yy.at(0), &yy.at(i+1), grads.data(), grads.size());
+
+    // deprecated?
 	for (int i = 0; i < grads.size(); i++){
 		grads.at(i) = (yy.at(i+1) - yy.at(i));
 	}
@@ -39,6 +43,38 @@ void SampledLinearInterpolator_64f::lerp(const double *xxq, double *yyq, int ans
 	ippsAddProduct_64f(remPart.data(), gradients, yyq, anslen); 
 }
 
+void SampledLinearInterpolator_64f::lerp(const double *xxq, double *yyq, int anslen, SampledLinearInterpolatorWorkspace_64f *ws)
+{
+    // == identical to the original, but repoint all workspace vectors ==
+    // some resizing
+	ws->divAns.resize(anslen);
+	ws->intPart.resize(anslen);
+	ws->remPart.resize(anslen);
+	ws->indexes.resize(anslen);
+    
+	// divide first
+	ippsDivC_64f(xxq, T, ws->divAns.data(), anslen);
+	// modf the whole array
+	ippsModf_64f(ws->divAns.data(), ws->intPart.data(), ws->remPart.data(), anslen);
+	// convert to integers for indexing
+	ippsConvert_64f32s_Sfs(ws->intPart.data(), ws->indexes.data(), anslen, ippRndNear, 0);
+	// reuse the intPart which is not needed any more as the gradients vector
+	Ipp64f *gradients = ws->intPart.data();
+	ippsZero_64f(gradients, anslen); // zero it out
+	Ipp32s idx;
+	for (int qi = 0; qi < anslen; qi++){
+		idx = ws->indexes.at(qi);
+		if (idx >=0 && idx < len-1){ // don't index outside, we need to access the next point as well
+			gradients[qi] = grads.at(idx); // now simply use the value directly
+			yyq[qi] = yy.at(idx); // write the output value as well, this is also only written if within bounds
+		}
+		
+	}
+	// multiply gradients into the decimal part and add to output
+	// note that grads were actually 'diffs' not gradients, since we have normalised by T already in the first division
+	ippsAddProduct_64f(ws->remPart.data(), gradients, yyq, anslen); 
+}
+
 // ===================================================================================================================
 void ConstAmpSigLerp_64f::propagate(const double *t, const double *tau, const double phi, int anslen, Ipp64fc *x)
 {
@@ -65,6 +101,44 @@ void ConstAmpSigLerp_64f::propagate(const double *t, const double *tau, const do
 	// calculate phasor change due to carrier frequency
 	// divAns.resize(anslen); // unnecessary since lerp should have done it
 	Ipp64f *carrierPhase = divAns.data(); // re-use since lerp doesn't require it any more
+	calcCarrierFreq_TauPhase(tau, anslen, carrierPhase);
+	
+	// now add the two phases together
+	ippsAdd_64f_I(carrierPhase, phasevec.data(), anslen);
+	// and the constant phi
+	ippsAddC_64f_I(phi, phasevec.data(), anslen);
+	
+	// and turn it into complex
+	ippsPolarToCart_64fc(ampvec.data(), phasevec.data(), x, anslen);
+
+}
+
+void ConstAmpSigLerp_64f::propagate(const double *t, const double *tau, const double phi, int anslen, Ipp64fc *x, SampledLinearInterpolatorWorkspace_64f *ws)
+{
+    // == again, same as above, but with separate workspace ==
+    // some resizes
+	tmtau.resize(anslen);
+	phasevec.resize(anslen);
+	ampvec.resize(anslen);
+	
+	// first calculate t - tau
+	ippsSub_64f((const Ipp64f*)tau, (const Ipp64f*)t, tmtau.data(), anslen); // src2 - src1
+	
+	// now lerp the phase (resize will happen internally)
+	lerp(tmtau.data(), phasevec.data(), anslen, ws);
+	
+	// and write the ampvec
+	ippsZero_64f(ampvec.data(), ampvec.size());
+	for (int i = 0; i < ampvec.size(); i++){
+		// write const amplitude value only for time values within defined range
+		if ((tmtau.at(i) >= xx.front()) && (tmtau.at(i) <= xx.back())){ // TODO: after moving timevec vector out of lerp object, rename this
+			ampvec.at(i) = amp;
+		}
+	}
+	
+	// calculate phasor change due to carrier frequency
+	// divAns.resize(anslen); // unnecessary since lerp should have done it
+	Ipp64f *carrierPhase = ws->divAns.data(); // re-use since lerp doesn't require it any more
 	calcCarrierFreq_TauPhase(tau, anslen, carrierPhase);
 	
 	// now add the two phases together

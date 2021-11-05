@@ -12,14 +12,30 @@ cdef extern from "SampledLinearInterpolator.cpp":
 cdef extern from "SampledLinearInterpolator.h":
     ctypedef struct Ipp64fc:
         pass
+		
+    cdef cppclass SampledLinearInterpolatorWorkspace_64f:
+        SampledLinearInterpolatorWorkspace_64f(int) except +
     
     cdef cppclass SampledLinearInterpolator_64f:
-        SampledLinearInterpolator_64f(double*, double*, int, double) except +
+        SampledLinearInterpolator_64f(double*, int, double) except +
         
-        void lerp(double*, double*, int)
+        void lerp(double*, double*, int, SampledLinearInterpolatorWorkspace_64f*)
         
     cdef cppclass ConstAmpSigLerp_64f:
-        ConstAmpSigLerp_64f(double*, double*, int, double, double, double) except +
+        ConstAmpSigLerp_64f(double, double, double*, int, double, double, double) except +
         
-        void propagate(double*, double*, double, int, Ipp64fc*)
+        void propagate(double*, double*, double, int, Ipp64fc*, SampledLinearInterpolatorWorkspace_64f*)
+        
+    cdef cppclass ConstAmpSigLerpBursty_64f:
+        ConstAmpSigLerpBursty_64f() except +
+        
+        void addSignal(ConstAmpSigLerp_64f*)
+        void propagate(double*, double*, double*, double*, int, Ipp64fc*, SampledLinearInterpolatorWorkspace_64f*)
+        
+    cdef cppclass ConstAmpSigLerpBurstyMulti_64f:
+        ConstAmpSigLerpBurstyMulti_64f() except +
+        
+        void addSignal(ConstAmpSigLerpBursty_64f*)
+        void propagate(double*, double*, double*, double*, int, int, Ipp64fc*, int)
+        
         

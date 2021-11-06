@@ -78,6 +78,7 @@ class ConstAmpSigLerp_64f : public SampledLinearInterpolator_64f
 		ippe::vector<Ipp64f> tmtau;
 		ippe::vector<Ipp64f> ampvec;
 		ippe::vector<Ipp64f> phasevec;
+		int finalIdx;
 		
 		// Submethods
 		void calcCarrierFreq_TauPhase(const double *tau, int anslen, double *phase);
@@ -96,7 +97,11 @@ class ConstAmpSigLerp_64f : public SampledLinearInterpolator_64f
 		// Main calling function
 		void propagate(const double *t, const double *tau, const double phi, int anslen,
 						Ipp64fc *x,
-						SampledLinearInterpolatorWorkspace_64f *ws); // again, for external management
+						SampledLinearInterpolatorWorkspace_64f *ws, // again, for external management
+						int startIdx=-1); // default startIdx (helps for long timevec to specify it)
+						
+		// Getter for finalIdx
+		int getFinalIdx() { return finalIdx; }
 		
 		
 };
@@ -105,6 +110,7 @@ class ConstAmpSigLerpBursty_64f
 {
 	private:
 		std::vector<ConstAmpSigLerp_64f*> sDict; // contains the pointer to each burst
+		int finalIdx;
 		
 	public:
 		ConstAmpSigLerpBursty_64f()
@@ -120,7 +126,9 @@ class ConstAmpSigLerpBursty_64f
 		void propagate(const double *t, const double *tau, 
 						const double *phiArr, const double *tJumpArr, // these should have length == sDict.size
 						int anslen, Ipp64fc *x,
-						SampledLinearInterpolatorWorkspace_64f *ws); // again, for external management
+						SampledLinearInterpolatorWorkspace_64f *ws, // again, for external management
+						int startIdx=-1); // similar to above, helps to specify start
+		
 };
 
 // Yes the names are getting long, but i'm keeping the convention here for clarity..

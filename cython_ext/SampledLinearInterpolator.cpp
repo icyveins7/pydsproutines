@@ -45,7 +45,7 @@ void SampledLinearInterpolator_64f::lerp(const double *xxq, double *yyq, int ans
 }
 
 // ===================================================================================================================
-void ConstAmpSigLerp_64f::propagate(const double *t, const double *tau, const double phi, int anslen, Ipp64fc *x, SampledLinearInterpolatorWorkspace_64f *ws)
+void ConstAmpSigLerp_64f::propagate(const double *t, const double *tau, const double phi, int anslen, Ipp64fc *x, SampledLinearInterpolatorWorkspace_64f *ws, int startIdx)
 {
     // some resizes
 	tmtau.resize(anslen);
@@ -74,7 +74,15 @@ void ConstAmpSigLerp_64f::propagate(const double *t, const double *tau, const do
 			}
 				
 		}
+		
+		// cut loop early once it is over (assumes causality i.e. later samples cannot appear before earlier samples)
+		if (tmtau.at(i) > timevec_end){
+		    break;
+	    }
 	}
+    // save the finalIdx internally (this will be useful when iterating over multiple instances of this class,
+    // but using only 1 timevec (then we don't need to pass through the array multiple times!
+    finalIdx = endIdx;
 	
 	// now lerp the phase (resize will happen internally)
 	// but we don't need to do all of it if it's mostly zeros! use the markers
@@ -92,16 +100,15 @@ void ConstAmpSigLerp_64f::propagate(const double *t, const double *tau, const do
 	// and the constant phi
 	ippsAddC_64f_I(phi, phasevec.data(), anslen);
 	
-	// and turn it into complex
-	ippsPolarToCart_64fc(ampvec.data(), phasevec.data(), x, anslen);
+	// and turn it into complex (but only write to the viable indices)
+//	ippsPolarToCart_64fc(ampvec.data(), phasevec.data(), x, anslen);
+    ippsPolarToCart_64fc(&ampvec.at(startIdx), &phasevec.at(startIdx), &x[startIdx], endIdx - startIdx + 1); // this assumes x is pre-zeroed
 
 }
 
 void ConstAmpSigLerp_64f::calcCarrierFreq_TauPhase(const double *tau, int anslen, double *phase)
 {
 	ippsMulC_64f(tau, -IPP_2PI*fc, phase, anslen); // using the 2 pi define, DON'T PUT A 2* IN FRONT
-	// ippsMulC_64f(tau, -IPP_PI*fc, phase, anslen); // debugging
-	// ippsZero_64f(phase, anslen); // debugging
 }
 
 
@@ -114,7 +121,7 @@ void ConstAmpSigLerpBursty_64f::addSignal(ConstAmpSigLerp_64f* sig)
 void ConstAmpSigLerpBursty_64f::propagate(const double *t, const double *tau, 
 						const double *phiArr, const double *tJumpArr, // these should have length == sDict.size
 						int anslen, Ipp64fc *x,
-						SampledLinearInterpolatorWorkspace_64f *ws)
+						SampledLinearInterpolatorWorkspace_64f *ws, int startIdx)
 {
 	// note: no error-checking performed here for lengths of phiArr or tJumpArr..
 	
@@ -129,10 +136,16 @@ void ConstAmpSigLerpBursty_64f::propagate(const double *t, const double *tau,
 		// Add tau to the jump for the burst
 		ippsAddC_64f(tau, tJumpArr[i], tauPlusJump.data(), anslen);
 		// Propagate the signal
-		sDict.at(i)->propagate(t, tauPlusJump.data(), phiArr[i], anslen, xtmp.data(), ws);
+		sDict.at(i)->propagate(t, tauPlusJump.data(), phiArr[i], anslen, xtmp.data(), ws, startIdx);
 		// Add to x (the output)
 		ippsAdd_64fc_I(xtmp.data(), x, anslen);
+		
+		// Before continuing, update the startIdx to the finalIdx of the current signal, so we iterate forwards only
+		startIdx = sDict.at(i)->getFinalIdx();
 	}
+	
+	// update internal finalIdx similarly
+	finalIdx = sDict.back()->getFinalIdx();
 }
 
 
@@ -162,11 +175,11 @@ void ConstAmpSigLerpBurstyMulti_64f::propagate(
 	}
 	
 	// invoke a thread for each sig
+	int startIdx;
 	for (int i = 0; i < sigs.size(); i++){
-
-		// estimate the first index to be calculated
 		
-		// and the last index
+		// conservative estimate of startIdxs
+		startIdx = tJumpArrs[i*numBursts] / sigs.at(i)->sDict.front()-> ??? T; //  TODO:getter for T here..
 		
 		// zero the vector
 		ippsZero_64fc(xtmpvec.at(i % numThreads).data(), anslen);
@@ -181,7 +194,7 @@ void ConstAmpSigLerpBurstyMulti_64f::propagate(
 										
 		}
 		else{ // otherwise we must wait for the previous thread to end first
-			// thds.at(i % numThreads).join();
+			thds.at(i % numThreads).join();
 			// add the result into the final (no race condition since only the main thread does this
 			ippsAdd_64fc_I(xtmpvec.at(i % numThreads).data(), x, anslen);
 			// then relaunch here

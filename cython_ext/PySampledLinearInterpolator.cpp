@@ -1235,7 +1235,7 @@ struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f {
 };
 
 
-/* "PySampledLinearInterpolator.pyx":70
+/* "PySampledLinearInterpolator.pyx":71
  *         return x
  * 
  * cdef class PyConstAmpSigLerpBursty_64f:             # <<<<<<<<<<<<<<
@@ -1249,7 +1249,7 @@ struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f {
 };
 
 
-/* "PySampledLinearInterpolator.pyx":106
+/* "PySampledLinearInterpolator.pyx":109
  * 
  * 
  * cdef class PyConstAmpSigLerpBurstyMulti_64f:             # <<<<<<<<<<<<<<
@@ -1896,6 +1896,7 @@ static const char __pyx_k_timevec[] = "timevec";
 static const char __pyx_k_getstate[] = "__getstate__";
 static const char __pyx_k_phasevec[] = "phasevec";
 static const char __pyx_k_setstate[] = "__setstate__";
+static const char __pyx_k_startIdx[] = "startIdx";
 static const char __pyx_k_tJumpArr[] = "tJumpArr";
 static const char __pyx_k_TypeError[] = "TypeError";
 static const char __pyx_k_numBursts[] = "numBursts";
@@ -1951,6 +1952,7 @@ static PyObject *__pyx_n_s_reduce_ex;
 static PyObject *__pyx_n_s_setstate;
 static PyObject *__pyx_n_s_setstate_cython;
 static PyObject *__pyx_n_s_size;
+static PyObject *__pyx_n_s_startIdx;
 static PyObject *__pyx_n_s_t;
 static PyObject *__pyx_n_s_tJumpArr;
 static PyObject *__pyx_n_s_tJumpArrs;
@@ -1971,14 +1973,14 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_31PySampledLinearInterpo
 static PyObject *__pyx_pf_27PySampledLinearInterpolator_31PySampledLinearInterpolator_64f_8__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolator_64f *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
 static int __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f___cinit__(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, PyArrayObject *__pyx_v_timevec, PyArrayObject *__pyx_v_phasevec, double __pyx_v_T, double __pyx_v_amp, double __pyx_v_fc); /* proto */
 static void __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_2__dealloc__(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self); /* proto */
-static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_4propagate(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, PyArrayObject *__pyx_v_t, PyArrayObject *__pyx_v_tau, double __pyx_v_phi, struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *__pyx_v_pws); /* proto */
+static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_4propagate(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, PyArrayObject *__pyx_v_t, PyArrayObject *__pyx_v_tau, double __pyx_v_phi, struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *__pyx_v_pws, int __pyx_v_startIdx); /* proto */
 static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_6__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_8__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
 static int __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f___cinit__(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *__pyx_v_self); /* proto */
 static void __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_2__dealloc__(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_4numBursts(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_6addSignal(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *__pyx_v_self, struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_pycasl); /* proto */
-static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_8propagate(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *__pyx_v_self, PyArrayObject *__pyx_v_t, PyArrayObject *__pyx_v_tau, PyArrayObject *__pyx_v_phiArr, PyArrayObject *__pyx_v_tJumpArr, struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *__pyx_v_pws); /* proto */
+static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_8propagate(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *__pyx_v_self, PyArrayObject *__pyx_v_t, PyArrayObject *__pyx_v_tau, PyArrayObject *__pyx_v_phiArr, PyArrayObject *__pyx_v_tJumpArr, struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *__pyx_v_pws, int __pyx_v_startIdx); /* proto */
 static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_10__reduce_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_12__setstate_cython__(CYTHON_UNUSED struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *__pyx_v_self, CYTHON_UNUSED PyObject *__pyx_v___pyx_state); /* proto */
 static int __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMulti_64f___cinit__(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f *__pyx_v_self); /* proto */
@@ -3136,6 +3138,7 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
   PyArrayObject *__pyx_v_tau = 0;
   double __pyx_v_phi;
   struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *__pyx_v_pws = 0;
+  int __pyx_v_startIdx;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -3143,12 +3146,14 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("propagate (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_t,&__pyx_n_s_tau,&__pyx_n_s_phi,&__pyx_n_s_pws,0};
-    PyObject* values[4] = {0,0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_t,&__pyx_n_s_tau,&__pyx_n_s_phi,&__pyx_n_s_pws,&__pyx_n_s_startIdx,0};
+    PyObject* values[5] = {0,0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        CYTHON_FALLTHROUGH;
         case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
         CYTHON_FALLTHROUGH;
         case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
@@ -3169,40 +3174,55 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_tau)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 4, 4, 1); __PYX_ERR(1, 58, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 0, 4, 5, 1); __PYX_ERR(1, 58, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_phi)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 4, 4, 2); __PYX_ERR(1, 58, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 0, 4, 5, 2); __PYX_ERR(1, 58, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_pws)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 4, 4, 3); __PYX_ERR(1, 58, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 0, 4, 5, 3); __PYX_ERR(1, 58, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  4:
+        if (kw_args > 0) {
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_startIdx);
+          if (value) { values[4] = value; kw_args--; }
         }
       }
       if (unlikely(kw_args > 0)) {
         if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "propagate") < 0)) __PYX_ERR(1, 58, __pyx_L3_error)
       }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
-      goto __pyx_L5_argtuple_error;
     } else {
-      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
-      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
-      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
-      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+      switch (PyTuple_GET_SIZE(__pyx_args)) {
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        CYTHON_FALLTHROUGH;
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        break;
+        default: goto __pyx_L5_argtuple_error;
+      }
     }
     __pyx_v_t = ((PyArrayObject *)values[0]);
     __pyx_v_tau = ((PyArrayObject *)values[1]);
     __pyx_v_phi = __pyx_PyFloat_AsDouble(values[2]); if (unlikely((__pyx_v_phi == (double)-1) && PyErr_Occurred())) __PYX_ERR(1, 60, __pyx_L3_error)
     __pyx_v_pws = ((struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *)values[3]);
+    if (values[4]) {
+      __pyx_v_startIdx = __Pyx_PyInt_As_int(values[4]); if (unlikely((__pyx_v_startIdx == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 62, __pyx_L3_error)
+    } else {
+      __pyx_v_startIdx = ((int)-1);
+    }
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("propagate", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 58, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("propagate", 0, 4, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 58, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("PySampledLinearInterpolator.PyConstAmpSigLerp_64f.propagate", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -3211,7 +3231,7 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_t), __pyx_ptype_5numpy_ndarray, 1, "t", 0))) __PYX_ERR(1, 58, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_tau), __pyx_ptype_5numpy_ndarray, 1, "tau", 0))) __PYX_ERR(1, 59, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_pws), __pyx_ptype_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f, 1, "pws", 0))) __PYX_ERR(1, 61, __pyx_L1_error)
-  __pyx_r = __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_4propagate(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *)__pyx_v_self), __pyx_v_t, __pyx_v_tau, __pyx_v_phi, __pyx_v_pws);
+  __pyx_r = __pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_4propagate(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *)__pyx_v_self), __pyx_v_t, __pyx_v_tau, __pyx_v_phi, __pyx_v_pws, __pyx_v_startIdx);
 
   /* function exit code */
   goto __pyx_L0;
@@ -3222,7 +3242,7 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_4propagate(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, PyArrayObject *__pyx_v_t, PyArrayObject *__pyx_v_tau, double __pyx_v_phi, struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *__pyx_v_pws) {
+static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_4propagate(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *__pyx_v_self, PyArrayObject *__pyx_v_t, PyArrayObject *__pyx_v_tau, double __pyx_v_phi, struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *__pyx_v_pws, int __pyx_v_startIdx) {
   PyArrayObject *__pyx_v_x = 0;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_t;
   __Pyx_Buffer __pyx_pybuffer_t;
@@ -3261,8 +3281,8 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
   }
   __pyx_pybuffernd_tau.diminfo[0].strides = __pyx_pybuffernd_tau.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_tau.diminfo[0].shape = __pyx_pybuffernd_tau.rcbuffer->pybuffer.shape[0];
 
-  /* "PySampledLinearInterpolator.pyx":63
- *                         PySampledLinearInterpolatorWorkspace_64f pws):
+  /* "PySampledLinearInterpolator.pyx":64
+ *                         int startIdx=-1):
  * 
  *         assert(t.size == tau.size)             # <<<<<<<<<<<<<<
  *         cdef np.ndarray x = np.zeros(t.size, np.complex128)
@@ -3270,39 +3290,39 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
  */
   #ifndef CYTHON_WITHOUT_ASSERTIONS
   if (unlikely(!Py_OptimizeFlag)) {
-    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 63, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 64, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tau), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 63, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tau), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 64, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 63, __pyx_L1_error)
+    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 64, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 63, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 64, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     if (unlikely(!__pyx_t_4)) {
       PyErr_SetNone(PyExc_AssertionError);
-      __PYX_ERR(1, 63, __pyx_L1_error)
+      __PYX_ERR(1, 64, __pyx_L1_error)
     }
   }
   #endif
 
-  /* "PySampledLinearInterpolator.pyx":64
+  /* "PySampledLinearInterpolator.pyx":65
  * 
  *         assert(t.size == tau.size)
  *         cdef np.ndarray x = np.zeros(t.size, np.complex128)             # <<<<<<<<<<<<<<
  *         self.sig.propagate(<double*>t.data, <double*>tau.data, phi, t.size, <Ipp64fc*>x.data,
- *                            <SampledLinearInterpolatorWorkspace_64f*>pws.ws)
+ *                            <SampledLinearInterpolatorWorkspace_64f*>pws.ws, startIdx)
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 64, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 65, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 64, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 65, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 64, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 65, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 64, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 65, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_complex128); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 64, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_complex128); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 65, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_5 = NULL;
@@ -3320,7 +3340,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
   #if CYTHON_FAST_PYCALL
   if (PyFunction_Check(__pyx_t_1)) {
     PyObject *__pyx_temp[3] = {__pyx_t_5, __pyx_t_2, __pyx_t_6};
-    __pyx_t_3 = __Pyx_PyFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 64, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 65, __pyx_L1_error)
     __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
@@ -3330,7 +3350,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
   #if CYTHON_FAST_PYCCALL
   if (__Pyx_PyFastCFunction_Check(__pyx_t_1)) {
     PyObject *__pyx_temp[3] = {__pyx_t_5, __pyx_t_2, __pyx_t_6};
-    __pyx_t_3 = __Pyx_PyCFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 64, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyCFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 65, __pyx_L1_error)
     __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
@@ -3338,7 +3358,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
   } else
   #endif
   {
-    __pyx_t_8 = PyTuple_New(2+__pyx_t_7); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 64, __pyx_L1_error)
+    __pyx_t_8 = PyTuple_New(2+__pyx_t_7); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 65, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
     if (__pyx_t_5) {
       __Pyx_GIVEREF(__pyx_t_5); PyTuple_SET_ITEM(__pyx_t_8, 0, __pyx_t_5); __pyx_t_5 = NULL;
@@ -3349,38 +3369,38 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
     PyTuple_SET_ITEM(__pyx_t_8, 1+__pyx_t_7, __pyx_t_6);
     __pyx_t_2 = 0;
     __pyx_t_6 = 0;
-    __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_8, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 64, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_8, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 65, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(1, 64, __pyx_L1_error)
+  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(1, 65, __pyx_L1_error)
   __pyx_v_x = ((PyArrayObject *)__pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "PySampledLinearInterpolator.pyx":65
+  /* "PySampledLinearInterpolator.pyx":66
  *         assert(t.size == tau.size)
  *         cdef np.ndarray x = np.zeros(t.size, np.complex128)
  *         self.sig.propagate(<double*>t.data, <double*>tau.data, phi, t.size, <Ipp64fc*>x.data,             # <<<<<<<<<<<<<<
- *                            <SampledLinearInterpolatorWorkspace_64f*>pws.ws)
+ *                            <SampledLinearInterpolatorWorkspace_64f*>pws.ws, startIdx)
  * 
  */
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 65, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 66, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_3); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 65, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_3); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 66, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "PySampledLinearInterpolator.pyx":66
+  /* "PySampledLinearInterpolator.pyx":67
  *         cdef np.ndarray x = np.zeros(t.size, np.complex128)
  *         self.sig.propagate(<double*>t.data, <double*>tau.data, phi, t.size, <Ipp64fc*>x.data,
- *                            <SampledLinearInterpolatorWorkspace_64f*>pws.ws)             # <<<<<<<<<<<<<<
+ *                            <SampledLinearInterpolatorWorkspace_64f*>pws.ws, startIdx)             # <<<<<<<<<<<<<<
  * 
  *         return x
  */
-  __pyx_v_self->sig->propagate(((double *)__pyx_v_t->data), ((double *)__pyx_v_tau->data), __pyx_v_phi, __pyx_t_7, ((Ipp64fc *)__pyx_v_x->data), ((SampledLinearInterpolatorWorkspace_64f *)__pyx_v_pws->ws));
+  __pyx_v_self->sig->propagate(((double *)__pyx_v_t->data), ((double *)__pyx_v_tau->data), __pyx_v_phi, __pyx_t_7, ((Ipp64fc *)__pyx_v_x->data), ((SampledLinearInterpolatorWorkspace_64f *)__pyx_v_pws->ws), __pyx_v_startIdx);
 
-  /* "PySampledLinearInterpolator.pyx":68
- *                            <SampledLinearInterpolatorWorkspace_64f*>pws.ws)
+  /* "PySampledLinearInterpolator.pyx":69
+ *                            <SampledLinearInterpolatorWorkspace_64f*>pws.ws, startIdx)
  * 
  *         return x             # <<<<<<<<<<<<<<
  * 
@@ -3540,7 +3560,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_21PyConstAmpSigLerp_64f_
   return __pyx_r;
 }
 
-/* "PySampledLinearInterpolator.pyx":74
+/* "PySampledLinearInterpolator.pyx":75
  *     cdef int _numBursts
  * 
  *     def __cinit__(self):             # <<<<<<<<<<<<<<
@@ -3573,7 +3593,7 @@ static int __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__cinit__", 0);
 
-  /* "PySampledLinearInterpolator.pyx":75
+  /* "PySampledLinearInterpolator.pyx":76
  * 
  *     def __cinit__(self):
  *         self.sigb = new ConstAmpSigLerpBursty_64f()             # <<<<<<<<<<<<<<
@@ -3584,11 +3604,11 @@ static int __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_
     __pyx_t_1 = new ConstAmpSigLerpBursty_64f();
   } catch(...) {
     __Pyx_CppExn2PyErr();
-    __PYX_ERR(1, 75, __pyx_L1_error)
+    __PYX_ERR(1, 76, __pyx_L1_error)
   }
   __pyx_v_self->sigb = __pyx_t_1;
 
-  /* "PySampledLinearInterpolator.pyx":76
+  /* "PySampledLinearInterpolator.pyx":77
  *     def __cinit__(self):
  *         self.sigb = new ConstAmpSigLerpBursty_64f()
  *         self._numBursts = 0             # <<<<<<<<<<<<<<
@@ -3597,7 +3617,7 @@ static int __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_
  */
   __pyx_v_self->_numBursts = 0;
 
-  /* "PySampledLinearInterpolator.pyx":74
+  /* "PySampledLinearInterpolator.pyx":75
  *     cdef int _numBursts
  * 
  *     def __cinit__(self):             # <<<<<<<<<<<<<<
@@ -3616,7 +3636,7 @@ static int __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_
   return __pyx_r;
 }
 
-/* "PySampledLinearInterpolator.pyx":78
+/* "PySampledLinearInterpolator.pyx":79
  *         self._numBursts = 0
  * 
  *     def __dealloc__(self):             # <<<<<<<<<<<<<<
@@ -3639,7 +3659,7 @@ static void __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__dealloc__", 0);
 
-  /* "PySampledLinearInterpolator.pyx":79
+  /* "PySampledLinearInterpolator.pyx":80
  * 
  *     def __dealloc__(self):
  *         del self.sigb             # <<<<<<<<<<<<<<
@@ -3648,7 +3668,7 @@ static void __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f
  */
   delete __pyx_v_self->sigb;
 
-  /* "PySampledLinearInterpolator.pyx":78
+  /* "PySampledLinearInterpolator.pyx":79
  *         self._numBursts = 0
  * 
  *     def __dealloc__(self):             # <<<<<<<<<<<<<<
@@ -3660,7 +3680,7 @@ static void __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f
   __Pyx_RefNannyFinishContext();
 }
 
-/* "PySampledLinearInterpolator.pyx":81
+/* "PySampledLinearInterpolator.pyx":82
  *         del self.sigb
  * 
  *     def numBursts(self):             # <<<<<<<<<<<<<<
@@ -3690,7 +3710,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("numBursts", 0);
 
-  /* "PySampledLinearInterpolator.pyx":82
+  /* "PySampledLinearInterpolator.pyx":83
  * 
  *     def numBursts(self):
  *         return self._numBursts             # <<<<<<<<<<<<<<
@@ -3698,13 +3718,13 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
  *     def addSignal(self, PyConstAmpSigLerp_64f pycasl):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyInt_From_int(__pyx_v_self->_numBursts); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 82, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_From_int(__pyx_v_self->_numBursts); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 83, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "PySampledLinearInterpolator.pyx":81
+  /* "PySampledLinearInterpolator.pyx":82
  *         del self.sigb
  * 
  *     def numBursts(self):             # <<<<<<<<<<<<<<
@@ -3723,7 +3743,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   return __pyx_r;
 }
 
-/* "PySampledLinearInterpolator.pyx":84
+/* "PySampledLinearInterpolator.pyx":85
  *         return self._numBursts
  * 
  *     def addSignal(self, PyConstAmpSigLerp_64f pycasl):             # <<<<<<<<<<<<<<
@@ -3740,7 +3760,7 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("addSignal (wrapper)", 0);
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_pycasl), __pyx_ptype_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f, 1, "pycasl", 0))) __PYX_ERR(1, 84, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_pycasl), __pyx_ptype_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f, 1, "pycasl", 0))) __PYX_ERR(1, 85, __pyx_L1_error)
   __pyx_r = __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_6addSignal(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *)__pyx_v_self), ((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f *)__pyx_v_pycasl));
 
   /* function exit code */
@@ -3757,7 +3777,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("addSignal", 0);
 
-  /* "PySampledLinearInterpolator.pyx":85
+  /* "PySampledLinearInterpolator.pyx":86
  * 
  *     def addSignal(self, PyConstAmpSigLerp_64f pycasl):
  *         self.sigb.addSignal(<ConstAmpSigLerp_64f*>pycasl.sig)             # <<<<<<<<<<<<<<
@@ -3766,7 +3786,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
  */
   __pyx_v_self->sigb->addSignal(((ConstAmpSigLerp_64f *)__pyx_v_pycasl->sig));
 
-  /* "PySampledLinearInterpolator.pyx":86
+  /* "PySampledLinearInterpolator.pyx":87
  *     def addSignal(self, PyConstAmpSigLerp_64f pycasl):
  *         self.sigb.addSignal(<ConstAmpSigLerp_64f*>pycasl.sig)
  *         self._numBursts = self._numBursts + 1             # <<<<<<<<<<<<<<
@@ -3775,7 +3795,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
  */
   __pyx_v_self->_numBursts = (__pyx_v_self->_numBursts + 1);
 
-  /* "PySampledLinearInterpolator.pyx":84
+  /* "PySampledLinearInterpolator.pyx":85
  *         return self._numBursts
  * 
  *     def addSignal(self, PyConstAmpSigLerp_64f pycasl):             # <<<<<<<<<<<<<<
@@ -3790,7 +3810,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   return __pyx_r;
 }
 
-/* "PySampledLinearInterpolator.pyx":88
+/* "PySampledLinearInterpolator.pyx":89
  *         self._numBursts = self._numBursts + 1
  * 
  *     def propagate(self, np.ndarray[np.float64_t, ndim=1] t,             # <<<<<<<<<<<<<<
@@ -3806,6 +3826,7 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   PyArrayObject *__pyx_v_phiArr = 0;
   PyArrayObject *__pyx_v_tJumpArr = 0;
   struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *__pyx_v_pws = 0;
+  int __pyx_v_startIdx;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -3813,12 +3834,14 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("propagate (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_t,&__pyx_n_s_tau,&__pyx_n_s_phiArr,&__pyx_n_s_tJumpArr,&__pyx_n_s_pws,0};
-    PyObject* values[5] = {0,0,0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_t,&__pyx_n_s_tau,&__pyx_n_s_phiArr,&__pyx_n_s_tJumpArr,&__pyx_n_s_pws,&__pyx_n_s_startIdx,0};
+    PyObject* values[6] = {0,0,0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+        CYTHON_FALLTHROUGH;
         case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
         CYTHON_FALLTHROUGH;
         case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
@@ -3841,59 +3864,74 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_tau)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 1); __PYX_ERR(1, 88, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 0, 5, 6, 1); __PYX_ERR(1, 89, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_phiArr)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 2); __PYX_ERR(1, 88, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 0, 5, 6, 2); __PYX_ERR(1, 89, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_tJumpArr)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 3); __PYX_ERR(1, 88, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 0, 5, 6, 3); __PYX_ERR(1, 89, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  4:
         if (likely((values[4] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_pws)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 4); __PYX_ERR(1, 88, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 0, 5, 6, 4); __PYX_ERR(1, 89, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  5:
+        if (kw_args > 0) {
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_startIdx);
+          if (value) { values[5] = value; kw_args--; }
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "propagate") < 0)) __PYX_ERR(1, 88, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "propagate") < 0)) __PYX_ERR(1, 89, __pyx_L3_error)
       }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 5) {
-      goto __pyx_L5_argtuple_error;
     } else {
-      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
-      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
-      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
-      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
-      values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+      switch (PyTuple_GET_SIZE(__pyx_args)) {
+        case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+        CYTHON_FALLTHROUGH;
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        break;
+        default: goto __pyx_L5_argtuple_error;
+      }
     }
     __pyx_v_t = ((PyArrayObject *)values[0]);
     __pyx_v_tau = ((PyArrayObject *)values[1]);
     __pyx_v_phiArr = ((PyArrayObject *)values[2]);
     __pyx_v_tJumpArr = ((PyArrayObject *)values[3]);
     __pyx_v_pws = ((struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *)values[4]);
+    if (values[5]) {
+      __pyx_v_startIdx = __Pyx_PyInt_As_int(values[5]); if (unlikely((__pyx_v_startIdx == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 94, __pyx_L3_error)
+    } else {
+      __pyx_v_startIdx = ((int)-1);
+    }
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 88, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("propagate", 0, 5, 6, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 89, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("PySampledLinearInterpolator.PyConstAmpSigLerpBursty_64f.propagate", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_t), __pyx_ptype_5numpy_ndarray, 1, "t", 0))) __PYX_ERR(1, 88, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_tau), __pyx_ptype_5numpy_ndarray, 1, "tau", 0))) __PYX_ERR(1, 89, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_phiArr), __pyx_ptype_5numpy_ndarray, 1, "phiArr", 0))) __PYX_ERR(1, 90, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_tJumpArr), __pyx_ptype_5numpy_ndarray, 1, "tJumpArr", 0))) __PYX_ERR(1, 91, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_pws), __pyx_ptype_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f, 1, "pws", 0))) __PYX_ERR(1, 92, __pyx_L1_error)
-  __pyx_r = __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_8propagate(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *)__pyx_v_self), __pyx_v_t, __pyx_v_tau, __pyx_v_phiArr, __pyx_v_tJumpArr, __pyx_v_pws);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_t), __pyx_ptype_5numpy_ndarray, 1, "t", 0))) __PYX_ERR(1, 89, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_tau), __pyx_ptype_5numpy_ndarray, 1, "tau", 0))) __PYX_ERR(1, 90, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_phiArr), __pyx_ptype_5numpy_ndarray, 1, "phiArr", 0))) __PYX_ERR(1, 91, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_tJumpArr), __pyx_ptype_5numpy_ndarray, 1, "tJumpArr", 0))) __PYX_ERR(1, 92, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_pws), __pyx_ptype_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f, 1, "pws", 0))) __PYX_ERR(1, 93, __pyx_L1_error)
+  __pyx_r = __pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_8propagate(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *)__pyx_v_self), __pyx_v_t, __pyx_v_tau, __pyx_v_phiArr, __pyx_v_tJumpArr, __pyx_v_pws, __pyx_v_startIdx);
 
   /* function exit code */
   goto __pyx_L0;
@@ -3904,7 +3942,7 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_8propagate(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *__pyx_v_self, PyArrayObject *__pyx_v_t, PyArrayObject *__pyx_v_tau, PyArrayObject *__pyx_v_phiArr, PyArrayObject *__pyx_v_tJumpArr, struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *__pyx_v_pws) {
+static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBursty_64f_8propagate(struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *__pyx_v_self, PyArrayObject *__pyx_v_t, PyArrayObject *__pyx_v_tau, PyArrayObject *__pyx_v_phiArr, PyArrayObject *__pyx_v_tJumpArr, struct __pyx_obj_27PySampledLinearInterpolator_PySampledLinearInterpolatorWorkspace_64f *__pyx_v_pws, int __pyx_v_startIdx) {
   PyArrayObject *__pyx_v_x = 0;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_phiArr;
   __Pyx_Buffer __pyx_pybuffer_phiArr;
@@ -3946,27 +3984,27 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   __pyx_pybuffernd_tJumpArr.rcbuffer = &__pyx_pybuffer_tJumpArr;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_t.rcbuffer->pybuffer, (PyObject*)__pyx_v_t, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 88, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_t.rcbuffer->pybuffer, (PyObject*)__pyx_v_t, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 89, __pyx_L1_error)
   }
   __pyx_pybuffernd_t.diminfo[0].strides = __pyx_pybuffernd_t.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_t.diminfo[0].shape = __pyx_pybuffernd_t.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tau.rcbuffer->pybuffer, (PyObject*)__pyx_v_tau, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 88, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tau.rcbuffer->pybuffer, (PyObject*)__pyx_v_tau, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 89, __pyx_L1_error)
   }
   __pyx_pybuffernd_tau.diminfo[0].strides = __pyx_pybuffernd_tau.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_tau.diminfo[0].shape = __pyx_pybuffernd_tau.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_phiArr.rcbuffer->pybuffer, (PyObject*)__pyx_v_phiArr, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 88, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_phiArr.rcbuffer->pybuffer, (PyObject*)__pyx_v_phiArr, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 89, __pyx_L1_error)
   }
   __pyx_pybuffernd_phiArr.diminfo[0].strides = __pyx_pybuffernd_phiArr.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_phiArr.diminfo[0].shape = __pyx_pybuffernd_phiArr.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tJumpArr.rcbuffer->pybuffer, (PyObject*)__pyx_v_tJumpArr, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 88, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tJumpArr.rcbuffer->pybuffer, (PyObject*)__pyx_v_tJumpArr, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 89, __pyx_L1_error)
   }
   __pyx_pybuffernd_tJumpArr.diminfo[0].strides = __pyx_pybuffernd_tJumpArr.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_tJumpArr.diminfo[0].shape = __pyx_pybuffernd_tJumpArr.rcbuffer->pybuffer.shape[0];
 
-  /* "PySampledLinearInterpolator.pyx":94
- *                         PySampledLinearInterpolatorWorkspace_64f pws):
+  /* "PySampledLinearInterpolator.pyx":96
+ *                         int startIdx=-1):
  * 
  *         assert(t.size==tau.size)             # <<<<<<<<<<<<<<
  *         assert(phiArr.size == tJumpArr.size)
@@ -3974,59 +4012,9 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
  */
   #ifndef CYTHON_WITHOUT_ASSERTIONS
   if (unlikely(!Py_OptimizeFlag)) {
-    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 94, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 96, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tau), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 94, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 94, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 94, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    if (unlikely(!__pyx_t_4)) {
-      PyErr_SetNone(PyExc_AssertionError);
-      __PYX_ERR(1, 94, __pyx_L1_error)
-    }
-  }
-  #endif
-
-  /* "PySampledLinearInterpolator.pyx":95
- * 
- *         assert(t.size==tau.size)
- *         assert(phiArr.size == tJumpArr.size)             # <<<<<<<<<<<<<<
- *         assert(phiArr.size == self._numBursts)
- * 
- */
-  #ifndef CYTHON_WITHOUT_ASSERTIONS
-  if (unlikely(!Py_OptimizeFlag)) {
-    __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_phiArr), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 95, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_3);
-    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tJumpArr), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 95, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_1 = PyObject_RichCompare(__pyx_t_3, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_1); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 95, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_1); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 95, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-    if (unlikely(!__pyx_t_4)) {
-      PyErr_SetNone(PyExc_AssertionError);
-      __PYX_ERR(1, 95, __pyx_L1_error)
-    }
-  }
-  #endif
-
-  /* "PySampledLinearInterpolator.pyx":96
- *         assert(t.size==tau.size)
- *         assert(phiArr.size == tJumpArr.size)
- *         assert(phiArr.size == self._numBursts)             # <<<<<<<<<<<<<<
- * 
- *         cdef np.ndarray x = np.zeros(t.size, np.complex128)
- */
-  #ifndef CYTHON_WITHOUT_ASSERTIONS
-  if (unlikely(!Py_OptimizeFlag)) {
-    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_phiArr), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 96, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_self->_numBursts); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 96, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tau), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 96, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
     __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 96, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
@@ -4040,23 +4028,73 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   }
   #endif
 
+  /* "PySampledLinearInterpolator.pyx":97
+ * 
+ *         assert(t.size==tau.size)
+ *         assert(phiArr.size == tJumpArr.size)             # <<<<<<<<<<<<<<
+ *         assert(phiArr.size == self._numBursts)
+ * 
+ */
+  #ifndef CYTHON_WITHOUT_ASSERTIONS
+  if (unlikely(!Py_OptimizeFlag)) {
+    __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_phiArr), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 97, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_3);
+    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tJumpArr), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 97, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_2);
+    __pyx_t_1 = PyObject_RichCompare(__pyx_t_3, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_1); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 97, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_1); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 97, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    if (unlikely(!__pyx_t_4)) {
+      PyErr_SetNone(PyExc_AssertionError);
+      __PYX_ERR(1, 97, __pyx_L1_error)
+    }
+  }
+  #endif
+
   /* "PySampledLinearInterpolator.pyx":98
+ *         assert(t.size==tau.size)
+ *         assert(phiArr.size == tJumpArr.size)
+ *         assert(phiArr.size == self._numBursts)             # <<<<<<<<<<<<<<
+ * 
+ *         cdef np.ndarray x = np.zeros(t.size, np.complex128)
+ */
+  #ifndef CYTHON_WITHOUT_ASSERTIONS
+  if (unlikely(!Py_OptimizeFlag)) {
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_phiArr), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 98, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_1);
+    __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_self->_numBursts); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 98, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_2);
+    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 98, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+    __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 98, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+    if (unlikely(!__pyx_t_4)) {
+      PyErr_SetNone(PyExc_AssertionError);
+      __PYX_ERR(1, 98, __pyx_L1_error)
+    }
+  }
+  #endif
+
+  /* "PySampledLinearInterpolator.pyx":100
  *         assert(phiArr.size == self._numBursts)
  * 
  *         cdef np.ndarray x = np.zeros(t.size, np.complex128)             # <<<<<<<<<<<<<<
  *         self.sigb.propagate(<double*>t.data, <double*>tau.data, <double*>phiArr.data, <double*>tJumpArr.data,
  *                             t.size, <Ipp64fc*>x.data,
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 98, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 100, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 98, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 100, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 98, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 100, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 98, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 100, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_complex128); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 98, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_complex128); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 100, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_5 = NULL;
@@ -4074,7 +4112,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   #if CYTHON_FAST_PYCALL
   if (PyFunction_Check(__pyx_t_1)) {
     PyObject *__pyx_temp[3] = {__pyx_t_5, __pyx_t_2, __pyx_t_6};
-    __pyx_t_3 = __Pyx_PyFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 98, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 100, __pyx_L1_error)
     __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
@@ -4084,7 +4122,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   #if CYTHON_FAST_PYCCALL
   if (__Pyx_PyFastCFunction_Check(__pyx_t_1)) {
     PyObject *__pyx_temp[3] = {__pyx_t_5, __pyx_t_2, __pyx_t_6};
-    __pyx_t_3 = __Pyx_PyCFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 98, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyCFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 100, __pyx_L1_error)
     __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
@@ -4092,7 +4130,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   } else
   #endif
   {
-    __pyx_t_8 = PyTuple_New(2+__pyx_t_7); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 98, __pyx_L1_error)
+    __pyx_t_8 = PyTuple_New(2+__pyx_t_7); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 100, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
     if (__pyx_t_5) {
       __Pyx_GIVEREF(__pyx_t_5); PyTuple_SET_ITEM(__pyx_t_8, 0, __pyx_t_5); __pyx_t_5 = NULL;
@@ -4103,38 +4141,38 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
     PyTuple_SET_ITEM(__pyx_t_8, 1+__pyx_t_7, __pyx_t_6);
     __pyx_t_2 = 0;
     __pyx_t_6 = 0;
-    __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_8, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 98, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_8, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 100, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(1, 98, __pyx_L1_error)
+  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(1, 100, __pyx_L1_error)
   __pyx_v_x = ((PyArrayObject *)__pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "PySampledLinearInterpolator.pyx":100
+  /* "PySampledLinearInterpolator.pyx":102
  *         cdef np.ndarray x = np.zeros(t.size, np.complex128)
  *         self.sigb.propagate(<double*>t.data, <double*>tau.data, <double*>phiArr.data, <double*>tJumpArr.data,
  *                             t.size, <Ipp64fc*>x.data,             # <<<<<<<<<<<<<<
- *                             <SampledLinearInterpolatorWorkspace_64f*>pws.ws)
- * 
+ *                             <SampledLinearInterpolatorWorkspace_64f*>pws.ws,
+ *                             startIdx)
  */
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 100, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 102, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_3); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 100, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_3); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 102, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "PySampledLinearInterpolator.pyx":99
+  /* "PySampledLinearInterpolator.pyx":101
  * 
  *         cdef np.ndarray x = np.zeros(t.size, np.complex128)
  *         self.sigb.propagate(<double*>t.data, <double*>tau.data, <double*>phiArr.data, <double*>tJumpArr.data,             # <<<<<<<<<<<<<<
  *                             t.size, <Ipp64fc*>x.data,
- *                             <SampledLinearInterpolatorWorkspace_64f*>pws.ws)
+ *                             <SampledLinearInterpolatorWorkspace_64f*>pws.ws,
  */
-  __pyx_v_self->sigb->propagate(((double *)__pyx_v_t->data), ((double *)__pyx_v_tau->data), ((double *)__pyx_v_phiArr->data), ((double *)__pyx_v_tJumpArr->data), __pyx_t_7, ((Ipp64fc *)__pyx_v_x->data), ((SampledLinearInterpolatorWorkspace_64f *)__pyx_v_pws->ws));
+  (void)(__pyx_v_self->sigb->propagate(((double *)__pyx_v_t->data), ((double *)__pyx_v_tau->data), ((double *)__pyx_v_phiArr->data), ((double *)__pyx_v_tJumpArr->data), __pyx_t_7, ((Ipp64fc *)__pyx_v_x->data), ((SampledLinearInterpolatorWorkspace_64f *)__pyx_v_pws->ws), __pyx_v_startIdx));
 
-  /* "PySampledLinearInterpolator.pyx":103
- *                             <SampledLinearInterpolatorWorkspace_64f*>pws.ws)
+  /* "PySampledLinearInterpolator.pyx":106
+ *                             startIdx)
  * 
  *         return x             # <<<<<<<<<<<<<<
  * 
@@ -4145,7 +4183,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   __pyx_r = ((PyObject *)__pyx_v_x);
   goto __pyx_L0;
 
-  /* "PySampledLinearInterpolator.pyx":88
+  /* "PySampledLinearInterpolator.pyx":89
  *         self._numBursts = self._numBursts + 1
  * 
  *     def propagate(self, np.ndarray[np.float64_t, ndim=1] t,             # <<<<<<<<<<<<<<
@@ -4298,7 +4336,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_27PyConstAmpSigLerpBurst
   return __pyx_r;
 }
 
-/* "PySampledLinearInterpolator.pyx":111
+/* "PySampledLinearInterpolator.pyx":114
  *     cdef int numBursts
  * 
  *     def __cinit__(self):             # <<<<<<<<<<<<<<
@@ -4331,7 +4369,7 @@ static int __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMulti
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__cinit__", 0);
 
-  /* "PySampledLinearInterpolator.pyx":112
+  /* "PySampledLinearInterpolator.pyx":115
  * 
  *     def __cinit__(self):
  *         self.sigbm = new ConstAmpSigLerpBurstyMulti_64f()             # <<<<<<<<<<<<<<
@@ -4342,11 +4380,11 @@ static int __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMulti
     __pyx_t_1 = new ConstAmpSigLerpBurstyMulti_64f();
   } catch(...) {
     __Pyx_CppExn2PyErr();
-    __PYX_ERR(1, 112, __pyx_L1_error)
+    __PYX_ERR(1, 115, __pyx_L1_error)
   }
   __pyx_v_self->sigbm = __pyx_t_1;
 
-  /* "PySampledLinearInterpolator.pyx":113
+  /* "PySampledLinearInterpolator.pyx":116
  *     def __cinit__(self):
  *         self.sigbm = new ConstAmpSigLerpBurstyMulti_64f()
  *         self.numBursts = -1             # <<<<<<<<<<<<<<
@@ -4355,7 +4393,7 @@ static int __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMulti
  */
   __pyx_v_self->numBursts = -1;
 
-  /* "PySampledLinearInterpolator.pyx":114
+  /* "PySampledLinearInterpolator.pyx":117
  *         self.sigbm = new ConstAmpSigLerpBurstyMulti_64f()
  *         self.numBursts = -1
  *         self.numSig = 0             # <<<<<<<<<<<<<<
@@ -4364,7 +4402,7 @@ static int __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMulti
  */
   __pyx_v_self->numSig = 0;
 
-  /* "PySampledLinearInterpolator.pyx":111
+  /* "PySampledLinearInterpolator.pyx":114
  *     cdef int numBursts
  * 
  *     def __cinit__(self):             # <<<<<<<<<<<<<<
@@ -4383,7 +4421,7 @@ static int __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMulti
   return __pyx_r;
 }
 
-/* "PySampledLinearInterpolator.pyx":116
+/* "PySampledLinearInterpolator.pyx":119
  *         self.numSig = 0
  * 
  *     def __dealloc__(self):             # <<<<<<<<<<<<<<
@@ -4406,7 +4444,7 @@ static void __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMult
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__dealloc__", 0);
 
-  /* "PySampledLinearInterpolator.pyx":117
+  /* "PySampledLinearInterpolator.pyx":120
  * 
  *     def __dealloc__(self):
  *         del self.sigbm             # <<<<<<<<<<<<<<
@@ -4415,7 +4453,7 @@ static void __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMult
  */
   delete __pyx_v_self->sigbm;
 
-  /* "PySampledLinearInterpolator.pyx":116
+  /* "PySampledLinearInterpolator.pyx":119
  *         self.numSig = 0
  * 
  *     def __dealloc__(self):             # <<<<<<<<<<<<<<
@@ -4427,7 +4465,7 @@ static void __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMult
   __Pyx_RefNannyFinishContext();
 }
 
-/* "PySampledLinearInterpolator.pyx":119
+/* "PySampledLinearInterpolator.pyx":122
  *         del self.sigbm
  * 
  *     def addSignal(self, PyConstAmpSigLerpBursty_64f pycaslb):             # <<<<<<<<<<<<<<
@@ -4444,7 +4482,7 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("addSignal (wrapper)", 0);
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_pycaslb), __pyx_ptype_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f, 1, "pycaslb", 0))) __PYX_ERR(1, 119, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_pycaslb), __pyx_ptype_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f, 1, "pycaslb", 0))) __PYX_ERR(1, 122, __pyx_L1_error)
   __pyx_r = __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMulti_64f_4addSignal(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f *)__pyx_v_self), ((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f *)__pyx_v_pycaslb));
 
   /* function exit code */
@@ -4470,7 +4508,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("addSignal", 0);
 
-  /* "PySampledLinearInterpolator.pyx":120
+  /* "PySampledLinearInterpolator.pyx":123
  * 
  *     def addSignal(self, PyConstAmpSigLerpBursty_64f pycaslb):
  *         self.sigbm.addSignal(pycaslb.sigb)             # <<<<<<<<<<<<<<
@@ -4479,7 +4517,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
  */
   __pyx_v_self->sigbm->addSignal(__pyx_v_pycaslb->sigb);
 
-  /* "PySampledLinearInterpolator.pyx":121
+  /* "PySampledLinearInterpolator.pyx":124
  *     def addSignal(self, PyConstAmpSigLerpBursty_64f pycaslb):
  *         self.sigbm.addSignal(pycaslb.sigb)
  *         if (self.numBursts == -1):             # <<<<<<<<<<<<<<
@@ -4489,14 +4527,14 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
   __pyx_t_1 = ((__pyx_v_self->numBursts == -1L) != 0);
   if (__pyx_t_1) {
 
-    /* "PySampledLinearInterpolator.pyx":122
+    /* "PySampledLinearInterpolator.pyx":125
  *         self.sigbm.addSignal(pycaslb.sigb)
  *         if (self.numBursts == -1):
  *             self.numBursts = pycaslb.numBursts()             # <<<<<<<<<<<<<<
  *         else:
  *             assert(self.numBursts == pycaslb.numBursts()) # make sure they are all the same number of bursts
  */
-    __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_pycaslb), __pyx_n_s_numBursts); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 122, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_pycaslb), __pyx_n_s_numBursts); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 125, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     __pyx_t_4 = NULL;
     if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_3))) {
@@ -4510,14 +4548,14 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
     }
     __pyx_t_2 = (__pyx_t_4) ? __Pyx_PyObject_CallOneArg(__pyx_t_3, __pyx_t_4) : __Pyx_PyObject_CallNoArg(__pyx_t_3);
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 122, __pyx_L1_error)
+    if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 125, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    __pyx_t_5 = __Pyx_PyInt_As_int(__pyx_t_2); if (unlikely((__pyx_t_5 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 122, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_PyInt_As_int(__pyx_t_2); if (unlikely((__pyx_t_5 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 125, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     __pyx_v_self->numBursts = __pyx_t_5;
 
-    /* "PySampledLinearInterpolator.pyx":121
+    /* "PySampledLinearInterpolator.pyx":124
  *     def addSignal(self, PyConstAmpSigLerpBursty_64f pycaslb):
  *         self.sigbm.addSignal(pycaslb.sigb)
  *         if (self.numBursts == -1):             # <<<<<<<<<<<<<<
@@ -4527,7 +4565,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
     goto __pyx_L3;
   }
 
-  /* "PySampledLinearInterpolator.pyx":124
+  /* "PySampledLinearInterpolator.pyx":127
  *             self.numBursts = pycaslb.numBursts()
  *         else:
  *             assert(self.numBursts == pycaslb.numBursts()) # make sure they are all the same number of bursts             # <<<<<<<<<<<<<<
@@ -4537,9 +4575,9 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
   /*else*/ {
     #ifndef CYTHON_WITHOUT_ASSERTIONS
     if (unlikely(!Py_OptimizeFlag)) {
-      __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_self->numBursts); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 124, __pyx_L1_error)
+      __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_self->numBursts); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 127, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_2);
-      __pyx_t_4 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_pycaslb), __pyx_n_s_numBursts); if (unlikely(!__pyx_t_4)) __PYX_ERR(1, 124, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_pycaslb), __pyx_n_s_numBursts); if (unlikely(!__pyx_t_4)) __PYX_ERR(1, 127, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
       __pyx_t_6 = NULL;
       if (CYTHON_UNPACK_METHODS && likely(PyMethod_Check(__pyx_t_4))) {
@@ -4553,24 +4591,24 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
       }
       __pyx_t_3 = (__pyx_t_6) ? __Pyx_PyObject_CallOneArg(__pyx_t_4, __pyx_t_6) : __Pyx_PyObject_CallNoArg(__pyx_t_4);
       __Pyx_XDECREF(__pyx_t_6); __pyx_t_6 = 0;
-      if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 124, __pyx_L1_error)
+      if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 127, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_3);
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-      __pyx_t_4 = PyObject_RichCompare(__pyx_t_2, __pyx_t_3, Py_EQ); __Pyx_XGOTREF(__pyx_t_4); if (unlikely(!__pyx_t_4)) __PYX_ERR(1, 124, __pyx_L1_error)
+      __pyx_t_4 = PyObject_RichCompare(__pyx_t_2, __pyx_t_3, Py_EQ); __Pyx_XGOTREF(__pyx_t_4); if (unlikely(!__pyx_t_4)) __PYX_ERR(1, 127, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-      __pyx_t_1 = __Pyx_PyObject_IsTrue(__pyx_t_4); if (unlikely(__pyx_t_1 < 0)) __PYX_ERR(1, 124, __pyx_L1_error)
+      __pyx_t_1 = __Pyx_PyObject_IsTrue(__pyx_t_4); if (unlikely(__pyx_t_1 < 0)) __PYX_ERR(1, 127, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
       if (unlikely(!__pyx_t_1)) {
         PyErr_SetNone(PyExc_AssertionError);
-        __PYX_ERR(1, 124, __pyx_L1_error)
+        __PYX_ERR(1, 127, __pyx_L1_error)
       }
     }
     #endif
   }
   __pyx_L3:;
 
-  /* "PySampledLinearInterpolator.pyx":126
+  /* "PySampledLinearInterpolator.pyx":129
  *             assert(self.numBursts == pycaslb.numBursts()) # make sure they are all the same number of bursts
  * 
  *         self.numSig = self.numSig + 1             # <<<<<<<<<<<<<<
@@ -4579,7 +4617,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
  */
   __pyx_v_self->numSig = (__pyx_v_self->numSig + 1);
 
-  /* "PySampledLinearInterpolator.pyx":119
+  /* "PySampledLinearInterpolator.pyx":122
  *         del self.sigbm
  * 
  *     def addSignal(self, PyConstAmpSigLerpBursty_64f pycaslb):             # <<<<<<<<<<<<<<
@@ -4603,7 +4641,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
   return __pyx_r;
 }
 
-/* "PySampledLinearInterpolator.pyx":129
+/* "PySampledLinearInterpolator.pyx":132
  *         # print("Total signals: %d" % (self.numSig))
  * 
  *     def propagate(self, np.ndarray[np.float64_t, ndim=1] t,             # <<<<<<<<<<<<<<
@@ -4654,29 +4692,29 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_tau)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 1); __PYX_ERR(1, 129, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 1); __PYX_ERR(1, 132, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_phiArrs)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 2); __PYX_ERR(1, 129, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 2); __PYX_ERR(1, 132, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_tJumpArrs)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 3); __PYX_ERR(1, 129, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 3); __PYX_ERR(1, 132, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  4:
         if (likely((values[4] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_numThreads)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 4); __PYX_ERR(1, 129, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, 4); __PYX_ERR(1, 132, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "propagate") < 0)) __PYX_ERR(1, 129, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "propagate") < 0)) __PYX_ERR(1, 132, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 5) {
       goto __pyx_L5_argtuple_error;
@@ -4691,20 +4729,20 @@ static PyObject *__pyx_pw_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
     __pyx_v_tau = ((PyArrayObject *)values[1]);
     __pyx_v_phiArrs = ((PyArrayObject *)values[2]);
     __pyx_v_tJumpArrs = ((PyArrayObject *)values[3]);
-    __pyx_v_numThreads = __Pyx_PyInt_As_int(values[4]); if (unlikely((__pyx_v_numThreads == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 133, __pyx_L3_error)
+    __pyx_v_numThreads = __Pyx_PyInt_As_int(values[4]); if (unlikely((__pyx_v_numThreads == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 136, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 129, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("propagate", 1, 5, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(1, 132, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("PySampledLinearInterpolator.PyConstAmpSigLerpBurstyMulti_64f.propagate", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_t), __pyx_ptype_5numpy_ndarray, 1, "t", 0))) __PYX_ERR(1, 129, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_tau), __pyx_ptype_5numpy_ndarray, 1, "tau", 0))) __PYX_ERR(1, 130, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_phiArrs), __pyx_ptype_5numpy_ndarray, 1, "phiArrs", 0))) __PYX_ERR(1, 131, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_tJumpArrs), __pyx_ptype_5numpy_ndarray, 1, "tJumpArrs", 0))) __PYX_ERR(1, 132, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_t), __pyx_ptype_5numpy_ndarray, 1, "t", 0))) __PYX_ERR(1, 132, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_tau), __pyx_ptype_5numpy_ndarray, 1, "tau", 0))) __PYX_ERR(1, 133, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_phiArrs), __pyx_ptype_5numpy_ndarray, 1, "phiArrs", 0))) __PYX_ERR(1, 134, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_tJumpArrs), __pyx_ptype_5numpy_ndarray, 1, "tJumpArrs", 0))) __PYX_ERR(1, 135, __pyx_L1_error)
   __pyx_r = __pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurstyMulti_64f_6propagate(((struct __pyx_obj_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f *)__pyx_v_self), __pyx_v_t, __pyx_v_tau, __pyx_v_phiArrs, __pyx_v_tJumpArrs, __pyx_v_numThreads);
 
   /* function exit code */
@@ -4758,26 +4796,26 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
   __pyx_pybuffernd_tJumpArrs.rcbuffer = &__pyx_pybuffer_tJumpArrs;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_t.rcbuffer->pybuffer, (PyObject*)__pyx_v_t, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 129, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_t.rcbuffer->pybuffer, (PyObject*)__pyx_v_t, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 132, __pyx_L1_error)
   }
   __pyx_pybuffernd_t.diminfo[0].strides = __pyx_pybuffernd_t.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_t.diminfo[0].shape = __pyx_pybuffernd_t.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tau.rcbuffer->pybuffer, (PyObject*)__pyx_v_tau, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 129, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tau.rcbuffer->pybuffer, (PyObject*)__pyx_v_tau, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 132, __pyx_L1_error)
   }
   __pyx_pybuffernd_tau.diminfo[0].strides = __pyx_pybuffernd_tau.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_tau.diminfo[0].shape = __pyx_pybuffernd_tau.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_phiArrs.rcbuffer->pybuffer, (PyObject*)__pyx_v_phiArrs, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 129, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_phiArrs.rcbuffer->pybuffer, (PyObject*)__pyx_v_phiArrs, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 132, __pyx_L1_error)
   }
   __pyx_pybuffernd_phiArrs.diminfo[0].strides = __pyx_pybuffernd_phiArrs.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_phiArrs.diminfo[0].shape = __pyx_pybuffernd_phiArrs.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tJumpArrs.rcbuffer->pybuffer, (PyObject*)__pyx_v_tJumpArrs, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 129, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_tJumpArrs.rcbuffer->pybuffer, (PyObject*)__pyx_v_tJumpArrs, &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(1, 132, __pyx_L1_error)
   }
   __pyx_pybuffernd_tJumpArrs.diminfo[0].strides = __pyx_pybuffernd_tJumpArrs.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_tJumpArrs.diminfo[0].shape = __pyx_pybuffernd_tJumpArrs.rcbuffer->pybuffer.shape[0];
 
-  /* "PySampledLinearInterpolator.pyx":135
+  /* "PySampledLinearInterpolator.pyx":138
  *                         int numThreads):
  * 
  *         assert(t.size == tau.size)             # <<<<<<<<<<<<<<
@@ -4786,23 +4824,23 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
  */
   #ifndef CYTHON_WITHOUT_ASSERTIONS
   if (unlikely(!Py_OptimizeFlag)) {
-    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 135, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 138, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tau), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 135, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tau), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 138, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 135, __pyx_L1_error)
+    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 138, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 135, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 138, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     if (unlikely(!__pyx_t_4)) {
       PyErr_SetNone(PyExc_AssertionError);
-      __PYX_ERR(1, 135, __pyx_L1_error)
+      __PYX_ERR(1, 138, __pyx_L1_error)
     }
   }
   #endif
 
-  /* "PySampledLinearInterpolator.pyx":136
+  /* "PySampledLinearInterpolator.pyx":139
  * 
  *         assert(t.size == tau.size)
  *         assert(phiArrs.size == tJumpArrs.size)             # <<<<<<<<<<<<<<
@@ -4811,23 +4849,23 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
  */
   #ifndef CYTHON_WITHOUT_ASSERTIONS
   if (unlikely(!Py_OptimizeFlag)) {
-    __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_phiArrs), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 136, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_phiArrs), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 139, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
-    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tJumpArrs), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 136, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_tJumpArrs), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 139, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_1 = PyObject_RichCompare(__pyx_t_3, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_1); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 136, __pyx_L1_error)
+    __pyx_t_1 = PyObject_RichCompare(__pyx_t_3, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_1); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 139, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_1); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 136, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_1); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 139, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     if (unlikely(!__pyx_t_4)) {
       PyErr_SetNone(PyExc_AssertionError);
-      __PYX_ERR(1, 136, __pyx_L1_error)
+      __PYX_ERR(1, 139, __pyx_L1_error)
     }
   }
   #endif
 
-  /* "PySampledLinearInterpolator.pyx":137
+  /* "PySampledLinearInterpolator.pyx":140
  *         assert(t.size == tau.size)
  *         assert(phiArrs.size == tJumpArrs.size)
  *         assert(phiArrs.size == self.numBursts * self.numSig)             # <<<<<<<<<<<<<<
@@ -4836,39 +4874,39 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
  */
   #ifndef CYTHON_WITHOUT_ASSERTIONS
   if (unlikely(!Py_OptimizeFlag)) {
-    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_phiArrs), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 137, __pyx_L1_error)
+    __pyx_t_1 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_phiArrs), __pyx_n_s_size); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 140, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
-    __pyx_t_2 = __Pyx_PyInt_From_int((__pyx_v_self->numBursts * __pyx_v_self->numSig)); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 137, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PyInt_From_int((__pyx_v_self->numBursts * __pyx_v_self->numSig)); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 140, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
-    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 137, __pyx_L1_error)
+    __pyx_t_3 = PyObject_RichCompare(__pyx_t_1, __pyx_t_2, Py_EQ); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 140, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 137, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_4 < 0)) __PYX_ERR(1, 140, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     if (unlikely(!__pyx_t_4)) {
       PyErr_SetNone(PyExc_AssertionError);
-      __PYX_ERR(1, 137, __pyx_L1_error)
+      __PYX_ERR(1, 140, __pyx_L1_error)
     }
   }
   #endif
 
-  /* "PySampledLinearInterpolator.pyx":139
+  /* "PySampledLinearInterpolator.pyx":142
  *         assert(phiArrs.size == self.numBursts * self.numSig)
  * 
  *         cdef np.ndarray x = np.zeros(t.size, np.complex128)             # <<<<<<<<<<<<<<
  * 
  *         self.sigbm.propagate(<double*>t.data, <double*>tau.data, <double*>phiArrs.data, <double*>tJumpArrs.data,
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 139, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 142, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 139, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 142, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 139, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 142, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 139, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 142, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_complex128); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 139, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_complex128); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 142, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __pyx_t_5 = NULL;
@@ -4886,7 +4924,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
   #if CYTHON_FAST_PYCALL
   if (PyFunction_Check(__pyx_t_1)) {
     PyObject *__pyx_temp[3] = {__pyx_t_5, __pyx_t_2, __pyx_t_6};
-    __pyx_t_3 = __Pyx_PyFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 139, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 142, __pyx_L1_error)
     __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
@@ -4896,7 +4934,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
   #if CYTHON_FAST_PYCCALL
   if (__Pyx_PyFastCFunction_Check(__pyx_t_1)) {
     PyObject *__pyx_temp[3] = {__pyx_t_5, __pyx_t_2, __pyx_t_6};
-    __pyx_t_3 = __Pyx_PyCFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 139, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyCFunction_FastCall(__pyx_t_1, __pyx_temp+1-__pyx_t_7, 2+__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 142, __pyx_L1_error)
     __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
@@ -4904,7 +4942,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
   } else
   #endif
   {
-    __pyx_t_8 = PyTuple_New(2+__pyx_t_7); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 139, __pyx_L1_error)
+    __pyx_t_8 = PyTuple_New(2+__pyx_t_7); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 142, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_8);
     if (__pyx_t_5) {
       __Pyx_GIVEREF(__pyx_t_5); PyTuple_SET_ITEM(__pyx_t_8, 0, __pyx_t_5); __pyx_t_5 = NULL;
@@ -4915,28 +4953,28 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
     PyTuple_SET_ITEM(__pyx_t_8, 1+__pyx_t_7, __pyx_t_6);
     __pyx_t_2 = 0;
     __pyx_t_6 = 0;
-    __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_8, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 139, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_8, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 142, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(1, 139, __pyx_L1_error)
+  if (!(likely(((__pyx_t_3) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_3, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(1, 142, __pyx_L1_error)
   __pyx_v_x = ((PyArrayObject *)__pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "PySampledLinearInterpolator.pyx":142
+  /* "PySampledLinearInterpolator.pyx":145
  * 
  *         self.sigbm.propagate(<double*>t.data, <double*>tau.data, <double*>phiArrs.data, <double*>tJumpArrs.data,
  *                             self.numBursts, t.size, <Ipp64fc*>x.data, numThreads)             # <<<<<<<<<<<<<<
  * 
  *         return x
  */
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 142, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_t), __pyx_n_s_size); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 145, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_3); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 142, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_3); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 145, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "PySampledLinearInterpolator.pyx":141
+  /* "PySampledLinearInterpolator.pyx":144
  *         cdef np.ndarray x = np.zeros(t.size, np.complex128)
  * 
  *         self.sigbm.propagate(<double*>t.data, <double*>tau.data, <double*>phiArrs.data, <double*>tJumpArrs.data,             # <<<<<<<<<<<<<<
@@ -4945,7 +4983,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
  */
   __pyx_v_self->sigbm->propagate(((double *)__pyx_v_t->data), ((double *)__pyx_v_tau->data), ((double *)__pyx_v_phiArrs->data), ((double *)__pyx_v_tJumpArrs->data), __pyx_v_self->numBursts, __pyx_t_7, ((Ipp64fc *)__pyx_v_x->data), __pyx_v_numThreads);
 
-  /* "PySampledLinearInterpolator.pyx":144
+  /* "PySampledLinearInterpolator.pyx":147
  *                             self.numBursts, t.size, <Ipp64fc*>x.data, numThreads)
  * 
  *         return x             # <<<<<<<<<<<<<<
@@ -4955,7 +4993,7 @@ static PyObject *__pyx_pf_27PySampledLinearInterpolator_32PyConstAmpSigLerpBurst
   __pyx_r = ((PyObject *)__pyx_v_x);
   goto __pyx_L0;
 
-  /* "PySampledLinearInterpolator.pyx":129
+  /* "PySampledLinearInterpolator.pyx":132
  *         # print("Total signals: %d" % (self.numSig))
  * 
  *     def propagate(self, np.ndarray[np.float64_t, ndim=1] t,             # <<<<<<<<<<<<<<
@@ -6748,6 +6786,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_setstate, __pyx_k_setstate, sizeof(__pyx_k_setstate), 0, 0, 1, 1},
   {&__pyx_n_s_setstate_cython, __pyx_k_setstate_cython, sizeof(__pyx_k_setstate_cython), 0, 0, 1, 1},
   {&__pyx_n_s_size, __pyx_k_size, sizeof(__pyx_k_size), 0, 0, 1, 1},
+  {&__pyx_n_s_startIdx, __pyx_k_startIdx, sizeof(__pyx_k_startIdx), 0, 0, 1, 1},
   {&__pyx_n_s_t, __pyx_k_t, sizeof(__pyx_k_t), 0, 0, 1, 1},
   {&__pyx_n_s_tJumpArr, __pyx_k_tJumpArr, sizeof(__pyx_k_tJumpArr), 0, 0, 1, 1},
   {&__pyx_n_s_tJumpArrs, __pyx_k_tJumpArrs, sizeof(__pyx_k_tJumpArrs), 0, 0, 1, 1},
@@ -6970,25 +7009,25 @@ static int __Pyx_modinit_type_init_code(void) {
   if (PyObject_SetAttr(__pyx_m, __pyx_n_s_PyConstAmpSigLerp_64f, (PyObject *)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f) < 0) __PYX_ERR(1, 44, __pyx_L1_error)
   if (__Pyx_setup_reduce((PyObject*)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f) < 0) __PYX_ERR(1, 44, __pyx_L1_error)
   __pyx_ptype_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f = &__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerp_64f;
-  if (PyType_Ready(&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f) < 0) __PYX_ERR(1, 70, __pyx_L1_error)
+  if (PyType_Ready(&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f) < 0) __PYX_ERR(1, 71, __pyx_L1_error)
   #if PY_VERSION_HEX < 0x030800B1
   __pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f.tp_print = 0;
   #endif
   if ((CYTHON_USE_TYPE_SLOTS && CYTHON_USE_PYTYPE_LOOKUP) && likely(!__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f.tp_dictoffset && __pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f.tp_getattro == PyObject_GenericGetAttr)) {
     __pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f.tp_getattro = __Pyx_PyObject_GenericGetAttr;
   }
-  if (PyObject_SetAttr(__pyx_m, __pyx_n_s_PyConstAmpSigLerpBursty_64f, (PyObject *)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f) < 0) __PYX_ERR(1, 70, __pyx_L1_error)
-  if (__Pyx_setup_reduce((PyObject*)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f) < 0) __PYX_ERR(1, 70, __pyx_L1_error)
+  if (PyObject_SetAttr(__pyx_m, __pyx_n_s_PyConstAmpSigLerpBursty_64f, (PyObject *)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f) < 0) __PYX_ERR(1, 71, __pyx_L1_error)
+  if (__Pyx_setup_reduce((PyObject*)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f) < 0) __PYX_ERR(1, 71, __pyx_L1_error)
   __pyx_ptype_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f = &__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBursty_64f;
-  if (PyType_Ready(&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f) < 0) __PYX_ERR(1, 106, __pyx_L1_error)
+  if (PyType_Ready(&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f) < 0) __PYX_ERR(1, 109, __pyx_L1_error)
   #if PY_VERSION_HEX < 0x030800B1
   __pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f.tp_print = 0;
   #endif
   if ((CYTHON_USE_TYPE_SLOTS && CYTHON_USE_PYTYPE_LOOKUP) && likely(!__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f.tp_dictoffset && __pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f.tp_getattro == PyObject_GenericGetAttr)) {
     __pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f.tp_getattro = __Pyx_PyObject_GenericGetAttr;
   }
-  if (PyObject_SetAttr(__pyx_m, __pyx_n_s_PyConstAmpSigLerpBurstyMulti_64f, (PyObject *)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f) < 0) __PYX_ERR(1, 106, __pyx_L1_error)
-  if (__Pyx_setup_reduce((PyObject*)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f) < 0) __PYX_ERR(1, 106, __pyx_L1_error)
+  if (PyObject_SetAttr(__pyx_m, __pyx_n_s_PyConstAmpSigLerpBurstyMulti_64f, (PyObject *)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f) < 0) __PYX_ERR(1, 109, __pyx_L1_error)
+  if (__Pyx_setup_reduce((PyObject*)&__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f) < 0) __PYX_ERR(1, 109, __pyx_L1_error)
   __pyx_ptype_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f = &__pyx_type_27PySampledLinearInterpolator_PyConstAmpSigLerpBurstyMulti_64f;
   __Pyx_RefNannyFinishContext();
   return 0;

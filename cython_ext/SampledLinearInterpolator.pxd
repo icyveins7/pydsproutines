@@ -24,13 +24,13 @@ cdef extern from "SampledLinearInterpolator.h":
     cdef cppclass ConstAmpSigLerp_64f:
         ConstAmpSigLerp_64f(double, double, double*, int, double, double, double) except +
         
-        void propagate(double*, double*, double, int, Ipp64fc*, SampledLinearInterpolatorWorkspace_64f*)
+        void propagate(double*, double*, double, int, Ipp64fc*, SampledLinearInterpolatorWorkspace_64f*, int)
         
     cdef cppclass ConstAmpSigLerpBursty_64f:
         ConstAmpSigLerpBursty_64f() except +
         
         void addSignal(ConstAmpSigLerp_64f*)
-        void propagate(double*, double*, double*, double*, int, Ipp64fc*, SampledLinearInterpolatorWorkspace_64f*)
+        int propagate(double*, double*, double*, double*, int, Ipp64fc*, SampledLinearInterpolatorWorkspace_64f*, int)
         
     cdef cppclass ConstAmpSigLerpBurstyMulti_64f:
         ConstAmpSigLerpBurstyMulti_64f() except +

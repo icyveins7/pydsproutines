@@ -58,12 +58,13 @@ cdef class PyConstAmpSigLerp_64f:
     def propagate(self, np.ndarray[np.float64_t, ndim=1] t,
                         np.ndarray[np.float64_t, ndim=1] tau,
                         double phi,
-                        PySampledLinearInterpolatorWorkspace_64f pws):
+                        PySampledLinearInterpolatorWorkspace_64f pws,
+                        int startIdx=-1):
                         
         assert(t.size == tau.size)
         cdef np.ndarray x = np.zeros(t.size, np.complex128)
         self.sig.propagate(<double*>t.data, <double*>tau.data, phi, t.size, <Ipp64fc*>x.data,
-                           <SampledLinearInterpolatorWorkspace_64f*>pws.ws)
+                           <SampledLinearInterpolatorWorkspace_64f*>pws.ws, startIdx)
         
         return x
     
@@ -89,7 +90,8 @@ cdef class PyConstAmpSigLerpBursty_64f:
                         np.ndarray[np.float64_t, ndim=1] tau,
                         np.ndarray[np.float64_t, ndim=1] phiArr,
                         np.ndarray[np.float64_t, ndim=1] tJumpArr,
-                        PySampledLinearInterpolatorWorkspace_64f pws):
+                        PySampledLinearInterpolatorWorkspace_64f pws,
+                        int startIdx=-1):
         
         assert(t.size==tau.size)
         assert(phiArr.size == tJumpArr.size)
@@ -98,7 +100,8 @@ cdef class PyConstAmpSigLerpBursty_64f:
         cdef np.ndarray x = np.zeros(t.size, np.complex128)
         self.sigb.propagate(<double*>t.data, <double*>tau.data, <double*>phiArr.data, <double*>tJumpArr.data,
                             t.size, <Ipp64fc*>x.data,
-                            <SampledLinearInterpolatorWorkspace_64f*>pws.ws)
+                            <SampledLinearInterpolatorWorkspace_64f*>pws.ws,
+                            startIdx)
         
         return x
 

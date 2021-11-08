@@ -41,11 +41,6 @@ class SampledLinearInterpolator_64f
 		// Input arrays to interpolate around
 		ippe::vector<Ipp64f> yy;
 		ippe::vector<Ipp64f> grads;
-		// Workspace vectors
-		ippe::vector<Ipp64f> divAns;
-		ippe::vector<Ipp64f> intPart;
-		ippe::vector<Ipp64f> remPart;
-		ippe::vector<Ipp32s> indexes;
 		
 		// Pre-calculation
 		void calcGrads();
@@ -66,6 +61,8 @@ class SampledLinearInterpolator_64f
 		// Main calling function
 		void lerp(const double *xxq, double *yyq, int anslen, SampledLinearInterpolatorWorkspace_64f *ws); // when using external workspace, if this works well then just remove the other one?
 
+		// Getters
+		double getT(){ return T; }
 		
 };
 
@@ -75,10 +72,10 @@ class ConstAmpSigLerp_64f : public SampledLinearInterpolator_64f
 		double amp;
 		double fc;
 		double timevec_start, timevec_end;
-		ippe::vector<Ipp64f> tmtau;
+		
 		ippe::vector<Ipp64f> ampvec;
 		ippe::vector<Ipp64f> phasevec;
-		int finalIdx;
+		int finalIdx = -1;
 		
 		// Submethods
 		void calcCarrierFreq_TauPhase(const double *tau, int anslen, double *phase);
@@ -99,7 +96,10 @@ class ConstAmpSigLerp_64f : public SampledLinearInterpolator_64f
 						Ipp64fc *x,
 						SampledLinearInterpolatorWorkspace_64f *ws, // again, for external management
 						int startIdx=-1); // default startIdx (helps for long timevec to specify it)
-						
+		// // Submethods
+		ippe::vector<Ipp64f> tmtau; // we'll just make this public, so it's sharable
+		// void calc_tmtau(const double *t, const double *tau, int anslen);
+		
 		// Getter for finalIdx
 		int getFinalIdx() { return finalIdx; }
 		
@@ -123,11 +123,14 @@ class ConstAmpSigLerpBursty_64f
 		// Method to add signals
 		void addSignal(ConstAmpSigLerp_64f* sig);
 		// Method to propagate signals
-		void propagate(const double *t, const double *tau, 
+		int propagate(const double *t, const double *tau, 
 						const double *phiArr, const double *tJumpArr, // these should have length == sDict.size
 						int anslen, Ipp64fc *x,
 						SampledLinearInterpolatorWorkspace_64f *ws, // again, for external management
 						int startIdx=-1); // similar to above, helps to specify start
+						
+		// Getter for T
+		double getT(){ return sDict.front()->getT(); } // assumes all the same T
 		
 };
 
@@ -136,6 +139,10 @@ class ConstAmpSigLerpBurstyMulti_64f
 {
 	private:
 		std::vector<ConstAmpSigLerpBursty_64f*> sigs;
+		
+		void threadPropagate(const double *t, const double *tau,
+							const double *phiArrs, const double *tJumpArrs, int numBursts,
+							int anslen, Ipp64fc *xtmpvec, int numThreads, int threadIdx);
 		
 	public:
 		ConstAmpSigLerpBurstyMulti_64f()

@@ -14,20 +14,24 @@ void SampledLinearInterpolator_64f::lerp(const double *xxq, double *yyq, int ans
 	ws->divAns.resize(anslen);
 	ws->intPart.resize(anslen);
 	ws->remPart.resize(anslen);
-	ws->indexes.resize(anslen);
+//	ws->indexes.resize(anslen);
     
 	// divide first
 	ippsDivC_64f(xxq, T, ws->divAns.data(), anslen);
 	// modf the whole array
 	ippsModf_64f(ws->divAns.data(), ws->intPart.data(), ws->remPart.data(), anslen);
+	// instead of using indexes, just repoint + recast divAns, since 64f > 32s
+	Ipp32s *indexes = (Ipp32s*)ws->divAns.data();
 	// convert to integers for indexing
-	ippsConvert_64f32s_Sfs(ws->intPart.data(), ws->indexes.data(), anslen, ippRndNear, 0);
+//	ippsConvert_64f32s_Sfs(ws->intPart.data(), ws->indexes.data(), anslen, ippRndNear, 0);
+	ippsConvert_64f32s_Sfs(ws->intPart.data(), indexes, anslen, ippRndNear, 0);
 	// reuse the intPart which is not needed any more as the gradients vector
 	Ipp64f *gradients = ws->intPart.data();
 	ippsZero_64f(gradients, anslen); // zero it out
 	Ipp32s idx;
 	for (int qi = 0; qi < anslen; qi++){
-		idx = ws->indexes.at(qi);
+//		idx = ws->indexes.at(qi);
+		idx = indexes[qi];
 		if (idx >=0 && idx < len-1){ // don't index outside, we need to access the next point as well
 			gradients[qi] = grads.at(idx); // now simply use the value directly
 			yyq[qi] = yy.at(idx); // write the output value as well, this is also only written if within bounds
@@ -136,7 +140,7 @@ int ConstAmpSigLerpBursty_64f::propagate(const double *t, const double *tau,
 	
 	// temporary arrays
 	ippe::vector<Ipp64f> tauPlusJump(anslen);
-	ippe::vector<Ipp64fc> xtmp(anslen);
+//	ippe::vector<Ipp64fc> xtmp(anslen);
 	
 	// it is expected that x is already zeroed?
 	
@@ -179,7 +183,7 @@ void ConstAmpSigLerpBurstyMulti_64f::threadPropagate(
 	int anslen, Ipp64fc *xtmpvec, int numThreads, int threadIdx)
 {
 	// make your own workspace for each thread
-	SampledLinearInterpolatorWorkspace_64f ws(anslen);
+	SampledLinearInterpolatorWorkspace_64f ws; // default to not allocating at start, to prevent excessively large memory blocks
 	
 	// some vars
 	int startIdx;

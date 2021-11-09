@@ -10,7 +10,7 @@
 class SampledLinearInterpolatorWorkspace_64f
 {
     public:
-        SampledLinearInterpolatorWorkspace_64f(int size)
+        SampledLinearInterpolatorWorkspace_64f(int size=0)
         {
             // resize at start
             divAns.resize(size);

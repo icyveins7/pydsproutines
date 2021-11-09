@@ -120,7 +120,7 @@ cdef class PyConstAmpSigLerpBurstyMulti_64f:
         del self.sigbm
         
     def addSignal(self, PyConstAmpSigLerpBursty_64f pycaslb):
-        self.sigbm.addSignal(pycaslb.sigb)
+        self.sigbm.addSignal(<ConstAmpSigLerpBursty_64f*>pycaslb.sigb)
         if (self.numBursts == -1):
             self.numBursts = pycaslb.numBursts()
         else:
@@ -140,8 +140,16 @@ cdef class PyConstAmpSigLerpBurstyMulti_64f:
         assert(phiArrs.size == self.numBursts * self.numSig)
         
         cdef np.ndarray x = np.zeros(t.size, np.complex128)
-
-        self.sigbm.propagate(<double*>t.data, <double*>tau.data, <double*>phiArrs.data, <double*>tJumpArrs.data,
-                            self.numBursts, t.size, <Ipp64fc*>x.data, numThreads)
+        cdef int err
         
-        return x
+        try:
+            err = self.sigbm.propagate(<double*>t.data, <double*>tau.data, <double*>phiArrs.data, <double*>tJumpArrs.data,
+                                           self.numBursts, t.size, <Ipp64fc*>x.data, numThreads)
+        except:
+            with open("wtfpy.log","w") as f:
+                f.write("pls why")
+        
+        return x, err
+    
+    def getNumSig(self):
+        return self.numSig

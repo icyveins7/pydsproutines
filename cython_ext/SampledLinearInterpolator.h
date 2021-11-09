@@ -155,7 +155,7 @@ class ConstAmpSigLerpBurstyMulti_64f
 		// Method to add signals
 		void addSignal(ConstAmpSigLerpBursty_64f* sig);
 		// Method to propagate
-		void propagate(const double *t, const double *tau, 
+		int propagate(const double *t, const double *tau, 
 						const double *phiArrs, const double *tJumpArrs, int numBursts, // these should have length == sDict.size
 						int anslen, Ipp64fc *x,	int numThreads);
 	

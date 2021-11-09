@@ -54,7 +54,6 @@ void ConstAmpSigLerp_64f::propagate(const double *t, const double *tau, const do
 {
     // some resizes
 	tmtau.resize(anslen);
-	phasevec.resize(anslen);
 	ampvec.resize(anslen);
 	
 	// first calculate t - tau (the reason why the final burstyMulti is slow is because this is calculated in full each time)
@@ -89,34 +88,36 @@ void ConstAmpSigLerp_64f::propagate(const double *t, const double *tau, const do
     // save the finalIdx internally (this will be useful when iterating over multiple instances of this class,
     // but using only 1 timevec (then we don't need to pass through the array multiple times!
     finalIdx = sigEndIdx;
+    int siglen = sigEndIdx - sigStartIdx + 1;
 	
 	// TODO: add some error-checking here, but it works otherwise
 	
 	// now lerp the phase (resize will happen internally)
 	// but we don't need to do all of it if it's mostly zeros! use the markers
 	// ippsZero_64f(phasevec.data(), phasevec.size()); // zero the array first though (or maybe don't need? since amp will be 0..
-	lerp(&tmtau.at(sigStartIdx),
-		&phasevec.at(sigStartIdx),
-		sigEndIdx - sigStartIdx + 1,
+	phasevec.resize(siglen); // moved the resize here, to the shorter length
+    lerp(&tmtau.at(sigStartIdx),
+		phasevec.data(), // and so now write at index 0
+		siglen,
 		ws);
 	
 	
 	// calculate phasor change due to carrier frequency
-	// divAns.resize(anslen); // unnecessary since lerp should have done it
+    // lerp has resized divAns to size siglen
 	Ipp64f *carrierPhase = ws->divAns.data(); // re-use since lerp doesn't require it any more
-	calcCarrierFreq_TauPhase(tau, anslen, carrierPhase);
+	calcCarrierFreq_TauPhase(&tau[sigStartIdx], siglen, carrierPhase);
 	
 	// now add the two phases together
-	ippsAdd_64f_I(carrierPhase, phasevec.data(), anslen);
+	ippsAdd_64f_I(carrierPhase, phasevec.data(), siglen);
 	// and the constant phi
-	ippsAddC_64f_I(phi, phasevec.data(), anslen);
+	ippsAddC_64f_I(phi, phasevec.data(), siglen);
 	
 	// and turn it into complex (but only write to the viable indices)
 //	ippsPolarToCart_64fc(ampvec.data(), phasevec.data(), x, anslen);
     ippsPolarToCart_64fc(&ampvec.at(sigStartIdx),
-						&phasevec.at(sigStartIdx),
+						phasevec.data(), // phasevec was filled from idx 0
 						&x[sigStartIdx],
-						sigEndIdx - sigStartIdx + 1); // this assumes x is pre-zeroed
+						siglen); // this assumes x is pre-zeroed
 }
 
 void ConstAmpSigLerp_64f::calcCarrierFreq_TauPhase(const double *tau, int anslen, double *phase)
@@ -140,7 +141,7 @@ int ConstAmpSigLerpBursty_64f::propagate(const double *t, const double *tau,
 	
 	// temporary arrays
 	ippe::vector<Ipp64f> tauPlusJump(anslen);
-//	ippe::vector<Ipp64fc> xtmp(anslen);
+	// ippe::vector<Ipp64fc> xtmp(anslen);
 	
 	// it is expected that x is already zeroed?
 	
@@ -150,7 +151,7 @@ int ConstAmpSigLerpBursty_64f::propagate(const double *t, const double *tau,
 	for (int i = 0; i < sDict.size(); i++){
 		// Add tau to the jump for the burst
 		ippsAddC_64f(tau, tJumpArr[i], tauPlusJump.data(), anslen);
-		// // Propagate the signal
+		// Propagate the signal
 		// sDict.at(i)->propagate(t, tauPlusJump.data(), phiArr[i], anslen, xtmp.data(), ws, startIdx);
 		// // Add to x (the output)
 		// ippsAdd_64fc_I(xtmp.data(), x, anslen);
@@ -161,7 +162,7 @@ int ConstAmpSigLerpBursty_64f::propagate(const double *t, const double *tau,
 		// Before continuing, update the startIdx to the finalIdx of the current signal, so we iterate forwards only
 		nextStartIdx = sDict.at(i)->getFinalIdx();
 		// However, if it is not in range (ie errored), we revert to the original startIdx
-		startIdx = (startIdx >= -1 && startIdx < anslen) ? nextStartIdx : startIdx;
+		startIdx = (nextStartIdx >= -1 && nextStartIdx < anslen) ? nextStartIdx : startIdx;
 	}
 	
 	// update internal finalIdx similarly
@@ -187,6 +188,7 @@ void ConstAmpSigLerpBurstyMulti_64f::threadPropagate(
 	
 	// some vars
 	int startIdx;
+    double T = t[1] - t[0]; // estimate sample period
 	
 	// loop over the signals with a stride of numThreads
 	for (int i = threadIdx; i < sigs.size(); i = i + numThreads)
@@ -195,9 +197,9 @@ void ConstAmpSigLerpBurstyMulti_64f::threadPropagate(
 		// note that this makes the following fundamental assumptions:
 		// 1) 't' vector starts at 0
 		// 2) 't-tau' is strictly increasing; this implies that the first index found will always be the first index, even if tau is decreasing
-		startIdx = (int)(tJumpArrs[i*numBursts] / sigs.at(i)->getT());
+		startIdx = (int)(tJumpArrs[i*numBursts] / T);
 		if (startIdx <= -1){ startIdx = -1; } // this is the default minimum
-		
+
 		// run the propagator for the signal
 		sigs.at(i)->propagate(t, tau, 
 							&phiArrs[i*numBursts], &tJumpArrs[i*numBursts],
@@ -207,50 +209,72 @@ void ConstAmpSigLerpBurstyMulti_64f::threadPropagate(
 
 }
 
-void ConstAmpSigLerpBurstyMulti_64f::propagate(
+int ConstAmpSigLerpBurstyMulti_64f::propagate(
 	const double *t, const double *tau, 
 	const double *phiArrs, const double *tJumpArrs, int numBursts,
 	int anslen, Ipp64fc *x, int numThreads)
 {
-	// get ready for threads
-	std::vector<std::thread> thds(numThreads);
-	
-	// // temporary workspace vectors
-	// std::vector<ippe::vector<Ipp64fc>> xtmpvec(numThreads);
-	
-	// for (int i = 0; i < numThreads; i++){
-		// xtmpvec.at(i).resize(anslen);
-		// // zero the vector
-		// ippsZero_64fc(xtmpvec.at(i).data(), anslen);
-	// }
-	
-	// start threads
-	for (int thIdx = 0; thIdx < numThreads; thIdx++){
-		// thds.at(thIdx) = std::thread(&ConstAmpSigLerpBurstyMulti_64f::threadPropagate,
-								// this,
-								// t, tau,
-								// phiArrs, tJumpArrs, numBursts,
-								// anslen, xtmpvec.at(thIdx).data(), numThreads, thIdx);
-		
-		// in theory, if well separated, then can write directly to the output
-		// (since all the writes are performed only in viable indices, so no race conditions,
-		// BUT THIS IS RISKY)
-		thds.at(thIdx) = std::thread(&ConstAmpSigLerpBurstyMulti_64f::threadPropagate,
-								this,
-								t, tau,
-								phiArrs, tJumpArrs, numBursts,
-								anslen, x, numThreads, thIdx);
-		
-	}
-	
-	// join threads and sum
-	for (int thIdx = 0; thIdx < numThreads; thIdx++){
-		thds.at(thIdx).join();
-		
-		// // if doing the RISKY thing above, ignore this
-		// ippsAdd_64fc_I(xtmpvec.at(thIdx).data(), x, anslen);
-	}
-	
+    int err = 0;
+    
+    // // non-threaded debugging
+    // try{
+        // for (int thIdx = 0; thIdx < numThreads; thIdx++){
+            // threadPropagate(t, tau, phiArrs, tJumpArrs, numBursts, anslen, x, numThreads, thIdx);
+        // }
+    // }
+    
+    try{
+        // get ready for threads
+        std::vector<std::thread> thds;
+        thds.resize(numThreads);
+        
+        // // temporary workspace vectors
+        // std::vector<ippe::vector<Ipp64fc>> xtmpvec(numThreads);
+        
+        // for (int i = 0; i < numThreads; i++){
+            // xtmpvec.at(i).resize(anslen);
+            // // zero the vector
+            // ippsZero_64fc(xtmpvec.at(i).data(), anslen);
+        // }
+        
+        // start threads
+        for (int thIdx = 0; thIdx < numThreads; thIdx++){
+            // thds.at(thIdx) = std::thread(&ConstAmpSigLerpBurstyMulti_64f::threadPropagate,
+                                    // this,
+                                    // t, tau,
+                                    // phiArrs, tJumpArrs, numBursts,
+                                    // anslen, xtmpvec.at(thIdx).data(), numThreads, thIdx);
+            
+            // in theory, if well separated, then can write directly to the output
+            // (since all the writes are performed only in viable indices, so no race conditions,
+            // BUT THIS IS RISKY)
+            thds.at(thIdx) = std::thread(&ConstAmpSigLerpBurstyMulti_64f::threadPropagate,
+                                    this,
+                                    t, tau,
+                                    phiArrs, tJumpArrs, numBursts,
+                                    anslen, x, numThreads, thIdx);
+            
+        }
+        
+        // join threads and sum
+        for (int thIdx = 0; thIdx < numThreads; thIdx++){
+            thds.at(thIdx).join();
+            
+            // // if doing the RISKY thing above, ignore this
+            // ippsAdd_64fc_I(xtmpvec.at(thIdx).data(), x, anslen);
+        }
+    }
+    catch(...)
+    {
+        FILE *fp = fopen("D:\\gitrepos\\pydsproutines\\wtf.log","w");
+        char str[] = "wtf error?";
+        fwrite(str, 1, sizeof(str), fp);
+        fclose(fp);
+        
+        err = 1;
+    }
+    
+    return err;
 }
 
 

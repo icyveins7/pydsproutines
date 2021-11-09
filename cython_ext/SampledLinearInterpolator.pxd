@@ -36,6 +36,6 @@ cdef extern from "SampledLinearInterpolator.h":
         ConstAmpSigLerpBurstyMulti_64f() except +
         
         void addSignal(ConstAmpSigLerpBursty_64f*)
-        void propagate(double*, double*, double*, double*, int, int, Ipp64fc*, int)
+        int propagate(double*, double*, double*, double*, int, int, Ipp64fc*, int)
         
         

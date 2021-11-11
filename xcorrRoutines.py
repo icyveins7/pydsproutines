@@ -546,7 +546,47 @@ class GroupXcorrCZT:
             
         return xc, cztFreq
                 
+class GroupXcorrCZT_Permutations:
+    '''
+    Purpose of this class is to automatically xcorr different permutations of the groups, without unnecessary repeats.
+    Example case with 2 groups, template looks like
+    
+    T0_____T1_____
+    
+    but each template - T0, T1 - is selected from a set; example 
+    T0 <=> (T0_a, T0_b)
+    T1 <=> (T1_a, T1_b, T1_c)
+
+    where each group may have a different sized set. In this case, there must be 2 X 3 total permutations i.e. 6 total correlations.
+    However, the 5 groups may be correlated individually, and then combined to form the group correlation values.
+    This, in general, reduces the computational load to the size of the sets, rather than the product of the size of the sets.
+    '''
+    def __init__(self, ygroups: np.ndarray, ygroupIdxs: np.ndarray, groupStarts: np.ndarray,
+                 f1: float, f2: float, binWidth: float, fs: int, autoConj: bool=True):
         
+        assert(ygroups.shape[0] == ygroupIdxs.size) # ensure numTemplates responds
+        assert(np.unique(ygroupIdxs).size == groupStarts.size) # ensure numGroups corresponds
+        
+        self.numTemplates = ygroupIdxs.size
+        self.numGroups = groupStarts.size
+        assert(np.sort(np.unique(ygroupIdxs)) == np.arange(self.numGroups)) # ensure all groups accounted for
+        
+        self.fs = fs
+        # CZT parameters
+        self.f1 = f1
+        self.f2 = f2
+        self.binWidth = binWidth
+        
+        # Auto conj
+        self.ygroups = ygroups
+        if autoConj:
+            self.ygroups = self.ygroups.conj()
+        self.ygroupsEnergy = np.linalg.norm(self.ystack.flatten())**2
+        
+        
+        
+        
+    
 
 #%%
 group_xcorr_kernel = cp.RawKernel(r'''

@@ -12,6 +12,8 @@ import time
 from spectralRoutines import czt, CZTCached
 from signalCreationRoutines import makeFreq
 from musicRoutines import MUSIC
+from numba import jit
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
     import cupy as cp
@@ -560,6 +562,9 @@ class GroupXcorrCZT_Permutations:
     where each group may have a different sized set. In this case, there must be 2 X 3 total permutations i.e. 6 total correlations.
     However, the 5 groups may be correlated individually, and then combined to form the group correlation values.
     This, in general, reduces the computational load to the size of the sets, rather than the product of the size of the sets.
+    
+    So the class iterates over the group index, and the template index for each group index.
+    Assumption here is that each group has the same length, unlike the previous classes. This is to optimize the size of the czt for re-use.
     '''
     def __init__(self, ygroups: np.ndarray, ygroupIdxs: np.ndarray, groupStarts: np.ndarray,
                  f1: float, f2: float, binWidth: float, fs: int, autoConj: bool=True):
@@ -569,21 +574,112 @@ class GroupXcorrCZT_Permutations:
         
         self.numTemplates = ygroupIdxs.size
         self.numGroups = groupStarts.size
-        assert(np.sort(np.unique(ygroupIdxs)) == np.arange(self.numGroups)) # ensure all groups accounted for
+        print("Total %d templates, %d groups" % (self.numTemplates, self.numGroups))
         
+        assert(np.all(np.sort(np.unique(ygroupIdxs)) == np.arange(self.numGroups))) # ensure all groups accounted for and was sorted
+        
+        # Copying inputs
+        self.groupStarts = groupStarts
+        self.ygroupIdxs = ygroupIdxs
+        self.ygroups = ygroups
         self.fs = fs
+        self.length = ygroups.shape[1]
         # CZT parameters
         self.f1 = f1
         self.f2 = f2
         self.binWidth = binWidth
         
         # Auto conj
-        self.ygroups = ygroups
         if autoConj:
             self.ygroups = self.ygroups.conj()
-        self.ygroupsEnergy = np.linalg.norm(self.ystack.flatten())**2
+        self.ygroupsEnergy = np.linalg.norm(self.ygroups, axis=1)**2
         
         
+    def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None, numThreads: int=1):
+        # We are returning CAF for this (for now?)
+        if shifts is None:
+            shifts = np.arange(len(rx)-(self.groupStarts[-1]+self.length)+1)
+        else:
+            assert(shifts[-1] + self.groupStarts[-1] + self.length < rx.size) # make sure it can access it
+        
+        # Init memory for outputs
+        self.xcTemplates = np.zeros((self.numTemplates, shifts.size, int((self.f2-self.f1)/self.binWidth + 1)), dtype=np.complex128)
+        self.rxgroupNormSq = np.zeros((self.numGroups, shifts.size))
+        
+        # Pre-calculate the phases for each group
+        cztFreq = np.arange(self.f1, self.f2+self.binWidth/2, self.binWidth)
+        groupPhases = np.exp(1j*2*np.pi*cztFreq*self.groupStarts.reshape((-1,1))/self.fs)
+        
+        # # Debug single thread
+        # self._xcorrThread(shifts,rx,self.numGroups,self.numTemplates,cztFreq,
+        #                   self.ygroups,self.ygroupsEnergy,self.ygroupIdxs,self.groupStarts,groupPhases,
+        #                   self.length, self.f1, self.f2, self.binWidth,self.fs, 
+        #                   xcTemplates, rxgroupNormSq, 1,0)
+        # Start threads
+        with ThreadPoolExecutor(max_workers=numThreads) as executor:
+            future_x = {executor.submit(self._xcorrThread, shifts, rx, self.numGroups, self.numTemplates, cztFreq,
+                                        self.ygroups, self.ygroupsEnergy, self.ygroupIdxs, self.groupStarts, groupPhases,
+                                        self.length, self.f1, self.f2, self.binWidth, self.fs,
+                                        self.xcTemplates, self.rxgroupNormSq,
+                                        numThreads, i) : i for i in np.arange(numThreads)}
+        # After threads are done,
+        # breakpoint()
+        
+        return cztFreq
+    
+    def getCAF(self, templateIdx: np.ndarray):
+        assert(templateIdx.size == self.numGroups)
+        
+        # Initialize array
+        cafcplx = np.zeros((self.xcTemplates.shape[1],self.xcTemplates.shape[2]), dtype=np.complex128)
+        rxnormsq = np.zeros(self.rxgroupNormSq.shape[1])
+        ynormsq = 0
+        
+        for groupNumber in range(templateIdx.size):
+            templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]]
+            
+            cafcplx[:,:] = cafcplx[:,:] + self.xcTemplates[templateNumber,:,:]
+            rxnormsq += self.rxgroupNormSq[groupNumber,:]
+            ynormsq += self.ygroupsEnergy[templateNumber]
+            
+        caf = np.abs(cafcplx)**2/rxnormsq.reshape(-1,1)/ynormsq
+        
+        return caf
+            
+        
+        
+    @staticmethod
+    # @jit(nopython=True, nogil=True) # make sure it releases the gil?
+    def _xcorrThread(shifts, rx, numGroups, numTemplates, cztFreq,
+                     ygroups, ygroupsEnergy, ygroupIdxs, groupStarts, groupPhases,
+                     length, f1, f2, binWidth, fs,
+                     xcTemplates, rxgroupNormSq, # outputs, written directly to array
+                     numThreads, thIdx):
+        # Create the czt cached object in the thread
+        cztc = CZTCached(length, f1, f2, binWidth, fs)
+        
+        # Loop with numThreads strides over shifts
+        for i in np.arange(thIdx,shifts.size,numThreads):
+            shift = shifts[i]
+            
+            # Loop over the templates
+            for k in np.arange(numTemplates):
+                groupNumber = ygroupIdxs[k] # Get the group number for this template
+                ygroup = ygroups[k, :] # Get the array for this template
+                # Slice the correct start index for this group
+                rxgroup = rx[shift+groupStarts[groupNumber] : shift+groupStarts[groupNumber]+length]
+                if rxgroupNormSq[groupNumber, i] == 0: # Write to the normSq if not yet done i.e. only first template of the group
+                    rxgroupNormSq[groupNumber, i] = np.linalg.norm(rxgroup)**2 # may want to wrap this in if-else since re-calculated
+
+                pdt = ygroup * rxgroup
+                # Run the czt from the cached object
+                pdtczt = cztc.run(pdt)
+                # Shift the czt by a phase appropriate to the group number
+                # But save it to the template index
+                xcTemplates[k, i, :] = pdtczt * groupPhases[groupNumber,:]
+        
+        # END THREAD. Normalisations to be done outside
+
         
         
     

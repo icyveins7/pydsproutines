@@ -594,6 +594,30 @@ class GroupXcorrCZT_Permutations:
             self.ygroups = self.ygroups.conj()
         self.ygroupsEnergy = np.linalg.norm(self.ygroups, axis=1)**2
         
+    def xcorrGPU(self, rx: cp.ndarray, shifts: np.ndarray, batchSz=32):
+        '''
+        This is meant to be a performant GPU implementation based on maximum CZT batched use.
+        As such, it is recommended that rx be converted to complex64, as that is the dtype that will be returned.
+        
+        Since much of the data will be held on the GPU, the user should be aware that using a 
+        long 'shifts' vector will have a massive memory footprint.
+        '''
+        # Check that shifts is not out of range
+        assert(shifts[-1] + self.groupStarts[-1] + self.length < rx.size)
+        
+        # Initialize GPU memory for outputs
+        self.d_xcTemplates = cp.zeros((self.numTemplates, shifts.size, int((self.f2-self.f1)/self.binWidth + 1)), dtype=cp.complex64)
+        self.d_rxgroupNormSq = cp.zeros((self.numGroups, shifts.size), dtype=cp.float32)
+        
+        # Pre-calculate the phases for each group (TODO: i should move to this init?)
+        cztFreq = cp.arange(self.f1, self.f2+self.binWidth/2, self.binWidth) # Compute as doubles
+        groupPhases = cp.exp(1j*2*cp.pi*cztFreq*self.groupStarts.reshape((-1,1))/self.fs).astype(cp.complex64) # Convert to floats
+        
+        ## TODO: COMPLETE THIS
+        
+        
+        
+        
         
     def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None, numThreads: int=1):
         # We are returning CAF for this (for now?)
@@ -627,26 +651,55 @@ class GroupXcorrCZT_Permutations:
         
         return cztFreq
     
-    def getCAF(self, templateIdx: np.ndarray):
+    def getCAF(self, templateIdx: np.ndarray, numThreads: int=4):
         assert(templateIdx.size == self.numGroups)
         
         # Initialize array
         cafcplx = np.zeros((self.xcTemplates.shape[1],self.xcTemplates.shape[2]), dtype=np.complex128)
         rxnormsq = np.zeros(self.rxgroupNormSq.shape[1])
-        ynormsq = 0
-        
-        for groupNumber in range(templateIdx.size):
-            templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]]
+        ynormsq = np.zeros(1)
+
+        # # V1, unthreaded
+        # for groupNumber in range(templateIdx.size):
+        #     templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]]
             
-            cafcplx[:,:] = cafcplx[:,:] + self.xcTemplates[templateNumber,:,:]
-            rxnormsq += self.rxgroupNormSq[groupNumber,:]
-            ynormsq += self.ygroupsEnergy[templateNumber]
+        #     cafcplx[:,:] = cafcplx[:,:] + self.xcTemplates[templateNumber,:,:]
+        #     rxnormsq += self.rxgroupNormSq[groupNumber,:]
+        #     ynormsq += self.ygroupsEnergy[templateNumber]
+        
+        # V2, threaded (but insignificant speedup here..)
+        with ThreadPoolExecutor(max_workers=numThreads) as executor:
+            future_x = {executor.submit(self._getCAFThread, templateIdx,
+                                        cafcplx, rxnormsq, ynormsq,
+                                        i, numThreads) : i for i in np.arange(numThreads)}
             
         caf = np.abs(cafcplx)**2/rxnormsq.reshape(-1,1)/ynormsq
         
         return caf
             
+    def _getCAFThread(self, templateIdx: np.ndarray, 
+                      cafcplx: np.ndarray, rxnormsq: np.ndarray, ynormsq: np.ndarray,
+                      thIdx: int, numThreads: int):
         
+        # Define the indices to work on for this thread
+        numPerThread = int(self.xcTemplates.shape[1] / numThreads)
+        numLastThread = self.xcTemplates.shape[1] - numPerThread * (numThreads-1)
+        
+        for groupNumber in np.arange(templateIdx.size):
+            templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]]
+            
+            # First thread computes the norm squared values
+            if thIdx == 0: 
+                rxnormsq += self.rxgroupNormSq[groupNumber,:]
+                ynormsq += self.ygroupsEnergy[templateNumber]
+            
+            # Last thread takes the remainder rows
+            if thIdx == numThreads - 1:
+                cafcplx[-numLastThread:,:] = cafcplx[-numLastThread:,:] + self.xcTemplates[templateNumber,-numLastThread:,:]
+            else: # All previous threads compute based on the thread number
+                cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:] = cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:] + self.xcTemplates[templateNumber,thIdx*numPerThread:(thIdx+1)*numPerThread,:]
+                
+            
         
     @staticmethod
     # @jit(nopython=True, nogil=True) # make sure it releases the gil?

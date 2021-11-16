@@ -49,7 +49,7 @@ def czt(x, f1, f2, binWidth, fs):
     
     return g
 
-# Simple class to keep the FFT of the chirp filter to alleviate computations
+#%% Simple class to keep the FFT of the chirp filter to alleviate computations
 class CZTCached:
     def __init__(self, xlength, f1, f2, binWidth, fs):
         self.k = int((f2-f1)/binWidth + 1)
@@ -79,6 +79,54 @@ class CZTCached:
         g = g[self.m-1:self.m+self.k-1] * self.ww[self.m-1:self.m+self.k-1]
         
         return g
+    
+class CZTCachedGPU:
+    def __init__(self, xlength, f1, f2, binWidth, fs):
+        self.k = int((f2-f1)/binWidth + 1)
+        self.m = xlength
+        self.nfft = self.m + self.k
+        foundGoodPrimes = False
+        while not foundGoodPrimes:
+            self.nfft = self.nfft + 1
+            if np.max(sympy.primefactors(self.nfft)) <= 7: # change depending on highest tolerable radix
+                foundGoodPrimes = True
+        
+        kk = cp.arange(-self.m+1,np.max([self.k-1,self.m-1])+1)
+        kk2 = kk**2.0 / 2.0
+        self.d_ww = cp.exp(-1j * 2 * cp.pi * (f2-f1+binWidth)/(self.k*fs) * kk2) # Compute in fc128, convert after for better precision
+        chirpfilter = 1 / self.d_ww[:self.k-1+self.m]
+        self.d_fv = cp.fft.fft( chirpfilter, self.nfft )
+        
+        nn = cp.arange(self.m)
+        self.d_aa = cp.exp(1j * 2 * cp.pi * f1/fs * -nn) * self.d_ww[self.m+nn-1]
+        
+        # Convert to 32fc now
+        self.d_ww = self.d_ww.astype(cp.complex64)
+        self.d_fv = self.d_fv.astype(cp.complex64)
+        self.d_aa = self.d_aa.astype(cp.complex64)
+        
+    def run(self, x: cp.ndarray):
+        y = x * self.d_aa
+        
+        fy = cp.fft.fft(y, self.nfft)
+        fy = fy * self.d_fv
+        g = cp.fft.ifft(fy)
+        
+        g = g[self.m-1:self.m+self.k-1] * self.d_ww[self.m-1:self.m+self.k-1]
+        
+        return g
+    
+    def runMany(self, xmany: cp.ndarray):
+        y = xmany * self.d_aa
+        # FFTs/IFFTs done on each row
+        fy = cp.fft.fft(y, self.nfft, axis=-1) # actually it already does this by default
+        fy = fy * self.d_fv
+        g = cp.fft.ifft(fy, axis=-1)
+        
+        g = g[:,self.m-1:self.m+self.k-1] * self.d_ww[self.m-1:self.m+self.k-1]
+        
+        return g
+    
 
 
 #%%

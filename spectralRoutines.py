@@ -82,7 +82,7 @@ class CZTCached:
     
 class CZTCachedGPU:
     def __init__(self, xlength, f1, f2, binWidth, fs):
-        self.k = int((f2-f1)/binWidth + 1)
+        self.k = int((f2-f1)/binWidth + 1) # This is the number of frequency bins
         self.m = xlength
         self.nfft = self.m + self.k
         foundGoodPrimes = False
@@ -116,16 +116,20 @@ class CZTCachedGPU:
         
         return g
     
-    def runMany(self, xmany: cp.ndarray):
+    def runMany(self, xmany: cp.ndarray, out=None):
         y = xmany * self.d_aa
         # FFTs/IFFTs done on each row
         fy = cp.fft.fft(y, self.nfft, axis=-1) # actually it already does this by default
-        fy = fy * self.d_fv
+        fy = cp.multiply(fy,self.d_fv,out=fy)
         g = cp.fft.ifft(fy, axis=-1)
         
-        g = g[:,self.m-1:self.m+self.k-1] * self.d_ww[self.m-1:self.m+self.k-1]
-        
-        return g
+        if out is None:
+            g = g[:,self.m-1:self.m+self.k-1] * self.d_ww[self.m-1:self.m+self.k-1]
+            
+            return g
+        else: # Write direct to output
+            cp.multiply(g[:,self.m-1:self.m+self.k-1],self.d_ww[self.m-1:self.m+self.k-1],
+                        out=out)
     
 
 

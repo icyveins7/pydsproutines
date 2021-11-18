@@ -9,7 +9,7 @@ import numpy as np
 import scipy as sp
 import scipy.signal as sps
 import time
-from spectralRoutines import czt, CZTCached
+from spectralRoutines import czt, CZTCached, CZTCachedGPU
 from signalCreationRoutines import makeFreq
 from musicRoutines import MUSIC
 from numba import jit
@@ -569,7 +569,7 @@ class GroupXcorrCZT_Permutations:
     def __init__(self, ygroups: np.ndarray, ygroupIdxs: np.ndarray, groupStarts: np.ndarray,
                  f1: float, f2: float, binWidth: float, fs: int, autoConj: bool=True):
         
-        assert(ygroups.shape[0] == ygroupIdxs.size) # ensure numTemplates responds
+        assert(ygroups.shape[0] == ygroupIdxs.size) # ensure numTemplates corresponds
         assert(np.unique(ygroupIdxs).size == groupStarts.size) # ensure numGroups corresponds
         
         self.numTemplates = ygroupIdxs.size
@@ -598,6 +598,7 @@ class GroupXcorrCZT_Permutations:
         '''
         This is meant to be a performant GPU implementation based on maximum CZT batched use.
         As such, it is recommended that rx be converted to complex64, as that is the dtype that will be returned.
+        It is also expected that the rx array is passed in already on the GPU.
         
         Since much of the data will be held on the GPU, the user should be aware that using a 
         long 'shifts' vector will have a massive memory footprint.
@@ -611,14 +612,88 @@ class GroupXcorrCZT_Permutations:
         
         # Pre-calculate the phases for each group (TODO: i should move to this init?)
         cztFreq = cp.arange(self.f1, self.f2+self.binWidth/2, self.binWidth) # Compute as doubles
-        groupPhases = cp.exp(1j*2*cp.pi*cztFreq*self.groupStarts.reshape((-1,1))/self.fs).astype(cp.complex64) # Convert to floats
+        groupPhases = cp.exp(1j*2*cp.pi*cztFreq*cp.array(self.groupStarts.reshape((-1,1)))/self.fs).astype(cp.complex64) # Convert to floats
         
-        ## TODO: COMPLETE THIS
+        # Instantiate the CZT object
+        cztcg = CZTCachedGPU(self.length, self.f1, self.f2, self.binWidth, self.fs)
         
+        # Calculate the number to complete per batch
+        numPerBatch = np.hstack((np.zeros(int(shifts.size/batchSz),dtype=np.int32) + batchSz, np.remainder(shifts.size,batchSz,dtype=np.int32)))
+        startIdxPerBatch = np.hstack((0, np.cumsum(numPerBatch[:-1])))
         
+        # Pre-alloc a batch storage matrices?
+        d_mulMatrix = cp.zeros((batchSz,self.ygroups.shape[1]), dtype=cp.complex64)
+        d_pdtcztMatrix = cp.zeros((batchSz,cztcg.k), dtype=cp.complex64)
         
+        # Counter for normsq completion?
+        groupNormSqCompleted = np.zeros(self.numGroups, dtype=np.uint8)
         
+        # Loop over the templates instead of shifts
+        for k in np.arange(self.numTemplates):
+            # Load the current template to device
+            d_template = cp.array(self.ygroups[k,:], dtype=cp.complex64)
+            # Get the group number for the template
+            groupNumber = self.ygroupIdxs[k]
+            # And the groupStart index
+            groupStartIdx = self.groupStarts[groupNumber]
+            
+            # Calculate the norms outside the inner batch loop?
+            if groupNormSqCompleted[groupNumber] == 0:
+                # Calculate the slice for the shift -> absSq
+                d_rxSliceAbsSq = cp.abs(rx[groupStartIdx+shifts[0]:groupStartIdx+shifts[-1]+self.length])**2
+                for i in np.arange(shifts.size):
+                    self.d_rxgroupNormSq[groupNumber,i] = cp.sum(d_rxSliceAbsSq[i:i+self.length])
+            
+            # Loop over batches
+            for b in np.arange(numPerBatch.size):
+                for i in np.arange(numPerBatch[b]):
+                    shift = shifts[startIdxPerBatch[b] + i]
+                    
+                    # Multiply the appropriate slice
+                    # mulMatrix[:numPerBatch[i]] = rx[shift+groupStartIdx : shift+groupStartIdx+self.length] * d_template
+                    cp.multiply(rx[shift+groupStartIdx : shift+groupStartIdx+self.length],
+                                d_template,
+                                out = d_mulMatrix[i,:]) # Write to memory directly
+                    # # Calculate the groupNormSq
+                    # if self.d_rxgroupNormSq[groupNumber, i] == 0:
+                    #     self.d_rxgroupNormSq[groupNumber,i] = cp.linalg.norm(rx[shift+groupStartIdx : shift+groupStartIdx+self.length])**2
+                        
+                # Run czt on the entire batch
+                # d_pdtcztMatrix = cztcg.runMany(d_mulMatrix[:numPerBatch[b]])
+                cztcg.runMany(d_mulMatrix[:numPerBatch[b]], out=d_pdtcztMatrix[:numPerBatch[b]])
+                # Now multiply the phase and save directly
+                # self.d_xcTemplates[k, startIdxPerBatch[b]:startIdxPerBatch[b]+numPerBatch[b], :] = d_pdtcztMatrix * groupPhases[groupNumber,:]
+                cp.multiply(d_pdtcztMatrix[:numPerBatch[b]],
+                            groupPhases[groupNumber,:],
+                            out=self.d_xcTemplates[k, startIdxPerBatch[b]:startIdxPerBatch[b]+numPerBatch[b], :]) # Write to memory directly
+                
+        return cp.asnumpy(cztFreq)
         
+    def getCAF_GPU(self, templateIdx: np.ndarray):
+        assert(templateIdx.size == self.numGroups)
+        
+        # Initialize array
+        cafcplx = cp.zeros((self.d_xcTemplates.shape[1],self.d_xcTemplates.shape[2]), dtype=np.complex64)
+
+        rxnormsq = cp.zeros(self.d_rxgroupNormSq.shape[1])
+        ynormsq = np.zeros(1) # we can leave this on cpu
+
+        # GPU
+        for groupNumber in np.arange(templateIdx.size):
+            templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]][0] # cupy needs the 0
+
+            # cafcplx[:,:] = cafcplx[:,:] + self.d_xcTemplates[templateNumber,:,:] 
+            cp.add(cafcplx, self.d_xcTemplates[templateNumber,:,:], out = cafcplx)
+            # rxnormsq += self.rxgroupNormSq[groupNumber,:]
+            cp.add(rxnormsq, self.d_rxgroupNormSq[groupNumber,:], out=rxnormsq)
+            # ynormsq += self.ygroupsEnergy[templateNumber]
+            np.add(ynormsq, self.ygroupsEnergy[templateNumber], out=ynormsq)
+            
+        caf = cp.abs(cafcplx)**2/rxnormsq.reshape(-1,1)/ynormsq[0]
+        
+        return caf
+    
+    ## CPU Methods
     def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None, numThreads: int=1):
         # We are returning CAF for this (for now?)
         if shifts is None:
@@ -696,8 +771,14 @@ class GroupXcorrCZT_Permutations:
             # Last thread takes the remainder rows
             if thIdx == numThreads - 1:
                 cafcplx[-numLastThread:,:] = cafcplx[-numLastThread:,:] + self.xcTemplates[templateNumber,-numLastThread:,:]
+                # np.add(cafcplx[-numLastThread:,:],
+                #        self.xcTemplates[templateNumber,-numLastThread:,:],
+                #        out=cafcplx[-numLastThread:,:])
             else: # All previous threads compute based on the thread number
                 cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:] = cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:] + self.xcTemplates[templateNumber,thIdx*numPerThread:(thIdx+1)*numPerThread,:]
+                # np.add(cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:],
+                #        self.xcTemplates[templateNumber,thIdx*numPerThread:(thIdx+1)*numPerThread,:],
+                #        out=cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:])
                 
             
         

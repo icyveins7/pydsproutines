@@ -223,6 +223,14 @@ def plotTrajectory2d(r_x, r_xdot=None, r_xfmt='b.', quiver_scale=None, ax=None):
     
     return ax
 
+def plotConstellation(syms, fmt='.', ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+        
+    ax.plot(np.real(syms), np.imag(syms), fmt)
+    
+    return ax
+
 def mplBtnToggle(p, fig):
     '''
     Binds 'a' to reset and show all plots.

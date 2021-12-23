@@ -228,7 +228,7 @@ def plotConstellation(syms, fmt='.', ax=None):
         fig, ax = plt.subplots(1,1)
         
     ax.plot(np.real(syms), np.imag(syms), fmt)
-    ax.axis('eaual')
+    ax.axis('equal')
     
     return ax
 

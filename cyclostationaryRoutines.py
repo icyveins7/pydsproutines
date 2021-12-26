@@ -48,5 +48,5 @@ def estimateBaud(x: np.ndarray, fs: float):
     # Average the 2
     estBaud = (np.abs(b1) + np.abs(b2)) / 2
     
-    return estBaud, peaks[-2], peaks[-3]
+    return estBaud, peaks[-2], peaks[-3], Xf, freq
     

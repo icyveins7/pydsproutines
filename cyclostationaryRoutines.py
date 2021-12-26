@@ -31,6 +31,10 @@ def estimateBaud(x: np.ndarray, fs: float):
         be "fftshift(fft(abs(signal)))[idx1]".
     idx2
         Second index of fft vector used. Similar to the first.
+    Xf
+        fftshift(fft(abs(signal))) i.e. the FFT of the abs signal, described in idx1.
+    freq
+        freq vector (fft shifted) to apply the indices idx1 and idx2 to directly.
 
     '''
     Xf = np.fft.fftshift(np.fft.fft(np.abs(x)))

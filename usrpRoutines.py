@@ -252,12 +252,16 @@ class LiveReader(FolderReader):
         self.timeout = 3
         # Some other optionals
         self.exhaustFolderpath = None # To move files to after reading them
+        self.deleteAfter = False
         
         # Calculate input expected size per file
         self.expectedFileSize = numSampsPerFile * np.dtype(in_dtype).itemsize * 2 # x2 for complex
         
     def setTimeout(self, timeout):
         self.timeout = timeout
+        
+    def setDeleteAfter(self, b: bool):
+        self.deleteAfter = b
         
     def setExhaustFolder(self, path):
         self.exhaustFolderpath = path
@@ -277,6 +281,10 @@ class LiveReader(FolderReader):
             if self.exhaustFolderpath is not None:
                 exhaustpath = os.path.join(self.exhaustFolderpath, "%d%s" % (self.ftnow,self.extension))
                 shutil.move(fps[i],exhaustpaths[i])
+                
+            # Delete if set
+            if self.deleteAfter:
+                os.remove(fp)
             
             return alldata, fp, self.ftnow
         

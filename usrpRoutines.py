@@ -14,6 +14,7 @@ from signalCreationRoutines import *
 import scipy.signal as sps
 import shutil
 import psutil
+import time
 
 #%% Readers for complex data.
 
@@ -240,7 +241,58 @@ class SortedFolderReader(FolderReader):
         
         return selectTimes
         
-    
+#%% This is meant to only read one second at a time
+class LiveReader(FolderReader):
+    def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64):
+        super().__init__(folderpath, numSampsPerFile, extension, in_dtype, out_dtype)
+        # Track by the current filetime
+        self.ftnow = int(0)
+        # Timeouts
+        self.lastTime = 0
+        self.timeout = 3
+        # Some other optionals
+        self.exhaustFolderpath = None # To move files to after reading them
+        
+        # Calculate input expected size per file
+        self.expectedFileSize = numSampsPerFile * np.dtype(in_dtype).itemsize * 2 # x2 for complex
+        
+    def setTimeout(self, timeout):
+        self.timeout = timeout
+        
+    def setExhaustFolder(self, path):
+        self.exhaustFolderpath = path
+        
+    def getNext(self):
+        fp = os.path.join(self.folderpath, "%d%s" % (self.ftnow,self.extension))
+        # Check if it exists and is correct file size
+        if os.path.isfile(fp) and os.path.getsize(fp) == self.expectedFileSize:
+            # Read the file
+            alldata = simpleBinRead(fp, self.numSampsPerFile, self.in_dtype, self.out_dtype)
+        
+            # Update the current filetime
+            self.lastTime = time.time()
+            self.ftnow = self.ftnow + 1
+            
+            # Move out if needed
+            if self.exhaustFolderpath is not None:
+                exhaustpath = os.path.join(self.exhaustFolderpath, "%d%s" % (self.ftnow,self.extension))
+                shutil.move(fps[i],exhaustpaths[i])
+            
+            return alldata, fp, self.ftnow
+        
+        else: # If it doesn't exist or not correct file size, check if we have timed out
+            if time.time() - self.lastTime > self.timeout:
+                # Search for the next available file time and set it to that
+                self.refreshFilelists()
+                filetimes = np.sort(np.array([int(os.path.split(i)[-1].split('.')[0]) for i in self.filepaths],dtype=np.int32))
+                viableTimes = filetimes[filetimes>self.ftnow]
+                if viableTimes.size > 0:
+                    self.ftnow = viableTimes[0]
+                    print("Found next file at %d" % self.ftnow)
+                    
+            return None, None, None
+        
+        
 #%% Simple class to contain multiple synced readers
 class SyncReaders:
     def __init__(self, folderpaths, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64, ensure_incremental=True):

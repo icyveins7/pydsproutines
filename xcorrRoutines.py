@@ -416,7 +416,24 @@ def theoreticalMultiPeak(startIdx1, startIdx2, snr_linear_1=None, snr_linear_2=N
         u,indices = np.unique(mat, return_index=True)
         return u, matEffSNR[indices]
         
-        
+def argmax2d(m: np.ndarray):
+    '''
+    Returns the 2-D indices that mark the maximum value in the matrix m.
+
+    Parameters
+    ----------
+    m : np.ndarray
+        Input array.
+
+    Returns
+    -------
+    maxind: tuple
+        Indices of the max value. m[maxind[0],maxind[1]] should be the value.
+
+    '''
+    return np.unravel_index(np.argmax(m), m.shape)
+
+
 #%%
 class GroupXcorr:
     def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray, freqs: np.ndarray, fs: int, autoConj: bool=True):

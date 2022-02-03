@@ -133,3 +133,4 @@ def gridSearchTDOA_gpu(s1x_list, s2x_list, tdoa_list, td_sigma_list, xrange, yra
         return cp.asnumpy(d_cost_grid)
     else:
         return d_cost_grid
+    

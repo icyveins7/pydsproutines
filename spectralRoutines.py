@@ -66,6 +66,8 @@ def czt_scipy(x, f1, f2, binWidth, fs):
     return cc
 
 #%% Simple class to keep the FFT of the chirp filter to alleviate computations
+
+# Note, with the new scipy 1.8.0 update, this class has equivalent speed to the signal.CZT class
 class CZTCached:
     def __init__(self, xlength, f1, f2, binWidth, fs):
         self.k = int((f2-f1)/binWidth + 1)
@@ -95,6 +97,8 @@ class CZTCached:
         g = g[self.m-1:self.m+self.k-1] * self.ww[self.m-1:self.m+self.k-1]
         
         return g
+    
+
     
 class CZTCachedGPU:
     def __init__(self, xlength, f1, f2, binWidth, fs):

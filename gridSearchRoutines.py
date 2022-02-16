@@ -43,6 +43,44 @@ def gridSearchTDOA(s1x_list, s2x_list, tdoa_list, td_sigma_list, xrange, yrange,
     
     return cost_grid
 
+def gridSearchTDOA_direct(s1x_list, s2x_list, tdoa_list, td_sigma_list, gridmat, verb=True):
+    '''
+    
+    Parameters
+    ----------
+    gridmat : np.ndarray
+        N x 3 array, where N is the number of grid points in total; each row is the x,y,z values.
+
+
+    '''
+    
+    cost_grid = None
+    t1g = time.time()
+    for i in range(len(tdoa_list)):
+        # cpu code
+        s1x = s1x_list[i]
+        s2x = s2x_list[i]
+        tdoa = tdoa_list[i]
+        td_sigma = td_sigma_list[i]
+        
+        r = np.float32(tdoa * 299792458.0)
+        r_sigma = np.float32(td_sigma * 299792458.0)
+        
+        rm = np.linalg.norm(s2x - gridmat, axis=1) - np.linalg.norm(s1x - gridmat, axis=1)
+        
+        if cost_grid is None:
+            cost_grid = (r - rm)**2 / r_sigma**2
+        else:
+            cost_grid = cost_grid + (r - rm)**2 / r_sigma**2
+    
+    t2g = time.time()
+    if verb:
+        print("Grid search took %g seconds." % (t2g-t1g))
+    
+    return cost_grid
+
+#%%
+
 gridsearchtdoa_kernel = cp.RawKernel(r'''
 extern "C" __global__
 void gridsearchtdoa_kernel(int len, float *s1x_list, float *s2x_list,

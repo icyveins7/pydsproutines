@@ -10,6 +10,7 @@ import sympy
 from numba import jit
 import cupy as cp
 import time
+import scipy.signal as sps
 
 #%%
 def czt(x, f1, f2, binWidth, fs):
@@ -49,7 +50,24 @@ def czt(x, f1, f2, binWidth, fs):
     
     return g
 
+def czt_scipy(x, f1, f2, binWidth, fs):
+    '''
+    Comparison calling function for the new scipy CZT.
+    Note that as of scipy 1.8.0, their method appears to be slightly faster when start point is 0,
+    but slower when the start point is non 0.
+    3.0ms vs 3.6ms (start at 0 e.g. 0 to X Hz)
+    4.7ms vs 3.7ms (start at non 0 e.g. -X to X Hz)
+    '''
+    
+    length = int((f2-f1)/binWidth + 1)
+    a = np.exp(1j*2*np.pi*f1/fs) # not sure why this is positive, not negative
+    cc = sps.czt(x, length, np.exp(-1j*2*np.pi*binWidth/length), a)
+    
+    return cc
+
 #%% Simple class to keep the FFT of the chirp filter to alleviate computations
+
+# Note, with the new scipy 1.8.0 update, this class has equivalent speed to the signal.CZT class
 class CZTCached:
     def __init__(self, xlength, f1, f2, binWidth, fs):
         self.k = int((f2-f1)/binWidth + 1)
@@ -79,6 +97,8 @@ class CZTCached:
         g = g[self.m-1:self.m+self.k-1] * self.ww[self.m-1:self.m+self.k-1]
         
         return g
+    
+
     
 class CZTCachedGPU:
     def __init__(self, xlength, f1, f2, binWidth, fs):

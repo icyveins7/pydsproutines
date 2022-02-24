@@ -192,6 +192,12 @@ class GroupDatabase:
         self.cur.execute(stmt, (gidx, starttime, endtime))
         self.con.commit()
         
+    def getGroupByIdx(self, tablename: str, gidx: int):
+        stmt = "select * from %s where gidx=?" % tablename
+        self.cur.execute(stmt, (gidx,))
+        _, start, end = self.cur.fetchone()
+        return start, end
+        
     def getAllGroups(self, tablename: str, returnDataframe: bool = False):
         stmt = "select * from %s" % tablename
         if returnDataframe:
@@ -243,7 +249,7 @@ class SortedFolderReader(FolderReader):
     
     def splitHighAmpSubfolders(self, targetfolderpath:str, selectTimes:list = None,
                                minAmp:float = 1e3, bufFront:int = 1, bufBack:int = 1,
-                               fmt:str = "%06d"):
+                               fmt:str = "%06d", useDatabase:bool = False):
         '''
         Detects files with high amplitudes, and selects a group of files around them based on bufFront/bufBack.
         Groups are then individually written into separate subfolders based on 'fmt', residing in 'targetfolderpath'.
@@ -262,6 +268,8 @@ class SortedFolderReader(FolderReader):
             Number of files to save behind the high amplitude file. The default is 1.
         fmt : str, optional
             Subfolder name format. The default is "%06d".
+        useDatabase : bool, optional
+            Option to not copy files, but instead just write them to a database.
 
         Returns
         -------
@@ -294,22 +302,42 @@ class SortedFolderReader(FolderReader):
         if not os.path.isdir(targetfolderpath):
             os.makedirs(targetfolderpath)
             print("Created %s" % targetfolderpath)
-        
+            
+        # Create the database
+        if useDatabase:
+            dbfilepath = os.path.join(targetfolderpath,"groups.db")
+            print("Writing to database at %s" % dbfilepath)
+            gd = GroupDatabase(dbfilepath)
+            # tablename = os.path.split(targetfolderpath)[1] # may result in starting with numeric, so don't use this
+            tablename = "groups"
+            print("Using tablename: %s" % tablename)
+            gd.addTable(tablename)
+ 
         # Loop over groups
         for i in range(len(groupSplitIdx)-1):
             grptimes = selectTimes[groupSplitIdx[i]:groupSplitIdx[i+1]]
-            grpstring = fmt % i
-            subdirpath = os.path.join(targetfolderpath, grpstring)
-            if not os.path.isdir(subdirpath):
-                os.makedirs(subdirpath)
-            srcfilepaths = [os.path.join(self.folderpath, "%d.bin"%(i)) for i in grptimes]
-            dstfilepaths = [os.path.join(subdirpath, "%d.bin"%(i)) for i in grptimes]
-            for p in range(len(srcfilepaths)):
-                print("Group %d: copy %s to %s" % (i, srcfilepaths[p], dstfilepaths[p]))
-                try:
-                    shutil.copyfile(srcfilepaths[p],dstfilepaths[p])
-                except:
-                    print("Error occurred while copying %s to %s" % (srcfilepaths[p],dstfilepaths[p]))
+            
+            if not useDatabase:
+                grpstring = fmt % i
+                subdirpath = os.path.join(targetfolderpath, grpstring)
+                if not os.path.isdir(subdirpath):
+                    os.makedirs(subdirpath)
+                srcfilepaths = [os.path.join(self.folderpath, "%d.bin"%(i)) for i in grptimes]
+                dstfilepaths = [os.path.join(subdirpath, "%d.bin"%(i)) for i in grptimes]
+                for p in range(len(srcfilepaths)):
+                    print("Group %d: copy %s to %s" % (i, srcfilepaths[p], dstfilepaths[p]))
+                    try:
+                        shutil.copyfile(srcfilepaths[p],dstfilepaths[p])
+                    except:
+                        print("Error occurred while copying %s to %s" % (srcfilepaths[p],dstfilepaths[p]))
+            else: # if we are using database then append groups
+                gidx = i
+                starttime = grptimes[0]
+                endtime = grptimes[-1]
+                
+                gd.insertGroup(tablename, int(gidx), int(starttime), int(endtime))
+                print("Inserted: gidx=%d, start=%d, end=%d\n" % (gidx, starttime, endtime))
+                
             print("-----")
             
     
@@ -449,5 +477,40 @@ class GroupReaders:
         
     def resetGroup(self):
         self.cGrp = -1
+        
+        
+#%% Readers that work with the database
+class GroupReadersDB:
+    def __init__(self, grpdb, folderpaths, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64):
+        self.folderpaths = folderpaths
+        # Storage for getter methods later
+        self.numSampsPerFile = numSampsPerFile
+        self.extension = extension
+        self.in_dtype = in_dtype
+        self.out_dtype = out_dtype
+        
+        self.grpdb = grpdb
+        self.resetGroup() # inits cGrp to -1
+        self.cStart = None
+        self.cEnd = None
+        self.cFiles = []
+        
+    def nextGroup(self, ensure_exists: bool = True):
+        self.cGrp += 1
+        
+        self.cStart, self.cEnd = self.grpdb.getGroupByIdx("groups", self.cGrp) # standard table name
+        self.cFiles = [ [os.path.join(folder, "%d" % (i) + self.extension) for i in range(self.cStart, self.cEnd+1)]
+                       for folder in self.folderpaths]
+        
+        if ensure_exists:
+            for f in range(len(self.cFiles)):
+                for i in range(len(self.cFiles[f])):
+                    if not os.path.exists(self.cFiles[f][i]):
+                        raise FileNotFoundError(self.cFiles[f][i])
+        
+    def resetGroup(self):
+        self.cGrp = -1
+        
+        
     
     

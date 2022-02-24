@@ -507,6 +507,16 @@ class GroupReadersDB:
                 for i in range(len(self.cFiles[f])):
                     if not os.path.exists(self.cFiles[f][i]):
                         raise FileNotFoundError(self.cFiles[f][i])
+                        
+    def getAll(self):
+        alldata = []
+        for f in range(len(self.cFiles)):
+            filelist = self.cFiles[f]
+            data = multiBinReadThreaded(filelist, numSampsPerFile, in_dtype=self.in_dtype, out_dtype=self.out_dtype)
+            alldata.append(data)
+        
+        return alldata
+            
         
     def resetGroup(self):
         self.cGrp = -1

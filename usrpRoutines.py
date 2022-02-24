@@ -16,6 +16,32 @@ import shutil
 import psutil
 import time
 
+import sqlite3 as sq
+import io
+import pandas as pd
+
+#%% Sqlite adapters for numpy
+def adapt_array(arr):
+    """
+    http://stackoverflow.com/a/31312102/190597 (SoulNibbler)
+    """
+    out = io.BytesIO()
+    np.save(out, arr)
+    out.seek(0)
+    return sq.Binary(out.read())
+
+def convert_array(text):
+    out = io.BytesIO(text)
+    out.seek(0)
+    return np.load(out)
+
+# Converts np.array to TEXT when inserting
+sq.register_adapter(np.ndarray, adapt_array)
+
+# Converts TEXT to np.array when selecting
+sq.register_converter("ARRAY", convert_array)
+
+
 #%% Readers for complex data.
 
 def simpleBinRead(filename, numSamps=-1, in_dtype=np.int16, out_dtype=np.complex64):
@@ -127,6 +153,55 @@ class FolderReader:
             plt.figure()
             plt.specgram(alldata, NFFT=1024, Fs=fs)
             
+#%%
+class GroupDatabase:
+    def __init__(self, dbfilepath: str = "groups.db"):
+        self.dbfilepath = dbfilepath
+        
+        # Make the db
+        self.con = sq.connect(dbfilepath)
+        self.cur = self.con.cursor()
+        
+    def addTable(self, tablename: str):
+        stmt = "create table if not exists %s(gidx INTEGER UNIQUE, starttime INTEGER, endtime INTEGER)" % tablename
+        self.cur.execute(stmt)
+        self.con.commit()
+        
+    def getLatestGroupIdx(self, tablename: str):
+        stmt = "select max(gidx) from %s" % tablename
+        self.cur.execute(stmt)
+        r = self.cur.fetchone()
+        print(r)
+        return r
+        
+    def insertGroup(self, tablename: str, gidx: int, starttime: int, endtime: int):
+        '''
+        Parameters
+        ----------
+        tablename : str
+            Table to insert into.
+        gidx : int
+            Group index, unique value for each row.
+        starttime : int
+            Start time, inclusive.
+        endtime : int
+            End time, inclusive i.e. group is from starttime <= time <= endtime. 
+
+        '''
+        stmt = "insert into %s values(?,?,?)" % tablename
+        self.cur.execute(stmt, (gidx, starttime, endtime))
+        self.con.commit()
+        
+    def getAllGroups(self, tablename: str, returnDataframe: bool = False):
+        stmt = "select * from %s" % tablename
+        if returnDataframe:
+            df = pd.read_sql_query(stmt, self.con)
+            return df
+        else:
+            self.cur.execute(stmt)
+            r = self.cur.fetchall()
+            return r
+        
     
 class SortedFolderReader(FolderReader):
     def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64, ensure_incremental=True):

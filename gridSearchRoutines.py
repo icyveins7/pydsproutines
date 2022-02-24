@@ -7,6 +7,7 @@ Created on Thu Apr  1 13:47:58 2021
 
 import numpy as np
 import scipy as sp
+from scipy.stats.distributions import chi2
 import cupy as cp
 import time
 
@@ -172,3 +173,56 @@ def gridSearchTDOA_gpu(s1x_list, s2x_list, tdoa_list, td_sigma_list, xrange, yra
     else:
         return d_cost_grid
     
+    
+#%% CRB Routines
+def calcCRB_TD(x, S, sig_r, pairs=None, cmat=None):
+    if x.ndim == 1:
+        x = x.reshape((-1,1)) # Reshapes do not alter the external array (the one passed in)
+    
+    m = S.shape[1] # no. of sensors
+    r = np.linalg.norm(x - S, axis=0)
+    r_dx = (x - S) / r
+    
+    if pairs is None: # Assume every pair in S is used with no overlaps
+        pairs = np.arange(m).reshape((-1,2))
+        
+    numPairs = pairs.shape[0]
+    R = np.zeros((3,numPairs))
+    
+    for k in np.arange(numPairs):
+        R[:3, k] = r_dx[:, pairs[k,0]] - r_dx[:, pairs[k,1]]
+        
+    SIGR = np.diag(sig_r**-2)
+    FIM = R @ SIGR @ R.T
+    
+    if cmat is None:
+        crb = np.linalg.inv(FIM)
+    else:
+        U = sp.linalg.null_space(cmat.T)
+        crb = U @ np.linalg.inv(U.T @ FIM @ U) @ U.T
+        
+    return crb
+
+def projectCRBtoEllipse(crb, pos, percent, dof=2, theta=None):
+    if pos.ndim == 1:
+        pos = pos.reshape((-1,1))
+    
+    sigval = chi2.ppf(percent, df=dof)
+    u, s, vh = np.linalg.svd(crb)
+    a = s[0]**0.5
+    b = s[1]**0.5
+    
+    if theta is None:
+        theta = np.arange(0,2*np.pi,0.01)
+        
+    r = sigval**0.5 * a * b / np.sqrt(b**2 * np.cos(theta)**2  + a**2 * np.sin(theta)**2)
+    
+    x = np.repeat(np.expand_dims(r * np.cos(theta), 0), 3, axis=0)
+    y = np.repeat(np.expand_dims(r * np.sin(theta), 0), 3, axis=0)
+    ellipse = x * u[:,0].reshape((-1,1)) + y * u[:,1].reshape((-1,1)) + pos
+    
+    return ellipse
+    
+    
+    
+        

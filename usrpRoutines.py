@@ -512,7 +512,7 @@ class GroupReadersDB:
         alldata = []
         for f in range(len(self.cFiles)):
             filelist = self.cFiles[f]
-            data = multiBinReadThreaded(filelist, numSampsPerFile, in_dtype=self.in_dtype, out_dtype=self.out_dtype)
+            data = multiBinReadThreaded(filelist, self.numSampsPerFile, in_dtype=self.in_dtype, out_dtype=self.out_dtype)
             alldata.append(data)
         
         return alldata

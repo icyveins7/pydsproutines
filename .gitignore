@@ -10,3 +10,4 @@ cython_ext/build/*
 *.pyd
 cython_ext/*.pyd
 *.so
+*.o

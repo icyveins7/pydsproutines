@@ -7,6 +7,9 @@
  *
  * Uses IPP to quickly recreate exp(1i*2*pi*freq*(0:len-1)/fs) quickly.
  *
+ * gcc -c cpuToneDll.c -lippcore -lipps -fpic -o cpuToneDll.o
+ * gcc -shared -o cpuToneDll.so cpuToneDll.o
+ *
 */
 
 #include "ipp.h"
@@ -25,7 +28,7 @@ extern "C" {
 
 
 /* The gateway function */
-extern DLL_EXPORT int cpuWola(int len, double freq, double fs, double phase, Ipp64fc *tone){
+extern DLL_EXPORT int cpuTone(int len, double freq, double fs, double phase, Ipp64fc *tone){
 	ippInit();
 
     // computation
@@ -47,6 +50,8 @@ extern DLL_EXPORT int cpuWola(int len, double freq, double fs, double phase, Ipp
         }
         ippsTone_64fc(tone, len, 1.0, usedFreq/fs, &phase, ippAlgHintAccurate);
     }
+    
+    return 0;
 	
 }
 

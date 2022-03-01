@@ -7,9 +7,11 @@
  *
  * Uses IPP to quickly recreate exp(1i*2*pi*freq*(0:len-1)/fs) quickly.
  *
- * gcc -c cpuToneDll.c -lippcore -lipps -fpic -o cpuToneDll.o
- * gcc -shared -o cpuToneDll.so cpuToneDll.o
+ * gcc -c cpuToneDll.c -fpic -o cpuToneDll.o
+ * gcc -shared -o cpuToneDll.so cpuToneDll.o -lippcore -lipps
  *
+ * Note that order matters for the above; in particular, linking ippcore/ipps must be done after the object file (.o) inclusion.
+ * Speedup for (100M length): 3.39s for numpy, 308ms for this.
 */
 
 #include "ipp.h"

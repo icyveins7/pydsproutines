@@ -9,29 +9,35 @@ Created on Wed Mar  2 19:20:01 2022
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn import metrics
+import matplotlib.pyplot as plt
 
 
 #%%
 class ClusterEngine:
-    def __init__(self, minClusterSize=None, minClusterFraction=None, scoretypes=["sil"]):
+    def __init__(self, guesses, minClusterSize=None, minClusterFraction=None, scoretypes=["sil"]):
+        self.guesses = guesses
         self.minClusterSize = minClusterSize
         self.minClusterFraction = minClusterFraction
         self.scoretypes = scoretypes
+        self.scoretitles = {'sil': "Silhouette",
+                            'ch': "Calinski Harabasz",
+                            'db': "Davies Bouldin"}
         
-    def _cluster1d(self, x, guesses):
+    def _cluster1d(self, x):
   
-        self.scores = {key: np.zeros(len(guesses)) for key in self.scoretypes}
+        self.scores = {key: np.zeros(len(self.guesses)) for key in self.scoretypes}
         
-        for i in range(len(guesses)):
-            model = KMeans(n_clusters=guesses[i]).fit(x)
+        # Compute all requested scores
+        for i in range(len(self.guesses)):
+            model = KMeans(n_clusters=self.guesses[i]).fit(x)
             if 'sil' in self.scoretypes:
                 self.scores['sil'][i] = metrics.silhouette_score(x, model.labels_, metric='euclidean')
-            elif 'ch' in self.scoretypes:
+            if 'ch' in self.scoretypes:
                 self.scores['ch'][i] = metrics.calinski_harabasz_score(x, model.labels_)
-            elif 'db' in self.scoretypes:
+            if 'db' in self.scoretypes:
                 self.scores['db'][i] = metrics.davies_bouldin_score(x, model.labels_)
                 
-        # Use the first scoretype to decide
+        # Only use the first scoretype to decide
         if self.scoretypes[0] == "sil":
             sel = np.argmax(self.scores[self.scoretypes[0]]) # This one is max
         elif self.scoretypes[0] == "db":
@@ -39,11 +45,15 @@ class ClusterEngine:
         elif self.scoretypes[0] == "ch":
             raise NotImplementedError("Calinski Harabasz Score maximisation not available.") # will have to look for the kink, but seems unreliable
             
-        return guesses[sel]
+        return self.guesses[sel]
                 
         
             
-    def cluster(self, x, guesses, verbose=False):
+    def cluster(self, x: np.ndarray,
+                ensure_sorted: bool=True,
+                verbose: bool=False):
+        
+        
         if x.ndim == 1:
             x = x.reshape((-1,1)) # does not overwrite external argument array
         
@@ -51,16 +61,15 @@ class ClusterEngine:
         idxUsed = np.arange(x.size) # Initialize using the entire array
         idxRemoved = []
         while(True):
-            print("Clustering...")
             # Cluster first
-            bestguess = self._cluster1d(x[idxUsed], guesses)
+            bestguess = self._cluster1d(x[idxUsed])
             # Make the model with best guess of no. of clusters
             bestmodel = KMeans(n_clusters=bestguess).fit(x[idxUsed])
             # Count the cluster sizes
             uniqueLabels = np.unique(bestmodel.labels_)
             numPerCluster = np.array([np.argwhere(bestmodel.labels_ == label).size for label in uniqueLabels])
             if verbose:
-                print("Found %d clusters with members:" % uniqueLabels.size)
+                print("\nFound %d clusters with members:" % uniqueLabels.size)
                 print(numPerCluster)
             
             
@@ -75,11 +84,7 @@ class ClusterEngine:
                     print(idxUsed[idxToRemove])
                     print("with corresponding values")
                     print(x[idxUsed[idxToRemove]])
-                
-                # Append to removal list, using global indices
-                idxRemoved.extend(idxUsed[idxToRemove])
-                # Then delete it
-                idxUsed = np.delete(idxUsed, idxToRemove)
+            
                     
             elif self.minClusterFraction is not None and np.min(numPerCluster)/np.max(numPerCluster) < self.minClusterFraction:
                 # We again remove the smallest cluster
@@ -92,16 +97,66 @@ class ClusterEngine:
                     print("with corresponding values")
                     print(x[idxUsed[idxToRemove]])
                 
-                # Append to removal list, using global indices
-                idxRemoved.extend(idxUsed[idxToRemove])
-                # Then delete it
-                idxUsed = np.delete(idxUsed, idxToRemove)
-                
                 
             else:
                 break
             
-        return bestguess, bestmodel, np.array(idxRemoved)
+            # Remove those slated for removal
+            # Append to removal list, using global indices
+            idxRemoved.extend(idxUsed[idxToRemove])
+            # Then delete it
+            idxUsed = np.delete(idxUsed, idxToRemove)
+            
+        # Sort if desired
+        if ensure_sorted:
+            sortedIdx = np.argsort(bestmodel.cluster_centers_.flatten())
+            bestmodel.labels_ = sortedIdx[bestmodel.labels_]
+            bestmodel.cluster_centers_ = bestmodel.cluster_centers_[sortedIdx]
+            
+        return bestguess, bestmodel, np.array(idxRemoved), idxUsed
+    
+    @staticmethod
+    def plotClusters(x, bestmodel, idxRemoved, idxUsed, colours=['r','b']):
+        allIdx = np.arange(x.size)
+        fig, ax = plt.subplots(1,1,num="Clusters")
+        ax.plot(allIdx, x, 'x')
+        
+        # Plot the outliers removed
+        ax.plot(allIdx[idxRemoved], x[idxRemoved], 'ko', label='Outliers (%d)' % idxRemoved.size)
+        
+        # Plot the clusters via labels
+        for i in range(bestmodel.n_clusters):
+            si = idxUsed[np.argwhere(bestmodel.labels_ == i)]
+            ax.plot(allIdx[si], m[si], colours[i%len(colours)]+'s', markerfacecolor='none', label='Cluster %d (%d)' % (i, si.size))
+            
+        ax.legend()
+        
+        return fig, ax
+    
+    def plotScores(self, title:str="Cluster Scores"):
+        '''
+        Parameters
+        ----------
+        title : str, optional
+            Figure title. The default is 'Cluster Scores'.
+
+        Returns
+        -------
+        fig : pyplot figure
+        
+        ax : pyplot axes
+        '''
+        if title is None:
+            title = "Cluster Scores"
+        fig, ax = plt.subplots(len(self.scoretypes),1,num=title)
+        if len(self.scoretypes) == 1:
+            ax = [ax] # Hotfix for when only 1 score is used
+        
+        for i in range(len(self.scoretypes)):
+            ax[i].plot(self.guesses, self.scores[self.scoretypes[i]])
+            ax[i].set_title(self.scoretitles[self.scoretypes[i]])
+            
+        return fig, ax
                 
                 
         
@@ -126,16 +181,16 @@ if __name__ == "__main__":
     m = np.hstack((f1,f2,o))
     np.random.shuffle(m) # shuffles in place
     
-    # View
-    import matplotlib.pyplot as plt
-    plt.close('all')
-    allIdx = np.arange(m.size)
-    plt.plot(allIdx, m, 'x')
-    
     # Test the cluster engine
-    cle = ClusterEngine(minClusterSize=5)
-    bestguess, bestmodel, idxRemoved = cle.cluster(m, np.arange(2,10), verbose=True)
+    cle = ClusterEngine(np.arange(2,10), minClusterSize=5, scoretypes=['sil', 'db'])
+    bestguess, bestmodel, idxRemoved, idxUsed = cle.cluster(m, verbose=True)
     
-    # Plot the outliers removed
-    plt.plot(allIdx[idxRemoved], m[idxRemoved], 'ko')
+    # View
+    plt.close('all')
+    cle.plotClusters(m, bestmodel, idxRemoved, idxUsed)
+    
+    # Plot the scores
+    cle.plotScores()
+    
+    
     

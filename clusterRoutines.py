@@ -52,7 +52,28 @@ class ClusterEngine:
     def cluster(self, x: np.ndarray,
                 ensure_sorted: bool=True,
                 verbose: bool=False):
-        
+        '''
+        Parameters
+        ----------
+        x : np.ndarray
+            Input array to be clustered.
+        ensure_sorted : bool, optional
+            Option to sort the cluster centers in ascending order. The default is True.
+        verbose : bool, optional
+            Verbose debug prints. The default is False.
+
+        Returns
+        -------
+        bestguess : int
+            Best fit number of clusters based on configured guesses (see init).
+        bestmodel : KMeans
+            The fitted model. Common use cases are to see the labels via bestmodel.labels_.
+            See scikit-learn's documentation for more info.
+        idxRemoved: np.ndarray
+            The indices removed as outliers based on the configured options (see init).
+        idxUsed : np.ndarray
+            The remaining indices that are used in the 'bestmodel'.
+        '''  
         
         if x.ndim == 1:
             x = x.reshape((-1,1)) # does not overwrite external argument array

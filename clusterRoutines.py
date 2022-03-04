@@ -116,18 +116,27 @@ class ClusterEngine:
         return bestguess, bestmodel, np.array(idxRemoved), idxUsed
     
     @staticmethod
-    def plotClusters(x, bestmodel, idxRemoved, idxUsed, colours=['r','b']):
-        allIdx = np.arange(x.size)
-        fig, ax = plt.subplots(1,1,num="Clusters")
-        ax.plot(allIdx, x, 'x')
+    def plotClusters(x, bestmodel, idxRemoved, idxUsed, t=None, colours=['r','b'],
+                     ax=None, title="Clusters"):
+        if t is None:
+            t = np.arange(x.size) # just numbers them
+            
+        if ax is None: # Make a new plot with the title
+            fig, ax = plt.subplots(1,1,num=title)
+        else: # Else just plot on existing axes object
+            fig = None
+            
+        # Plot all the points
+        ax.plot(t, x, 'x')
         
         # Plot the outliers removed
-        ax.plot(allIdx[idxRemoved], x[idxRemoved], 'ko', label='Outliers (%d)' % idxRemoved.size)
+        if idxRemoved.size > 0:
+            ax.plot(t[idxRemoved], x[idxRemoved], 'ko', label='Outliers (%d)' % idxRemoved.size)
         
         # Plot the clusters via labels
         for i in range(bestmodel.n_clusters):
             si = idxUsed[np.argwhere(bestmodel.labels_ == i)]
-            ax.plot(allIdx[si], m[si], colours[i%len(colours)]+'s', markerfacecolor='none', label='Cluster %d (%d)' % (i, si.size))
+            ax.plot(t[si], x[si], colours[i%len(colours)]+'s', markerfacecolor='none', label='Cluster %d (%d)' % (i, si.size))
             
         ax.legend()
         

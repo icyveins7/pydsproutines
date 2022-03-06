@@ -8,8 +8,80 @@ Created on Thu Apr  1 13:47:58 2021
 import numpy as np
 import scipy as sp
 from scipy.stats.distributions import chi2
-import cupy as cp
+from numba import jit
 import time
+import cupy as cp
+
+#%%
+# @jit(nopython=True) # not working until numba includes axis option in linalg.norm
+def gridSearchRTT(
+        t_list: np.ndarray,
+        r_list: np.ndarray,
+        toa_list: np.ndarray,
+        toa_sigma_list: np.ndarray,
+        grid_list: np.ndarray,
+        verb: bool=True):
+    '''
+    Localizes based on a one-bounce RTT measurement.
+    
+    Parameters
+    ----------
+    t_list : np.ndarray
+        Transmitter position. If 1-d array, assumed as a static position,
+        otherwise each row represents a position for the associated measurement.
+    r_list : np.ndarray
+        Receiver position (may be the same as the transmitter). 
+        If 1-d array, assumed as a static position,
+        otherwise each row represents a position for the associated measurement.
+    toa_list : np.ndarray
+        RTT time-of-arrival measurements.
+    toa_sigma_list : np.ndarray
+        RTT measurement errors.
+    grid_list : np.ndarray
+        2-d array of grid points to evaluate costs at. Each row represents a point.
+    verb : bool, optional
+        Verbose printing (for timing). The default is True.
+
+    Returns
+    -------
+    cost_grid : np.ndarray
+        A cost array of length equal to the number of grid points.
+
+    '''
+    
+    # Instantiate output
+    numGridPts = grid_list.shape[0] # Each row is a point
+    cost_grid = np.zeros(numGridPts)
+    t1g = time.time()
+    
+    for i in range(len(toa_list)):
+        if t_list.ndim == 1: # Then static tx
+            t = t_list
+        else:
+            t = t_list[i,:]
+            
+        if r_list.ndim == 1: # Then static rx
+            r = r_list
+        else:
+            r = r_list[i,:]
+            
+        # Compute expectation for the grid points
+        e_dist = np.linalg.norm(t - grid_list, axis=1) + np.linalg.norm(r - grid_list, axis=1)
+        
+        # Compute distance, error from TOA
+        m_dist = 299792458.0 * toa_list[i]
+        m_err = 299792458.0 * toa_sigma_list[i]
+        
+        # Add to the grid
+        cost_grid = cost_grid + (e_dist - m_dist)**2 / m_err**2
+    
+    t2g = time.time()
+    if verb:
+        print("Grid search took %g seconds." % (t2g-t1g))
+        
+    return cost_grid
+    
+
 
 def gridSearchTDOA(s1x_list, s2x_list, tdoa_list, td_sigma_list, xrange, yrange, z, verb=True):
     '''
@@ -18,7 +90,7 @@ def gridSearchTDOA(s1x_list, s2x_list, tdoa_list, td_sigma_list, xrange, yrange,
     '''
     xm, ym = np.meshgrid(xrange,yrange)
     fullmesh = np.vstack((xm.flatten(),ym.flatten(),np.zeros(len(ym.flatten())) + z)).transpose().astype(np.float32)
-    cost_grid = None
+    cost_grid = 0
     
     t1g = time.time()
     for i in range(len(tdoa_list)):

@@ -10,7 +10,6 @@ import scipy as sp
 from scipy.stats.distributions import chi2
 from numba import jit
 import time
-import cupy as cp
 
 #%%
 # @jit(nopython=True) # not working until numba includes axis option in linalg.norm
@@ -152,100 +151,6 @@ def gridSearchTDOA_direct(s1x_list, s2x_list, tdoa_list, td_sigma_list, gridmat,
     
     return cost_grid
 
-#%%
-
-gridsearchtdoa_kernel = cp.RawKernel(r'''
-extern "C" __global__
-void gridsearchtdoa_kernel(int len, float *s1x_list, float *s2x_list,
-                           float *tdoa_list, float *td_sigma_list,
-                           float x0, float y0, float xp, float yp,
-                           int xn, int yn, float z,
-                           float *cost_grid)
-{
-    // allocate shared memory
-    extern __shared__ float s[];
-    float *s_s1x_l = s; // (len * 3) floats
-    float *s_s2x_l = (float*)&s_s1x_l[len * 3]; // (len * 3) floats
-    float *s_r_l = (float*)&s_s2x_l[len * 3]; // (len) floats
-    float *s_rsigma_l = (float*)&s_r_l[len]; // (len) floats
-    
-    // load shared memory
-    for (int t = threadIdx.x; t < len * 3; t = t + blockDim.x){
-        s_s1x_l[t] = s1x_list[t];
-        s_s2x_l[t] = s2x_list[t];
-    }
-    for (int t = threadIdx.x; t < len; t = t + blockDim.x){
-        s_r_l[t] = tdoa_list[t] * 299792458.0;
-        s_rsigma_l[t] = td_sigma_list[t] * 299792458.0; // perform the multiplies while loading
-    }
-    
-    __syncthreads();
-    
-    int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    int row = tid / xn;
-    int col = tid % xn;
-    
-    float x = col * xp + x0;
-    float y = row * yp + y0;
-    
-    float rm, rm2, rm1;
-    float fullcost = 0.0f;
-    float cost;
-    
-    for (int i = 0; i < len; i++){
-        
-        rm1 = norm3df(s_s1x_l[i*3+0] - x, s_s1x_l[i*3+1] - y, s_s1x_l[i*3+2] - z);
-        rm2 = norm3df(s_s2x_l[i*3+0] - x, s_s2x_l[i*3+1] - y, s_s2x_l[i*3+2] - z);
-        rm = rm2 - rm1; // theoretical range for the point
-        
-        cost = (s_r_l[i] - rm) / s_rsigma_l[i];
- 
-        fullcost = fmaf(cost, cost, fullcost); // accumulate costs (len) times
-        
-    }
-    
-    // write to output
-    int cost_grid_len = xn * yn;
-    if (tid < cost_grid_len){
-        cost_grid[tid] = fullcost;
-    }
-}
-''', 'gridsearchtdoa_kernel')
-
-def gridSearchTDOA_gpu(s1x_list, s2x_list, tdoa_list, td_sigma_list, xrange, yrange, z, verb=True, moveToCPU=False):
-    d_s1x_l = cp.asarray(s1x_list).astype(cp.float32)
-    d_s2x_l = cp.asarray(s2x_list).astype(cp.float32)
-    d_tdoa_l = cp.asarray(tdoa_list).astype(cp.float32)
-    d_tdsigma_l = cp.asarray(td_sigma_list).astype(cp.float32)
-    
-    x0 = np.min(xrange).astype(np.float32)
-    xp = (xrange[1]-xrange[0]).astype(np.float32)
-    xn = len(xrange)
-    y0 = np.min(yrange).astype(np.float32)
-    yp = (yrange[1]-yrange[0]).astype(np.float32)
-    yn = len(yrange)
-    
-    # prepare output
-    d_cost_grid = cp.zeros(xn*yn, dtype=cp.float32)
-    
-    # run kernel
-    t1 = time.time()
-    THREADS_PER_BLOCK = 128
-    NUM_BLOCKS = int(d_cost_grid.size/THREADS_PER_BLOCK + 1)
-    gridsearchtdoa_kernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), (len(s1x_list), d_s1x_l, d_s2x_l, d_tdoa_l, d_tdsigma_l,
-                                                               x0, y0, xp, yp, xn, yn, z, d_cost_grid), 
-                          shared_mem=(d_s1x_l.size + d_s2x_l.size + d_tdoa_l.size + d_tdsigma_l.size) * 4)
-    t2 = time.time()
-    
-    if verb:
-        print("Grid search kernel took %g seconds." % (t2-t1))
-    
-    if moveToCPU:
-        return cp.asnumpy(d_cost_grid)
-    else:
-        return d_cost_grid
-    
-    
 #%% CRB Routines
 def calcCRB_TD(x, S, sig_r, pairs=None, cmat=None):
     if x.ndim == 1:
@@ -296,5 +201,106 @@ def projectCRBtoEllipse(crb, pos, percent, dof=2, theta=None):
     return ellipse
     
     
+
+#%%
+try:
+    import cupy as cp
     
+    gridsearchtdoa_kernel = cp.RawKernel(r'''
+    extern "C" __global__
+    void gridsearchtdoa_kernel(int len, float *s1x_list, float *s2x_list,
+                               float *tdoa_list, float *td_sigma_list,
+                               float x0, float y0, float xp, float yp,
+                               int xn, int yn, float z,
+                               float *cost_grid)
+    {
+        // allocate shared memory
+        extern __shared__ float s[];
+        float *s_s1x_l = s; // (len * 3) floats
+        float *s_s2x_l = (float*)&s_s1x_l[len * 3]; // (len * 3) floats
+        float *s_r_l = (float*)&s_s2x_l[len * 3]; // (len) floats
+        float *s_rsigma_l = (float*)&s_r_l[len]; // (len) floats
         
+        // load shared memory
+        for (int t = threadIdx.x; t < len * 3; t = t + blockDim.x){
+            s_s1x_l[t] = s1x_list[t];
+            s_s2x_l[t] = s2x_list[t];
+        }
+        for (int t = threadIdx.x; t < len; t = t + blockDim.x){
+            s_r_l[t] = tdoa_list[t] * 299792458.0;
+            s_rsigma_l[t] = td_sigma_list[t] * 299792458.0; // perform the multiplies while loading
+        }
+        
+        __syncthreads();
+        
+        int tid = blockDim.x * blockIdx.x + threadIdx.x;
+        int row = tid / xn;
+        int col = tid % xn;
+        
+        float x = col * xp + x0;
+        float y = row * yp + y0;
+        
+        float rm, rm2, rm1;
+        float fullcost = 0.0f;
+        float cost;
+        
+        for (int i = 0; i < len; i++){
+            
+            rm1 = norm3df(s_s1x_l[i*3+0] - x, s_s1x_l[i*3+1] - y, s_s1x_l[i*3+2] - z);
+            rm2 = norm3df(s_s2x_l[i*3+0] - x, s_s2x_l[i*3+1] - y, s_s2x_l[i*3+2] - z);
+            rm = rm2 - rm1; // theoretical range for the point
+            
+            cost = (s_r_l[i] - rm) / s_rsigma_l[i];
+     
+            fullcost = fmaf(cost, cost, fullcost); // accumulate costs (len) times
+            
+        }
+        
+        // write to output
+        int cost_grid_len = xn * yn;
+        if (tid < cost_grid_len){
+            cost_grid[tid] = fullcost;
+        }
+    }
+    ''', 'gridsearchtdoa_kernel')
+
+    def gridSearchTDOA_gpu(s1x_list, s2x_list, tdoa_list, td_sigma_list, xrange, yrange, z, verb=True, moveToCPU=False):
+        d_s1x_l = cp.asarray(s1x_list).astype(cp.float32)
+        d_s2x_l = cp.asarray(s2x_list).astype(cp.float32)
+        d_tdoa_l = cp.asarray(tdoa_list).astype(cp.float32)
+        d_tdsigma_l = cp.asarray(td_sigma_list).astype(cp.float32)
+        
+        x0 = np.min(xrange).astype(np.float32)
+        xp = (xrange[1]-xrange[0]).astype(np.float32)
+        xn = len(xrange)
+        y0 = np.min(yrange).astype(np.float32)
+        yp = (yrange[1]-yrange[0]).astype(np.float32)
+        yn = len(yrange)
+        
+        # prepare output
+        d_cost_grid = cp.zeros(xn*yn, dtype=cp.float32)
+        
+        # run kernel
+        t1 = time.time()
+        THREADS_PER_BLOCK = 128
+        NUM_BLOCKS = int(d_cost_grid.size/THREADS_PER_BLOCK + 1)
+        gridsearchtdoa_kernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), (len(s1x_list), d_s1x_l, d_s2x_l, d_tdoa_l, d_tdsigma_l,
+                                                                   x0, y0, xp, yp, xn, yn, z, d_cost_grid), 
+                              shared_mem=(d_s1x_l.size + d_s2x_l.size + d_tdoa_l.size + d_tdsigma_l.size) * 4)
+        t2 = time.time()
+        
+        if verb:
+            print("Grid search kernel took %g seconds." % (t2-t1))
+        
+        if moveToCPU:
+            return cp.asnumpy(d_cost_grid)
+        else:
+            return d_cost_grid
+        
+        
+
+        
+            
+except:
+    print("Cupy unavailable. GPU routines not imported.")
+

@@ -113,6 +113,16 @@ def plotSurface(xm, ym, z, cmap='coolwarm'):
     
     return fig, ax
 
+def plotHeatmap(heatmap, x0, y0, width, height, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    else:
+        fig = None
+        
+    ax.imshow(heatmap, origin='lower', extent=(x0, x0+width, y0, y0+height))
+    
+    return fig, ax
+
 def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None):
     '''
     This is a useful tool to overlay heatmaps onto normal scatter plots,

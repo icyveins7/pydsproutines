@@ -10,6 +10,7 @@ import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from PyQt5.QtCore import Qt, QRectF
 import numpy as np
+import scipy.signal as sps
 import matplotlib.pyplot as plt
 from signalCreationRoutines import makeFreq
 from matplotlib import cm
@@ -241,6 +242,13 @@ def plotConstellation(syms, fmt='.', ax=None):
     ax.axis('equal')
     
     return ax
+
+def plotFreqz(taps):
+    fig, ax = plt.subplots(1,1,num="Filter performance (%d taps)" % taps.size)
+    w, h = sps.freqz(taps, 1, taps.size)
+    ax.plot(w/np.pi, 20*np.log10(np.abs(h)))
+    
+    return fig, ax
 
 def mplBtnToggle(p, fig):
     '''

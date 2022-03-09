@@ -70,6 +70,9 @@ def czt_scipy(x, f1, f2, binWidth, fs):
 # Note, with the new scipy 1.8.0 update, this class has equivalent speed to the signal.CZT class
 class CZTCached:
     def __init__(self, xlength, f1, f2, binWidth, fs):
+        self.binWidth = binWidth # Need these 2 for getFreq
+        self.f1 = f1
+    
         self.k = int((f2-f1)/binWidth + 1)
         self.m = xlength
         self.nfft = self.m + self.k
@@ -97,11 +100,18 @@ class CZTCached:
         g = g[self.m-1:self.m+self.k-1] * self.ww[self.m-1:self.m+self.k-1]
         
         return g
+        
+    def getFreq(self):
+        return np.arange(self.k) * self.binWidth + self.f1
+        
     
 
     
 class CZTCachedGPU:
     def __init__(self, xlength, f1, f2, binWidth, fs):
+        self.binWidth = binWidth # Need these 2 for getFreq
+        self.f1 = f1
+        
         self.k = int((f2-f1)/binWidth + 1) # This is the number of frequency bins
         self.m = xlength
         self.nfft = self.m + self.k
@@ -124,6 +134,9 @@ class CZTCachedGPU:
         self.d_ww = self.d_ww.astype(cp.complex64)
         self.d_fv = self.d_fv.astype(cp.complex64)
         self.d_aa = self.d_aa.astype(cp.complex64)
+        
+    def getFreq(self):
+        return np.arange(self.k) * self.binWidth + self.f1
         
     def run(self, x: cp.ndarray):
         y = x * self.d_aa

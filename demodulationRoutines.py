@@ -105,4 +105,52 @@ def ML_demod_QPSK(y, h, up, numSyms):
 #         print(i_bits)
         
 #         for b in range(len(i_bits)):
-            
+    
+if __name__ == "__main__":
+    from signalCreationRoutines import *
+    from plotRoutines import *
+    import matplotlib.pyplot as plt
+    
+    plt.close('all')
+    
+    baud = 10000
+    up = 10
+    fs = baud * up
+    
+    bits = randBits(100, 2)
+    sig, _, data, theta = makePulsedCPFSKsyms(bits, baud, up=up)
+    
+    _, rx = addSigToNoise(int(sig.size*1.5), int(0.25*sig.size), sig, bw_signal = baud, chnBW = fs,
+                       snr_inband_linear = 10)
+    
+    fig, ax = plt.subplots(2,1)
+    ax[0].plot(np.abs(rx))
+    plotSpectra([rx],[fs],ax=ax[1])
+    
+    # Filter
+    taps = sps.firwin(200, 0.1)
+    rxfilt = sps.lfilter(taps,1,rx)
+    ax[0].plot(np.abs(rxfilt))
+    plotSpectra([rxfilt],[fs],ax=ax[1])
+    
+    # Attempt demod
+    searchRange = np.arange(int(0.5*sig.size))
+    demodBits = np.zeros((searchRange.size, 100))
+    costs = np.zeros(searchRange.size)
+    for i in range(searchRange.size):
+        s = searchRange[i]
+        demodBits[i,:], cost, _ = demodulateCP2FSK(rxfilt[s:s+100*up], 0.5, up, 0)
+        costs[i] = np.sum(np.max(cost,axis=0))
+        
+    dfig, dax = plt.subplots(1,1)
+    dax.plot(costs)
+    
+    bc = np.argmax(costs)
+    bbits = demodBits[bc,:]
+    print("Bits %d/%d" % (len(np.argwhere(bbits==bits)), len(bits)))
+    print("Demodded at index %d" % bc)    
+    
+    plt.figure("Bits")
+    plt.plot(bits)
+    plt.plot(bbits)
+    

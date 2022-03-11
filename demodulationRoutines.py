@@ -8,6 +8,7 @@ Created on Fri Jun 19 16:21:35 2020
 import numpy as np
 from numba import jit
 
+#%%
 @jit(nopython=True)
 def demodulateCP2FSK(syms, h, up, sIdx):
     m = np.array([[-1],
@@ -31,7 +32,53 @@ def demodulateCP2FSK(syms, h, up, sIdx):
         
     return demodBits, bitCost, tones
 
+##
+class BurstyDemodulator:
+    '''
+    This class and all derived versions attempt to perform an aligned, synchronous
+    demodulation of all bursts at the same time, amalgamating the cost functions into one.
+    This prevents the misalignment (usually by one symbol) of the bursts, which when used
+    in remodulation of the observed signal, can cause grave reconstruction errors in the 
+    differential modulation modes (DQPSK, CPFSK etc.).
+    '''
+    def __init__(self, burstLen: int, guardLen: int):
+        self.burstLen = burstLen
+        self.guardLen = guardLen
+        self.period = self.burstLen + self.guardLen
+        
+    def demod(self, x: np.ndarray, numBursts: int, searchIdx: np.ndarray=None):
+        raise NotImplementedError("Only invoke with derived classes.")
+        
+##
+class BurstyDemodulatorCP2FSK:
+    def __init__(self, burstLen: int, guardLen: int, up: int, h: float=0.5):
+        super().__init__(burstLen, guardLen) # Refer to parent class
+        # Extra params
+        self.up = up
+        self.h = h
+        
+    
+    def demod(self, x: np.ndarray, numBursts: int, searchIdx: np.ndarray=None):
+        duration = numBursts * self.burstLen + (numBursts-1) * self.guardLen
+        
+        if searchIdx is None:
+            searchIdx = np.arange(x.size - duration + 1)
+            
+        allcosts = np.zeros(searchIdx.size)
+        for i in range(searchIdx.size):
+            s = searchIdx[i]
+            bursts = np.array([x[sb:sb+self.burstLen] for sb in np.arange(s, s+duration, self.period)]) # Carve out the aligned bursts
+            
+            for b in np.arange(numBursts):
+                xs = bursts[b,:]
+                demodBits, cost, _ = demodulateCP2FSK(xs, self.h, self.up, 0)
+                
+                allcosts[i] += cost
+        
+        return allcosts
 
+
+#%%
 def convertIntToBase4Combination(l, i):
     base_4_repr = np.array(list(np.base_repr(i,base=4)),dtype=np.uint8)
     base_4_repr = np.pad(base_4_repr, (l - len(base_4_repr),0)) # pad it to the numSyms
@@ -117,11 +164,22 @@ if __name__ == "__main__":
     up = 10
     fs = baud * up
     
-    bits = randBits(100, 2)
-    sig, _, data, theta = makePulsedCPFSKsyms(bits, baud, up=up)
+    numBursts = 2
+    burstBits = 90
+    period = 100
     
-    _, rx = addSigToNoise(int(sig.size*1.5), int(0.25*sig.size), sig, bw_signal = baud, chnBW = fs,
-                       snr_inband_linear = 10)
+    bits = randBits(burstBits * numBursts, 2).reshape((numBursts,burstBits))
+    sig1, _, data2, theta2 = makePulsedCPFSKsyms(bits[0,:], baud, up=up)
+    sig2, _, data2, theta2 = makePulsedCPFSKsyms(bits[1,:], baud, up=up)
+    
+    # _, rx = addSigToNoise(int(sig.size*1.5), int(0.25*sig.size), sig, bw_signal = baud, chnBW = fs,
+    #                    snr_inband_linear = 10)
+    
+    sigStart = int(0.25*sig1.size)
+    snr = 1000
+    _, rx = addManySigToNoise(int(sig1.size*5),
+                              [sigStart, sigStart + period*up], [sig1,sig2], bw_signal = baud, chnBW = fs,
+                       snr_inband_linearList = [snr,snr])
     
     fig, ax = plt.subplots(2,1)
     ax[0].plot(np.abs(rx))
@@ -134,12 +192,12 @@ if __name__ == "__main__":
     plotSpectra([rxfilt],[fs],ax=ax[1])
     
     # Attempt demod
-    searchRange = np.arange(int(0.5*sig.size))
-    demodBits = np.zeros((searchRange.size, 100))
+    searchRange = np.arange(int(0.5*sig1.size))
+    demodBits = np.zeros((searchRange.size, burstBits))
     costs = np.zeros(searchRange.size)
     for i in range(searchRange.size):
         s = searchRange[i]
-        demodBits[i,:], cost, _ = demodulateCP2FSK(rxfilt[s:s+100*up], 0.5, up, 0)
+        demodBits[i,:], cost, _ = demodulateCP2FSK(rxfilt[s:s+burstBits*up], 0.5, up, 0)
         costs[i] = np.sum(np.max(cost,axis=0))
         
     dfig, dax = plt.subplots(1,1)
@@ -153,4 +211,8 @@ if __name__ == "__main__":
     plt.figure("Bits")
     plt.plot(bits)
     plt.plot(bbits)
+    
+    if len(np.argwhere(bbits==bits)) != len(bits):
+        # Attempt re-demod at the exact place to demonstrate
+        print("Bits %d/%d at known alignment." % (len(np.argwhere(demodBits[351,:]==bits)), len(bits)))
     

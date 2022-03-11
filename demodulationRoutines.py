@@ -50,7 +50,7 @@ class BurstyDemodulator:
         raise NotImplementedError("Only invoke with derived classes.")
         
 ##
-class BurstyDemodulatorCP2FSK:
+class BurstyDemodulatorCP2FSK(BurstyDemodulator):
     def __init__(self, burstLen: int, guardLen: int, up: int, h: float=0.5):
         super().__init__(burstLen, guardLen) # Refer to parent class
         # Extra params
@@ -72,8 +72,9 @@ class BurstyDemodulatorCP2FSK:
             for b in np.arange(numBursts):
                 xs = bursts[b,:]
                 demodBits, cost, _ = demodulateCP2FSK(xs, self.h, self.up, 0)
+                # print(cost)
                 
-                allcosts[i] += cost
+                allcosts[i] += np.sum(np.max(cost, axis=0))
         
         return allcosts
 

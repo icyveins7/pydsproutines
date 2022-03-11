@@ -190,10 +190,10 @@ def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absRes
     cutoutNormSq = cutoutNorm**2.0
     
     if not freqsearch:
-        print('No frequency scanning xcorr..')
+        # print('No frequency scanning xcorr..')
     
         if absResult is True:
-            print('Returning normalized QF^2 real values..')
+            # print('Returning normalized QF^2 real values..')
             result = np.zeros(len(shifts),dtype=np.float64)
 
             for i in range(len(shifts)):
@@ -217,11 +217,11 @@ def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absRes
             return result
     
     elif not outputCAF:
-        print('Frequency scanning, but no CAF output (flattened to time)..')
+        # print('Frequency scanning, but no CAF output (flattened to time)..')
         freqlist = np.zeros(len(shifts),dtype=np.uint32)
         
         if absResult is True:
-            print('Returning normalized QF^2 real values..')
+            # print('Returning normalized QF^2 real values..')
             result = np.zeros(len(shifts),dtype=np.float64)
 
             for i in range(len(shifts)):
@@ -239,7 +239,7 @@ def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absRes
             return result, freqlist
         
         else:
-            print('Returning normalized QF complex values..')
+            # print('Returning normalized QF complex values..')
             result = np.zeros(len(shifts),dtype=np.complex128)
             
             for i in range(len(shifts)):
@@ -256,10 +256,10 @@ def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absRes
             return result, freqlist
     
     else:
-        print('Frequency scanning, outputting raw CAF...')
+        # print('Frequency scanning, outputting raw CAF...')
         
         if absResult is True:
-            print('Returning normalized QF^2 real values..')
+            # print('Returning normalized QF^2 real values..')
             result = np.zeros((len(shifts), len(cutout)), dtype=np.float64)
 
             for i in range(len(shifts)):
@@ -274,7 +274,7 @@ def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absRes
             return result
         
         else:
-            print('Returning normalized QF complex values..')
+            # print('Returning normalized QF complex values..')
             result = np.zeros((len(shifts), len(cutout)), dtype=np.complex128)
             
             for i in range(len(shifts)):

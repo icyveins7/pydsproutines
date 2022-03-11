@@ -11,14 +11,16 @@ import scipy.signal as sps
 
 #%%
 class BurstSelector:
-    def __init__(self, burstLen: int, medfiltlen: int=None):
+    def __init__(self, burstLen: int, medfiltlen: int=None, minHeightFactor: float=None):
         self.burstLen = burstLen
         self.medfiltlen = medfiltlen
+        self.minHeightFactor = minHeightFactor
         
         # Holding arrays/output
         self.energy = None
         self.peaks = None
         self.peakprops = None
+        self.minHeight = None
         
     def detect(self, x_abs: np.ndarray, sortPeaks: bool=True, limit: int=None):
         if self.medfiltlen is not None:
@@ -30,7 +32,12 @@ class BurstSelector:
         self.energy = sps.convolve(np.ones(self.burstLen), self.f, mode='valid')
         
         # Detect the bursts
-        self.peaks, self.peakprops = sps.find_peaks(self.energy, distance=self.burstLen)
+        if self.minHeightFactor is not None:
+            self.minHeight = np.max(self.energy) * self.minHeightFactor
+        else:
+            self.minHeight = None
+            
+        self.peaks, self.peakprops = sps.find_peaks(self.energy, height=self.minHeight, distance=self.burstLen)
         
         if sortPeaks:
             self.peaks = np.sort(self.peaks)
@@ -43,4 +50,6 @@ class BurstSelector:
         
         ax.plot(self.energy/self.burstLen, label='Window Convolved')
         ax.plot(self.peaks, self.energy[self.peaks]/self.burstLen, 'rx', label="Peaks Detected")
+        if self.minHeight is not None:
+            ax.hlines(self.minHeight/self.burstLen, ax.axis()[0], ax.axis()[1], linestyles='dashed', label="Minimum Height", zorder=10)
         ax.legend()

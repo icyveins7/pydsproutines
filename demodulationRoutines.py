@@ -64,19 +64,37 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
         if searchIdx is None:
             searchIdx = np.arange(x.size - duration + 1)
             
-        allcosts = np.zeros(searchIdx.size)
+        self.dcosts = np.zeros(searchIdx.size)
         for i in range(searchIdx.size):
             s = searchIdx[i]
             bursts = np.array([x[sb:sb+self.burstLen] for sb in np.arange(s, s+duration, self.period)]) # Carve out the aligned bursts
             
             for b in np.arange(numBursts):
+                print("Search %d/%d, burst %d/%d" % (i,searchIdx.size,b,numBursts))
+                
                 xs = bursts[b,:]
                 demodBits, cost, _ = demodulateCP2FSK(xs, self.h, self.up, 0)
                 # print(cost)
                 
-                allcosts[i] += np.sum(np.max(cost, axis=0))
+                self.dcosts[i] += np.sum(np.max(cost, axis=0))
         
-        return allcosts
+        mi = np.argmax(self.dcosts)
+        
+        dbits = self.demodAtIdx(x, mi, numBursts, duration)
+        
+        return dbits, searchIdx[mi]
+    
+    def demodAtIdx(self, x, idx, numBursts, duration):
+        bbursts = np.array([x[sb:sb+self.burstLen] for sb in np.arange(idx, idx+duration, self.period)]) # Carve out the best bursts
+        dbits = np.zeros((numBursts, int(self.burstLen/self.up)), dtype=np.uint8)
+        
+        for b in np.arange(numBursts):
+            xs = bbursts[b,:]
+            demodBits, cost, _ = demodulateCP2FSK(xs, self.h, self.up, 0)
+            
+            dbits[b,:] = demodBits
+            
+        return dbits
 
 
 #%%
@@ -165,55 +183,75 @@ if __name__ == "__main__":
     up = 10
     fs = baud * up
     
-    numBursts = 2
+    numBursts = 20
     burstBits = 90
     period = 100
+    guardBits = period - burstBits
     
     bits = randBits(burstBits * numBursts, 2).reshape((numBursts,burstBits))
-    sig1, _, data2, theta2 = makePulsedCPFSKsyms(bits[0,:], baud, up=up)
-    sig2, _, data2, theta2 = makePulsedCPFSKsyms(bits[1,:], baud, up=up)
-    
-    # _, rx = addSigToNoise(int(sig.size*1.5), int(0.25*sig.size), sig, bw_signal = baud, chnBW = fs,
-    #                    snr_inband_linear = 10)
-    
-    sigStart = int(0.25*sig1.size)
-    snr = 1000
-    _, rx = addManySigToNoise(int(sig1.size*5),
-                              [sigStart, sigStart + period*up], [sig1,sig2], bw_signal = baud, chnBW = fs,
-                       snr_inband_linearList = [snr,snr])
+    sigs = []
+    for i in range(numBursts):
+        sig, _, _, _ = makePulsedCPFSKsyms(bits[i,:], baud, up=up)
+        sigs.append(sig)
+        
+    sigStart = int(0.25*sigs[0].size)
+    snr = 10
+    _, rx = addManySigToNoise(int((numBursts+1)*period*up),
+                              np.arange(0,numBursts*period*up,period*up)+sigStart, sigs, bw_signal = baud, chnBW = fs,
+                       snr_inband_linearList = snr+np.zeros(numBursts))
     
     fig, ax = plt.subplots(2,1)
     ax[0].plot(np.abs(rx))
     plotSpectra([rx],[fs],ax=ax[1])
     
     # Filter
-    taps = sps.firwin(200, 0.1)
+    taps = sps.firwin(201, 0.1)
     rxfilt = sps.lfilter(taps,1,rx)
     ax[0].plot(np.abs(rxfilt))
     plotSpectra([rxfilt],[fs],ax=ax[1])
     
-    # Attempt demod
-    searchRange = np.arange(int(0.5*sig1.size))
-    demodBits = np.zeros((searchRange.size, burstBits))
-    costs = np.zeros(searchRange.size)
-    for i in range(searchRange.size):
-        s = searchRange[i]
-        demodBits[i,:], cost, _ = demodulateCP2FSK(rxfilt[s:s+burstBits*up], 0.5, up, 0)
-        costs[i] = np.sum(np.max(cost,axis=0))
+    # Attempt bursty demod
+    searchRange = np.arange(int(0.5*sigs[0].size))
+    
+    bd = BurstyDemodulatorCP2FSK(burstBits*up, (period-burstBits)*up, up)
+    # dbits, dalign = bd.demod(rxfilt, numBursts, searchRange)
+    # plt.figure("Bursty demod cost")
+    # plt.plot(searchRange, bd.dcosts)
+    
+    dalign = 327
+    dbits = bd.demodAtIdx(rxfilt, dalign, numBursts, numBursts * period * up - guardBits * up) # Hard coded correct alignment
+    
+    if np.all(dbits==bits):
+        print("Full demodulation of %d bursts * %d symbols is correct." % (numBursts, burstBits))
+    else:
+        print("Full demodulation failed for these bursts:")
+        failedBursts = np.argwhere(np.any(bits != dbits, axis=1)).flatten()
+        for i in range(failedBursts.size):
+            fb = failedBursts[i]
+            rm, _, _, _ = makePulsedCPFSKsyms(dbits[fb,:], baud, up=up)
+            metric = np.abs(np.vdot(rm, rxfilt[dalign:dalign+rm.size]))**2 / np.linalg.norm(rm)**2 / np.linalg.norm(rxfilt[dalign:dalign+rm.size])**2
+            print("Burst %d with QF2 %f" % (fb, metric))      
+    
+    # demodBits = np.zeros((searchRange.size, burstBits))
+    # costs = np.zeros(searchRange.size)
+    # for i in range(searchRange.size):
+    #     s = searchRange[i]
+    #     demodBits[i,:], cost, _ = demodulateCP2FSK(rxfilt[s:s+burstBits*up], 0.5, up, 0)
+    #     costs[i] = np.sum(np.max(cost,axis=0))
         
-    dfig, dax = plt.subplots(1,1)
-    dax.plot(costs)
+    # dfig, dax = plt.subplots(1,1)
+    # dax.plot(costs)
     
-    bc = np.argmax(costs)
-    bbits = demodBits[bc,:]
-    print("Bits %d/%d" % (len(np.argwhere(bbits==bits)), len(bits)))
-    print("Demodded at index %d" % bc)    
+    # bc = np.argmax(costs)
+    # bbits = demodBits[bc,:]
+    # print("Bits %d/%d" % (len(np.argwhere(bbits==bits)), bits.size))
+    # print("Demodded at index %d" % bc)    
     
-    plt.figure("Bits")
-    plt.plot(bits)
-    plt.plot(bbits)
+    # plt.figure("Bits")
+    # plt.plot(bits)
+    # plt.plot(bbits)
     
-    if len(np.argwhere(bbits==bits)) != len(bits):
-        # Attempt re-demod at the exact place to demonstrate
-        print("Bits %d/%d at known alignment." % (len(np.argwhere(demodBits[351,:]==bits)), len(bits)))
+    # if len(np.argwhere(bbits==bits)) != bits.size:
+    #     # Attempt re-demod at the exact place to demonstrate
+    #     print("Bits %d/%d at known alignment." % (len(np.argwhere(demodBits[351,:]==bits)), bits.size))
     

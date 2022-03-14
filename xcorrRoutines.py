@@ -433,6 +433,15 @@ def argmax2d(m: np.ndarray):
     '''
     return np.unravel_index(np.argmax(m), m.shape)
 
+def calcQF2(x: np.ndarray, y: np.ndarray):
+    '''
+    Simple one-line function to calculate QF2 for two equal length arrays (already aligned).
+    '''
+    x_energy = np.linalg.norm(x)**2
+    y_energy = np.linalg.norm(y)**2
+    qf2 = np.abs(np.vdot(x,y))**2 / x_energy / y_energy
+    return qf2
+
 
 #%%
 class GroupXcorr:

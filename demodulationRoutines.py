@@ -10,7 +10,7 @@ from numba import jit
 
 #%%
 @jit(nopython=True)
-def demodulateCP2FSK(syms, h, up, sIdx):
+def demodulateCP2FSK(syms, h, up):
     m = np.array([[-1],
                   [+1]]) # these map to [0, 1] bits
     
@@ -18,12 +18,12 @@ def demodulateCP2FSK(syms, h, up, sIdx):
     tones = np.exp(1j*np.pi*h*np.arange(up)/up * m)
     
     # loop over each upsampled section of a symbol
-    numSyms = int(np.floor((len(syms)-sIdx) / up))
+    numSyms = int(np.floor(len(syms) / up))
     bitCost = np.zeros((2,numSyms))
     demodBits = np.zeros(numSyms, dtype = np.uint8)
     
     for i in range(numSyms):
-        symbol = syms[sIdx + i*up : sIdx + (i+1)*up]
+        symbol = syms[i*up : (i+1)*up]
         
         for k in range(2):
             bitCost[k,i] = np.abs(np.vdot(symbol, tones[k]))
@@ -57,23 +57,56 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
         self.up = up
         self.h = h
         
+        # Configurations
+        self.burstIdxs = None
+        
+        # Outputs
+        self.dcosts = None
+        
+        
+    def setBurstIdxs(self, burstIdxs: np.ndarray=None):
+        '''
+        Parameters
+        ----------
+        burstIdxs : np.ndarray, optional
+            Integer array of burst indices that should be demodulated.
+            This can be used to ignore certain bursts, or if there are missing bursts
+            within the window passed to the demod() call.
+            The default is None, which will then fit as many bursts as possible during 
+            the demod() method call.
+
+        Returns
+        -------
+        None.
+
+        '''
+        self.burstIdxs = burstIdxs
     
     def demod(self, x: np.ndarray, numBursts: int, searchIdx: np.ndarray=None):
         duration = numBursts * self.burstLen + (numBursts-1) * self.guardLen
         
+        # Set a default searchIdx over entire duration
         if searchIdx is None:
             searchIdx = np.arange(x.size - duration + 1)
             
+        # Check for pre-configured burst indices
+        if self.burstIdxs is None:
+            burstShifts = np.arange(0,duration, self.period)
+        else:
+            burstShifts = self.burstIdxs * self.period
+            
+        # Main loop
         self.dcosts = np.zeros(searchIdx.size)
         for i in range(searchIdx.size):
             s = searchIdx[i]
-            bursts = np.array([x[sb:sb+self.burstLen] for sb in np.arange(s, s+duration, self.period)]) # Carve out the aligned bursts
-            
+            bursts = np.array([x[sb:sb+self.burstLen] for sb in 
+                               (burstShifts + s)]) # Carve out the aligned bursts
+
             for b in np.arange(numBursts):
-                print("Search %d/%d, burst %d/%d" % (i,searchIdx.size,b,numBursts))
+                # print("Search %d/%d, burst %d/%d" % (i,searchIdx.size,b,numBursts))
                 
                 xs = bursts[b,:]
-                demodBits, cost, _ = demodulateCP2FSK(xs, self.h, self.up, 0)
+                demodBits, cost, _ = demodulateCP2FSK(xs, self.h, self.up)
                 # print(cost)
                 
                 self.dcosts[i] += np.sum(np.max(cost, axis=0))
@@ -90,9 +123,7 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
         
         for b in np.arange(numBursts):
             xs = bbursts[b,:]
-            demodBits, cost, _ = demodulateCP2FSK(xs, self.h, self.up, 0)
-            
-            dbits[b,:] = demodBits
+            dbits[b,:], cost, _ = demodulateCP2FSK(xs, self.h, self.up)
             
         return dbits
 
@@ -205,7 +236,7 @@ if __name__ == "__main__":
     plotSpectra([rx],[fs],ax=ax[1])
     
     # Filter
-    taps = sps.firwin(201, 0.1)
+    taps = sps.firwin(201, baud/fs*1.5)
     rxfilt = sps.lfilter(taps,1,rx)
     ax[0].plot(np.abs(rxfilt))
     plotSpectra([rxfilt],[fs],ax=ax[1])
@@ -214,23 +245,39 @@ if __name__ == "__main__":
     searchRange = np.arange(int(0.5*sigs[0].size))
     
     bd = BurstyDemodulatorCP2FSK(burstBits*up, (period-burstBits)*up, up)
-    # dbits, dalign = bd.demod(rxfilt, numBursts, searchRange)
-    # plt.figure("Bursty demod cost")
-    # plt.plot(searchRange, bd.dcosts)
+    dbits, dalign = bd.demod(rxfilt, numBursts, searchRange)
+    print("Demodulation index at %d" % dalign)
+    plt.figure("Bursty demod cost")
+    plt.plot(searchRange, bd.dcosts)
     
-    dalign = 327
-    dbits = bd.demodAtIdx(rxfilt, dalign, numBursts, numBursts * period * up - guardBits * up) # Hard coded correct alignment
+    # # This is the exact actual value
+    # dalign = 327
+    # dbits = bd.demodAtIdx(rxfilt, dalign, numBursts, numBursts * period * up - guardBits * up) # Hard coded correct alignment
     
     if np.all(dbits==bits):
         print("Full demodulation of %d bursts * %d symbols is correct." % (numBursts, burstBits))
+        
     else:
         print("Full demodulation failed for these bursts:")
         failedBursts = np.argwhere(np.any(bits != dbits, axis=1)).flatten()
         for i in range(failedBursts.size):
             fb = failedBursts[i]
             rm, _, _, _ = makePulsedCPFSKsyms(dbits[fb,:], baud, up=up)
-            metric = np.abs(np.vdot(rm, rxfilt[dalign:dalign+rm.size]))**2 / np.linalg.norm(rm)**2 / np.linalg.norm(rxfilt[dalign:dalign+rm.size])**2
-            print("Burst %d with QF2 %f" % (fb, metric))      
+            rm = rm[:burstBits * up] # cut it
+            balign = dalign + fb * period * up
+            metric = np.abs(np.vdot(rm, rxfilt[balign:balign+rm.size]))**2 / np.linalg.norm(rm)**2 / np.linalg.norm(rxfilt[balign:balign+rm.size])**2
+            print("Burst %d with QF2 %f, bits %d/%d" % (fb, metric, np.argwhere(bits[fb,:] == dbits[fb,:]).size, burstBits))      
+    
+        print("Full demodulation successful for these bursts:")
+        successBursts = np.argwhere(np.all(bits == dbits, axis=1)).flatten()
+        for i in range(successBursts.size):
+            sb = successBursts[i]
+            rm, _, _, _ = makePulsedCPFSKsyms(dbits[sb,:], baud, up=up)
+            rm = rm[:burstBits * up] # cut it
+            balign = dalign + sb * period * up
+            metric = np.abs(np.vdot(rm, rxfilt[balign:balign+rm.size]))**2 / np.linalg.norm(rm)**2 / np.linalg.norm(rxfilt[balign:balign+rm.size])**2
+            print("Burst %d with QF2 %f, bits %d/%d" % (sb, metric, np.argwhere(bits[sb,:] == dbits[sb,:]).size, burstBits))      
+    
     
     # demodBits = np.zeros((searchRange.size, burstBits))
     # costs = np.zeros(searchRange.size)

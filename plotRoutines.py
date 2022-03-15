@@ -193,6 +193,29 @@ def pgPlotPhasorVsTime(complexData, color=(1.0,1.0,1.0,1.0), start=0, end=200, s
     
     return view
 
+def plotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None):    
+    if ax is None: # hurray for python scoping allowing this
+        fig = plt.figure(windowTitle)
+        ax = fig.add_subplot(111)
+    else:
+        fig = None
+    
+    for i, data in enumerate(dataList):
+        amp = np.abs(data)
+        t = np.arange(data.size) / fs[i]
+        if colors is not None:
+            ax.plot(t, amp, colors[i])
+        else:
+            ax.plot(t, amp)
+        
+    if labels is not None:
+        ax.legend(labels)
+    
+    ax.set_title(title)
+    
+    return fig, ax
+    
+
 def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None):    
     if ax is None: # hurray for python scoping allowing this
         fig = plt.figure(windowTitle)

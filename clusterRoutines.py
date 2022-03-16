@@ -257,16 +257,53 @@ class AngularClusterEngine(ClusterEngine2D):
         
         # Check extra conditionals
         if self.minAngleSep is not None:
-            # TODO: find the angle differences directly, as this results in -pi to pi being far apart again
-            if bestmodel.cluster_centers_.dtype == np.float64:
-                angleCenters = np.angle(bestmodel.cluster_centers_.view(np.complex128)).flatten()
-            elif bestmodel.cluster_centers_.dtype == np.float32:
-                angleCenters = np.angle(bestmodel.cluster_centers_.view(np.complex64)).flatten()
-                
-            # TODO: find the angle difference and compare
+            numCombined = 0
+            for i in range(bestmodel.n_clusters):
+                for j in range(i+1, bestmodel.n_clusters):
+                    # Check if the current cluster is within angular range of the later clusters
+                    angle_ij = np.arccos(
+                        np.dot(
+                            bestmodel.cluster_centers_[i],
+                            bestmodel.cluster_centers_[j])
+                        ) / np.linalg.norm(bestmodel.cluster_centers_[i]) / np.linalg.norm(bestmodel.cluster_centers_[j])
+                    
+                    if np.abs(angle_ij) < self.minAngleSep:
+                        # We set all of cluster i to the later cluster j
+                        bestmodel.labels_[bestmodel.labels_ == i] = j
+                        # Decrement the number of clusters
+                        numCombined += 1
+                        
+                        if verbose:
+                            print("Cluster %d merged into %d" % (i,j))
+                            
+                        break
             
+            # We correct the number of clusters
+            bestmodel.n_clusters -= numCombined
+            # Also shift the labels back to 0
+            bestmodel.labels_ = bestmodel.labels_ - np.min(bestmodel.labels_)
+            # And correct the best guess
+            bestguess = bestmodel.n_clusters
+            
+            if verbose and numCombined > 0:
+                print("Merges result finally in %d clusters instead" % bestguess)
         
         return bestguess, bestmodel, idxRemoved, idxUsed
+    
+    @staticmethod
+    def plotClusters(x, bestmodel, idxRemoved, idxUsed, colours=['r','b'],
+                     ax=None, title="Clusters"):
+        
+        fig, ax = ClusterEngine2D.plotClusters(x, bestmodel, idxRemoved, idxUsed, colours, ax, title)
+        # Set a simple circle and axis limits
+        theta = np.arange(0,2*np.pi,0.01)
+        circle = np.vstack((np.cos(theta),np.sin(theta)))
+        ax.plot(circle[0],circle[1],'k--')
+        ax.axis([-1.1,1.1,-1.1,1.1])
+        ax.set_aspect('equal')
+        
+        return fig, ax
+        
         
 
     
@@ -299,6 +336,29 @@ if __name__ == "__main__":
     
     # Plot the scores
     cle.plotScores()
+    
+    ## Angular Clustering
+    # Generate some angles
+    a0 = np.random.randn(100) * 0.01
+    a1 = np.random.randn(10) * 0.01 + np.pi/2
+    
+    # Attach
+    ma = np.hstack((a0,a1))
+    ma_cplx = np.exp(1j*ma)
+    
+    # Test the cluster engine
+    acle = AngularClusterEngine(np.arange(2,10), minAngleSep=np.pi/24)
+    aguess, amodel, aRemoved, aUsed = acle.cluster(ma_cplx, verbose=True)
+    acle.plotClusters(ma_cplx, amodel, aRemoved, aUsed, title="Angle Clusters")
+    
+    # Test the cluster engine when it's just one cluster
+    aguess, amodel, aRemoved, aUsed = acle.cluster(ma_cplx[:a0.size], verbose=True)
+    acle.plotClusters(ma_cplx[:a0.size], amodel, aRemoved, aUsed, title="Angle Clusters (Only 1)")
+    
+    
+    
+    
+    
     
     
     

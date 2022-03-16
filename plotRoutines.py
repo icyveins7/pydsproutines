@@ -16,6 +16,14 @@ from signalCreationRoutines import makeFreq
 from matplotlib import cm
 from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 
+from PyQt5.QtWidgets import QApplication
+
+def closeAllFigs():
+    '''Helper function to close both Pyqtgraph and Matplotlib windows.'''
+    QApplication.closeAllWindows()
+    plt.close("all")
+    
+
 def pgPlotDeltaFuncs(fig, x, h, color='r', symbol=None, name=None):
     '''
     Adds delta function dashed lines to the specified pyqtgraph plot.

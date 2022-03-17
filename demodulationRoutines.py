@@ -7,6 +7,7 @@ Created on Fri Jun 19 16:21:35 2020
 
 import numpy as np
 from numba import jit
+import cupy as cp
 
 #%%
 @jit(nopython=True)
@@ -29,6 +30,26 @@ def demodulateCP2FSK(syms, h, up):
             bitCost[k,i] = np.abs(np.vdot(symbol, tones[k]))
         
         demodBits[i] = np.argmax(bitCost[:,i])
+        
+    return demodBits, bitCost, tones
+
+def cupyDemodulateCP2FSK(syms: cp.ndarray, h: float, up: int):
+    m = cp.array([[-1],
+                  [+1]])
+    
+    tones = cp.exp(1j*np.pi*h*cp.arange(up)/up*m)
+    
+    numSyms = int(np.floor(len(syms) / up))
+    bitCost = cp.zeros((2,numSyms))
+    demodBits = cp.zeros(numSyms, dtype = np.uint8)
+    
+    for i in range(numSyms):
+        symbol = syms[i*up : (i+1)*up]
+        
+        for k in range(2):
+            bitCost[k,i] = cp.abs(cp.vdot(symbol, tones[k]))
+        
+        demodBits[i] = cp.argmax(bitCost[:,i])
         
     return demodBits, bitCost, tones
 
@@ -100,13 +121,16 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
         for i in range(searchIdx.size):
             s = searchIdx[i]
             bursts = np.array([x[sb:sb+self.burstLen] for sb in 
-                               (burstShifts + s)]) # Carve out the aligned bursts
+                                (burstShifts + s)]) # Carve out the aligned bursts
+            # bursts = cp.array([x[sb:sb+self.burstLen] for sb in 
+            #                    (burstShifts + s)]) # Carve out the aligned bursts
 
             for b in np.arange(numBursts):
                 # print("Search %d/%d, burst %d/%d" % (i,searchIdx.size,b,numBursts))
                 
                 xs = bursts[b,:]
                 demodBits, cost, _ = demodulateCP2FSK(xs, self.h, self.up)
+                # demodBits, cost, _ = cupyDemodulateCP2FSK(xs, self.h, self.up)
                 # print(cost)
                 
                 self.dcosts[i] += np.sum(np.max(cost, axis=0))

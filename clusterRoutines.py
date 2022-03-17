@@ -138,6 +138,15 @@ class ClusterEngine:
         return bestguess, bestmodel, np.array(idxRemoved), idxUsed
     
     @staticmethod
+    def getLargestCluster(model):
+        clusterSizes = np.array([np.argwhere(model.labels_ == i).size for i in range(model.n_clusters)])
+        maxci = np.argmax(clusterSizes)
+        maxCenter = model.cluster_centers_[maxci]
+        maxClusterSize = clusterSizes[maxci]
+        
+        return maxCenter, maxClusterSize
+    
+    @staticmethod
     def plotClusters(x, bestmodel, idxRemoved, idxUsed, t=None, colours=['r','b'],
                      ax=None, title="Clusters"):
         if t is None:

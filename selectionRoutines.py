@@ -8,6 +8,8 @@ Created on Thu Mar 10 14:37:43 2022
 import numpy as np
 import scipy as sp
 import scipy.signal as sps
+import cupy as cp
+import cupyx.scipy.signal as cpss
 
 #%%
 class BurstSelector:
@@ -22,9 +24,18 @@ class BurstSelector:
         self.peakprops = None
         self.minHeight = None
         
+        # Configurations
+        self.useGpuMedfilt = False
+        
+    def toggleGpuMedfilt(self, enabled=True):
+        self.useGpuMedfilt = enabled
+        
     def detect(self, x_abs: np.ndarray, sortPeaks: bool=True, limit: int=None):
         if self.medfiltlen is not None:
-            self.f = sps.medfilt(x_abs, self.medfiltlen)
+            if self.useGpuMedfilt:
+                self.f = cpss.medfilt(cp.array(x_abs), self.medfiltlen).get()
+            else:
+                self.f = sps.medfilt(x_abs, self.medfiltlen)
         else:
             self.f = x_abs
             

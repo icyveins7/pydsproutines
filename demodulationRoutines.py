@@ -106,26 +106,29 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
     def demod(self, x: np.ndarray, numBursts: int, searchIdx: np.ndarray=None):
         duration = numBursts * self.burstLen + (numBursts-1) * self.guardLen
         
-        # Set a default searchIdx over entire duration
-        if searchIdx is None:
-            searchIdx = np.arange(x.size - duration + 1)
-            
         # Check for pre-configured burst indices
         if self.burstIdxs is None:
             burstShifts = np.arange(0,duration, self.period)
         else:
+            duration = np.max(self.burstIdxs) * self.burstLen + (np.max(self.burstIdxs)-1) * self.guardLen
             burstShifts = self.burstIdxs * self.period
+            
+        # Set a default searchIdx over entire duration
+        if searchIdx is None:
+            searchIdx = np.arange(x.size - duration + 1)
+            
             
         # Main loop
         self.dcosts = np.zeros(searchIdx.size)
         for i in range(searchIdx.size):
             s = searchIdx[i]
             bursts = np.array([x[sb:sb+self.burstLen] for sb in 
-                                (burstShifts + s)]) # Carve out the aligned bursts
+                                (burstShifts + s) if sb+self.burstLen<=x.size]) # Carve out the aligned bursts
+
             # bursts = cp.array([x[sb:sb+self.burstLen] for sb in 
             #                    (burstShifts + s)]) # Carve out the aligned bursts
 
-            for b in np.arange(numBursts):
+            for b in np.arange(bursts.shape[0]):
                 # print("Search %d/%d, burst %d/%d" % (i,searchIdx.size,b,numBursts))
                 
                 xs = bursts[b,:]
@@ -142,10 +145,11 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
         return dbits, searchIdx[mi]
     
     def demodAtIdx(self, x, idx, numBursts, duration):
-        bbursts = np.array([x[sb:sb+self.burstLen] for sb in np.arange(idx, idx+duration, self.period)]) # Carve out the best bursts
-        dbits = np.zeros((numBursts, int(self.burstLen/self.up)), dtype=np.uint8)
+        bbursts = np.array([x[sb:sb+self.burstLen] for sb in np.arange(idx, idx+duration, self.period)
+                            if sb+self.burstLen <= x.size]) # Carve out the best bursts
+        dbits = np.zeros((bbursts.shape[0], int(self.burstLen/self.up)), dtype=np.uint8)
         
-        for b in np.arange(numBursts):
+        for b in np.arange(bbursts.shape[0]):
             xs = bbursts[b,:]
             dbits[b,:], cost, _ = demodulateCP2FSK(xs, self.h, self.up)
             

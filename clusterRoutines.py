@@ -299,6 +299,7 @@ class AngularClusterEngine(ClusterEngine2D):
         
         return bestguess, bestmodel, idxRemoved, idxUsed
     
+    
     @staticmethod
     def plotClusters(x, bestmodel, idxRemoved, idxUsed, colours=['r','b'],
                      ax=None, title="Clusters"):
@@ -310,6 +311,14 @@ class AngularClusterEngine(ClusterEngine2D):
         ax.plot(circle[0],circle[1],'k--')
         ax.axis([-1.1,1.1,-1.1,1.1])
         ax.set_aspect('equal')
+        
+        # Plot dashed lines to the circle for each cluster
+        for i,center in enumerate(bestmodel.cluster_centers_):
+            line = np.array([[0,0],
+                             center])
+            ax.plot(line[:,0], line[:,1], colours[i%len(colours)]+'--')
+            phi = np.arctan2(center[1],center[0])
+            ax.annotate("%.3f" % phi, center/2)
         
         return fig, ax
         

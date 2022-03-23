@@ -62,20 +62,20 @@ class BurstyDemodulator:
     in remodulation of the observed signal, can cause grave reconstruction errors in the 
     differential modulation modes (DQPSK, CPFSK etc.).
     '''
-    def __init__(self, burstLen: int, guardLen: int):
+    def __init__(self, burstLen: int, guardLen: int, up: int=1):
         self.burstLen = burstLen
         self.guardLen = guardLen
         self.period = self.burstLen + self.guardLen
+        self.up = up
         
     def demod(self, x: np.ndarray, numBursts: int, searchIdx: np.ndarray=None):
         raise NotImplementedError("Only invoke with derived classes.")
         
 ##
 class BurstyDemodulatorCP2FSK(BurstyDemodulator):
-    def __init__(self, burstLen: int, guardLen: int, up: int, h: float=0.5):
-        super().__init__(burstLen, guardLen) # Refer to parent class
+    def __init__(self, burstLen: int, guardLen: int, up: int=1, h: float=0.5):
+        super().__init__(burstLen, guardLen, up) # Refer to parent class
         # Extra params
-        self.up = up
         self.h = h
         
         # Configurations
@@ -84,6 +84,55 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
         # Outputs
         self.dcosts = None
         
+    def demod(self, x: np.ndarray, numBursts: int=None, searchIdx: np.ndarray=None):
+        # t1 = time.perf_counter()
+        if self.burstIdxs is None: # Priority is to use the pre-set burstIdxs
+            if numBursts is None: # Otherwise we generate it here using a simple np.arange
+                raise ValueError("Please call setBurstIdxs() before demodulating or set the numBursts argument.")
+            else:
+                self.setBurstIdxs(np.arange(numBursts))
+        
+        # Construct the tones
+        gtone = np.exp(1j*np.pi*self.h*np.arange(self.up)/self.up)
+        tones = np.vstack((gtone.conj(),gtone))
+        # Perform a one-pass correlation over the entire array
+        xc = np.vstack([np.correlate(x, tone) for tone in tones])
+        xc_abs = np.abs(xc)
+        # Also perform the one-pass max over it
+        xc_abs_argmax = np.argmax(xc_abs, axis=0) 
+        xc_abs_max = np.max(xc_abs, axis=0) # Note: using the argmax to regenerate using list comprehension is extremely slow..
+        
+        # Construct the starting indices for each burst
+        burstStarts = self.burstIdxs * self.period * self.up
+
+        # Construct the symbol spacing for each individual burst
+        symbolSpacing = np.arange(0, self.burstLen*self.up, self.up)
+        # Construct zero-origin indices for every symbol, in every burst
+        genIdx = np.array([start + symbolSpacing for start in burstStarts]).flatten()
+        
+        # Construct a search index if not specified
+        if searchIdx is None:
+            # extent = genIdx[-1] + self.up
+            searchIdx = np.arange(xc_abs_max.size - genIdx[-1])
+            print("Auto-generated search indices from %d to %d" % (searchIdx[0], searchIdx[-1]))
+        
+        # Loop over the search range
+        self.d_costs = np.zeros(searchIdx.size)
+        for i, s in enumerate(searchIdx):
+            # Construct the shifted indices for every symbol based on current search index
+            idx = s + genIdx
+            # Sum the costs for these indices
+            self.d_costs[i] = np.sum(xc_abs_max[idx])
+            
+        # Now find the best cost and extract the corresponding bits
+        mi = searchIdx[np.argmax(self.d_costs)]
+        dbits = xc_abs_argmax[mi+genIdx].reshape((-1,self.burstLen))
+        
+        # t2 = time.perf_counter()
+        # print("Took %f s." % (t2-t1))
+        
+        return dbits, mi
+
         
     def setBurstIdxs(self, burstIdxs: np.ndarray=None):
         '''
@@ -102,59 +151,6 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
 
         '''
         self.burstIdxs = burstIdxs
-    
-    def demod(self, x: np.ndarray, numBursts: int, searchIdx: np.ndarray=None):
-        duration = numBursts * self.burstLen + (numBursts-1) * self.guardLen
-        
-        # Check for pre-configured burst indices
-        if self.burstIdxs is None:
-            burstShifts = np.arange(0,duration, self.period)
-        else:
-            duration = np.max(self.burstIdxs) * self.burstLen + (np.max(self.burstIdxs)-1) * self.guardLen
-            burstShifts = self.burstIdxs * self.period
-            
-        # Set a default searchIdx over entire duration
-        if searchIdx is None:
-            searchIdx = np.arange(x.size - duration + 1)
-            
-            
-        # Main loop
-        self.dcosts = np.zeros(searchIdx.size)
-        for i in range(searchIdx.size):
-            s = searchIdx[i]
-            bursts = np.array([x[sb:sb+self.burstLen] for sb in 
-                                (burstShifts + s) if sb+self.burstLen<=x.size]) # Carve out the aligned bursts
-
-            # bursts = cp.array([x[sb:sb+self.burstLen] for sb in 
-            #                    (burstShifts + s)]) # Carve out the aligned bursts
-
-            for b in np.arange(bursts.shape[0]):
-                # print("Search %d/%d, burst %d/%d" % (i,searchIdx.size,b,numBursts))
-                
-                xs = bursts[b,:]
-                demodBits, cost, _ = demodulateCP2FSK(xs, self.h, self.up)
-                # demodBits, cost, _ = cupyDemodulateCP2FSK(xs, self.h, self.up)
-                # print(cost)
-                
-                self.dcosts[i] += np.sum(np.max(cost, axis=0))
-        
-        mi = np.argmax(self.dcosts)
-        
-        dbits = self.demodAtIdx(x, mi, numBursts, duration)
-        
-        return dbits, searchIdx[mi]
-    
-    def demodAtIdx(self, x, idx, numBursts, duration):
-        bbursts = np.array([x[sb:sb+self.burstLen] for sb in np.arange(idx, idx+duration, self.period)
-                            if sb+self.burstLen <= x.size]) # Carve out the best bursts
-        dbits = np.zeros((bbursts.shape[0], int(self.burstLen/self.up)), dtype=np.uint8)
-        
-        for b in np.arange(bbursts.shape[0]):
-            xs = bbursts[b,:]
-            dbits[b,:], cost, _ = demodulateCP2FSK(xs, self.h, self.up)
-            
-        return dbits
-
 
 #%%
 def convertIntToBase4Combination(l, i):
@@ -242,7 +238,7 @@ if __name__ == "__main__":
     up = 10
     fs = baud * up
     
-    numBursts = 20
+    numBursts = 99
     burstBits = 90
     period = 100
     guardBits = period - burstBits
@@ -272,7 +268,7 @@ if __name__ == "__main__":
     # Attempt bursty demod
     searchRange = np.arange(int(0.5*sigs[0].size))
     
-    bd = BurstyDemodulatorCP2FSK(burstBits*up, (period-burstBits)*up, up)
+    bd = BurstyDemodulatorCP2FSK(burstBits, (period-burstBits), up)
     dbits, dalign = bd.demod(rxfilt, numBursts, searchRange)
     print("Demodulation index at %d" % dalign)
     plt.figure("Bursty demod cost")

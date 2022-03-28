@@ -115,6 +115,55 @@ def gridSearchTDOA(s1x_list, s2x_list, tdoa_list, td_sigma_list, xrange, yrange,
     
     return cost_grid
 
+def gridSearchFDOA(s1x_list, s2x_list, s1v_list, s2v_list, fdoa_list, fd_sigma_list, xrange, yrange, z, fc, verb=True):
+    xm, ym = np.meshgrid(xrange,yrange)
+    fullmesh = np.vstack((xm.flatten(),ym.flatten(),np.zeros(len(ym.flatten())) + z)).transpose().astype(np.float32)
+    cost_grid = 0
+    
+    # Pre-normalize fdoa by the fc
+    nfdoa_list = fdoa_list / fc
+    nfd_sigma_list = fd_sigma_list / fc
+    
+    for i, fdoa in enumerate(nfdoa_list):
+        s1x = s1x_list[i].astype(np.float32)
+        s2x = s2x_list[i].astype(np.float32)
+        s1v = s1v_list[i].astype(np.float32)
+        s2v = s2v_list[i].astype(np.float32)
+    
+        fd_sigma = nfd_sigma_list[i].astype(np.float32)
+        
+        # Range rate
+        drdt = np.float32(fdoa * 299792458.0)
+        drdt_sigma = np.float32(fd_sigma * 299792458.0)
+        
+        # Do we need this?
+        rm = np.linalg.norm(s2x - fullmesh, axis=1) - np.linalg.norm(s1x - fullmesh, axis=1)
+        
+        # Calculate direction vectors from the grid
+        dirvecm1 = s1x - fullmesh
+        dirvecm2 = s2x - fullmesh
+        # Need the normalized versions
+        dirvecm1 = dirvecm1 / np.linalg.norm(dirvecm1, axis=1).reshape((-1,1))
+        dirvecm2 = dirvecm2 / np.linalg.norm(dirvecm2, axis=1).reshape((-1,1))
+        # We want the component of velocity along the direction vectors
+        parvm1 = np.dot(dirvecm1, s1v)
+        parvm2 = np.dot(dirvecm2, s2v) # This should already be negative when direction and velocities are opposed
+        # print(parvm1)
+        # print(parvm2)
+        # For each velocity calculated, compute the range rate difference
+        # as the metric
+        vmdiff = parvm2 - parvm1
+        # print(vmdiff)
+        
+        if cost_grid is None:
+            cost_grid = (drdt - vmdiff)**2 / drdt_sigma**2
+        else:
+            cost_grid = cost_grid + (drdt - vmdiff)**2 / drdt_sigma**2
+            
+    return cost_grid
+        
+        
+
 def gridSearchTDOA_direct(s1x_list, s2x_list, tdoa_list, td_sigma_list, gridmat, verb=True):
     '''
     

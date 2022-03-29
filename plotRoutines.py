@@ -201,6 +201,29 @@ def pgPlotPhasorVsTime(complexData, color=(1.0,1.0,1.0,1.0), start=0, end=200, s
     
     return view
 
+# Pyqtgraph version
+def pgPlotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None): 
+    if ax is None:
+        win = pg.GraphicsLayoutWidget(title=windowTitle)
+        ax = win.addPlot(title=title)
+    else:
+        win = None
+        
+    if labels is not None:
+        ax.addLegend()
+        
+    for i, data in enumerate(dataList):
+        amp = np.abs(data)
+        t = np.arange(data.size) / fs[i]
+        if colors is not None:
+            ax.plot(t, amp, pen=colors[i], name=labels[i] if labels is not None else None)
+        else:
+            ax.plot(t, amp, name=labels[i] if labels is not None else None)
+    
+    win.show()
+    
+    return win, ax
+    
 def plotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None):    
     if ax is None: # hurray for python scoping allowing this
         fig = plt.figure(windowTitle)

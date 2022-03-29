@@ -247,6 +247,28 @@ def plotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, title=
     return fig, ax
     
 
+# Pyqtgraph version
+def pgPlotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None): 
+    if ax is None:
+        win = pg.GraphicsLayoutWidget(title=windowTitle)
+        ax = win.addPlot(title=title)
+    else:
+        win = None
+        
+    if labels is not None:
+        ax.addLegend()
+        
+    for i, data in enumerate(dataList):
+        spec = 20*np.log10(np.abs(np.fft.fft(data)))
+        if colors is not None:
+            ax.plot(makeFreq(len(spec), fs[i]), spec, pen=colors[i], name=labels[i] if labels is not None else None)
+        else:
+            ax.plot(makeFreq(len(spec), fs[i]), spec, name=labels[i] if labels is not None else None)
+        
+    win.show()
+    
+    return win, ax
+
 def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None):    
     if ax is None: # hurray for python scoping allowing this
         fig = plt.figure(windowTitle)

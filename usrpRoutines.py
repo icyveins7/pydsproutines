@@ -247,9 +247,9 @@ class SortedFolderReader(FolderReader):
         fts = self.filetimes[self.fidx-numFiles:self.fidx]
         return alldata, fps, fts
     
-    def splitHighAmpSubfolders(self, targetfolderpath:str, selectTimes:list = None,
-                               minAmp:float = 1e3, bufFront:int = 1, bufBack:int = 1,
-                               fmt:str = "%06d", useDatabase:bool = False):
+    def splitHighAmpSubfolders(self, targetfolderpath: str, selectTimes: list=None,
+                               minAmp: float=1e3, bufFront: int=1, bufBack: int=1, onlyExtractTimes: bool=False,
+                               fmt: str="%06d", useDatabase: bool=False, dbfilepath: str=None):
         '''
         Detects files with high amplitudes, and selects a group of files around them based on bufFront/bufBack.
         Groups are then individually written into separate subfolders based on 'fmt', residing in 'targetfolderpath'.
@@ -294,6 +294,9 @@ class SortedFolderReader(FolderReader):
         selectTimes = list(set(selectTimes))
         selectTimes.sort()
         
+        if onlyExtractTimes:
+            return selectTimes # return here directly
+        
         # Now pull groups out where the difference is more than 1
         groupSplitIdx = np.hstack((0,(np.argwhere(np.diff(selectTimes) > 1) + 1).flatten(), len(selectTimes)))
         # print(groupSplitIdx)
@@ -305,7 +308,8 @@ class SortedFolderReader(FolderReader):
             
         # Create the database
         if useDatabase:
-            dbfilepath = os.path.join(targetfolderpath,"groups.db")
+            if dbfilepath is None:
+                dbfilepath = os.path.join(targetfolderpath,"groups.db") # Default if not specified
             print("Writing to database at %s" % dbfilepath)
             gd = GroupDatabase(dbfilepath)
             # tablename = os.path.split(targetfolderpath)[1] # may result in starting with numeric, so don't use this

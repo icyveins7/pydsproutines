@@ -13,30 +13,14 @@ import cupy as cp
 import cupyx.scipy.signal as cpsps
 import cpuWola as cpw
 
-def cp_lfilter(ftap, x):
+def cp_lfilter(ftap: cp.ndarray, x: cp.ndarray):
     '''
-    Note: try to make sure the inputs are of the same type to maintain consistency.
-    Use ftap.astype(np.complex128) and x.astype(np.complex128) for example.
+    Note: convert inputs into GPU arrays before passing them in.
     '''
     
-    padlen = len(ftap) + len(x) - 1
+    c = cpsps.convolve(ftap, x)[:x.size]
     
-    h_ftap_pad = np.pad(ftap,(0,padlen-len(ftap)))
-    h_x_pad = np.pad(x,(0,padlen-len(x)))
-    
-    d_ftap_pad = cp.asarray(h_ftap_pad)
-    d_x_pad = cp.asarray(h_x_pad)
-    
-    d_ftap_pad = cp.fft.fft(d_ftap_pad)
-    d_x_pad = cp.fft.fft(d_x_pad)
-    d_prod = d_ftap_pad * d_x_pad
-    d_result = cp.fft.ifft(d_prod)
-    
-    h_result = cp.asnumpy(d_result)
-    
-    h_result_clip = h_result[:len(x)]
-    
-    return h_result_clip
+    return c
 
 def wola(f_tap, x, Dec, N=None, dtype=np.complex64):
     '''

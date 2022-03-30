@@ -82,7 +82,7 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
         self.burstIdxs = None
         
         # Outputs
-        self.dcosts = None
+        self.d_costs = None
         
     def demod(self, x: np.ndarray, numBursts: int=None, searchIdx: np.ndarray=None):
         # t1 = time.perf_counter()

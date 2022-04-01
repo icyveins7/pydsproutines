@@ -206,6 +206,7 @@ def pgPlotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, titl
     if ax is None:
         win = pg.GraphicsLayoutWidget(title=windowTitle)
         ax = win.addPlot(title=title)
+        win.show()
     else:
         win = None
         
@@ -219,8 +220,6 @@ def pgPlotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, titl
             ax.plot(t, amp, pen=colors[i], name=labels[i] if labels is not None else None)
         else:
             ax.plot(t, amp, name=labels[i] if labels is not None else None)
-    
-    win.show()
     
     return win, ax
     
@@ -252,6 +251,7 @@ def pgPlotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, titl
     if ax is None:
         win = pg.GraphicsLayoutWidget(title=windowTitle)
         ax = win.addPlot(title=title)
+        win.show()
     else:
         win = None
         
@@ -264,9 +264,7 @@ def pgPlotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, titl
             ax.plot(makeFreq(len(spec), fs[i]), spec, pen=colors[i], name=labels[i] if labels is not None else None)
         else:
             ax.plot(makeFreq(len(spec), fs[i]), spec, name=labels[i] if labels is not None else None)
-        
-    win.show()
-    
+
     return win, ax
 
 def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None):    

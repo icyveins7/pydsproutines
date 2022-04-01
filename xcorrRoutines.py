@@ -546,7 +546,7 @@ class GroupXcorrCZT:
         xc = np.zeros((shifts.size, int((self.f2-self.f1)/self.binWidth + 1)))
         # Pre-calculate the phases for each group
         cztFreq = np.arange(self.f1, self.f2+self.binWidth/2, self.binWidth)
-        groupPhases = np.exp(1j*2*np.pi*cztFreq*self.starts.reshape((-1,1))/self.fs)
+        groupPhases = np.exp(-1j*2*np.pi*cztFreq*self.starts.reshape((-1,1))/self.fs)
         
         for i in np.arange(shifts.size):
             shift = shifts[i]
@@ -638,7 +638,7 @@ class GroupXcorrCZT_Permutations:
         
         # Pre-calculate the phases for each group (TODO: i should move to this init?)
         cztFreq = cp.arange(self.f1, self.f2+self.binWidth/2, self.binWidth) # Compute as doubles
-        groupPhases = cp.exp(1j*2*cp.pi*cztFreq*cp.array(self.groupStarts.reshape((-1,1)))/self.fs).astype(cp.complex64) # Convert to floats
+        groupPhases = cp.exp(-1j*2*cp.pi*cztFreq*cp.array(self.groupStarts.reshape((-1,1)))/self.fs).astype(cp.complex64) # Convert to floats
         
         # Instantiate the CZT object
         cztcg = CZTCachedGPU(self.length, self.f1, self.f2, self.binWidth, self.fs)
@@ -733,7 +733,7 @@ class GroupXcorrCZT_Permutations:
         
         # Pre-calculate the phases for each group
         cztFreq = np.arange(self.f1, self.f2+self.binWidth/2, self.binWidth)
-        groupPhases = np.exp(1j*2*np.pi*cztFreq*self.groupStarts.reshape((-1,1))/self.fs)
+        groupPhases = np.exp(-1j*2*np.pi*cztFreq*self.groupStarts.reshape((-1,1))/self.fs)
         
         # # Debug single thread
         # self._xcorrThread(shifts,rx,self.numGroups,self.numTemplates,cztFreq,

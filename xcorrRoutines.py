@@ -14,6 +14,7 @@ from signalCreationRoutines import makeFreq
 from musicRoutines import MUSIC
 from numba import jit
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import sqlite3 as sq
 
 try:
     import cupy as cp
@@ -1163,3 +1164,32 @@ class GroupXcorrGPU(GroupXcorr):
     
         return xc, freqinds
           
+#%% Database for storing CAFs
+class CafDb:
+    def __init__(self, dbpath="cafs.db"):
+        self.dbpath = dbpath
+        self.con = sq.connect(self.dbpath)
+        self.cur = self.con.cursor()
+        
+        self.initMetadata()
+
+    def initMetadata(self):
+        self.cur.execute(
+            "create table if not exists metadata("
+                "table TEXT,"
+                "freqdim INTEGER, freq0 REAL, freqstep REAL,"
+                "timedim INTEGER, time0 REAL, timestep REAL,"
+                "dtype TEXT, src0 TEXT, src1 TEXT)")
+        self.con.commit()
+
+    def addTable(self,
+        table: str,
+        freqdim: int, freq0: float, freqstep: float,
+        timedim: int, time0: float, timestep: float,
+        dtype: np.float64, src0: str=None, src1: str=None):
+
+        # First add to metadata
+
+        # Then create the empty table
+
+        return None

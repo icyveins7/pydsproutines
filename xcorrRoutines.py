@@ -1166,30 +1166,55 @@ class GroupXcorrGPU(GroupXcorr):
           
 #%% Database for storing CAFs
 class CafDb:
+    # Class-wide constants
+    tableMetadata = ["freqdim", "freq0", "freqstep", "timedim", "time0", "timestep", "dtype", "src0", "src1"]
+    tableTypes = ["INTEGER", "REAL", "REAL", "INTEGER", "REAL", "REAL", "TEXT", "TEXT", "TEXT"]
+    metaStructure = {tableMeta: tableType for tableMeta, tableType in zip(tableMetadata, tableTypes)}
+    metaStructure["table"] = "TEXT"
+
     def __init__(self, dbpath="cafs.db"):
         self.dbpath = dbpath
         self.con = sq.connect(self.dbpath)
         self.cur = self.con.cursor()
         
+        # Placeholders for reference
+        self.metadict = {}
+
         self.initMetadata()
+        # self.reloadMetadata()
 
     def initMetadata(self):
-        self.cur.execute(
-            "create table if not exists metadata("
-                "table TEXT,"
-                "freqdim INTEGER, freq0 REAL, freqstep REAL,"
-                "timedim INTEGER, time0 REAL, timestep REAL,"
-                "dtype TEXT, src0 TEXT, src1 TEXT)")
+        stmt = "create table if not exists metadata(%s)" % (", ".join(["%s %s" % (key,val) for key, val in self.metaStructure.items()]))
+        print(stmt)
+        self.cur.execute(stmt) # TODO: fix this failure?
         self.con.commit()
+
+    def reloadMetadata(self):
+        self.cur.execute("select * from metadata")
+        self.metadict.clear()
+        metadata = self.cur.fetchall()
+        for meta in metadata:
+            self.metadict[meta[0]] = {
+                "freqdim": meta[1],
+                "freq0": meta[2],
+            }
+
 
     def addTable(self,
         table: str,
         freqdim: int, freq0: float, freqstep: float,
         timedim: int, time0: float, timestep: float,
-        dtype: np.float64, src0: str=None, src1: str=None):
+        dtype: str="64f", src0: str=None, src1: str=None):
 
         # First add to metadata
+        self.cur.execute("insert into metadata values(?,?,?,?,?,?,?,?,?,?)",
+            (table, freqdim, freq0, freqstep, timedim, time0, timestep, dtype, src0, src1)
+        )
 
         # Then create the empty table
+        self.cur.execute("create table if not exists %s(idx INTEGER PRIMARY KEY, caf BLOB, comment TEXT)" % table)
 
-        return None
+        self.con.commit()
+
+    
+

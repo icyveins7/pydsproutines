@@ -615,7 +615,16 @@ if __name__ == '__main__':
     
     dsr = 100
     ftap = sps.firwin(1000, 1/dsr)
+    
+    # Filter via taps
     xn_filt = sps.lfilter(ftap,1,xn)
+    
+    # Filter via fft
+    xn_fft = np.fft.fft(xn)
+    numBins = int(xn.size/dsr/2)
+    xn_fft[numBins:-numBins] = 0
+    xn_filt = np.fft.ifft(xn_fft)
+    
     xn_filtds = xn_filt[int(len(ftap)/2):int(len(ftap)/2+length):dsr]
     
     figds, axds = plt.subplots(2,1,num="Filter+Downsample")

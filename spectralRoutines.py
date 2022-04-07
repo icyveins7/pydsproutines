@@ -8,7 +8,7 @@ Created on Wed Apr  7 16:26:26 2021
 import numpy as np
 import sympy
 from numba import jit
-import cupy as cp
+# import cupy as cp
 import time
 import scipy.signal as sps
 
@@ -105,66 +105,69 @@ class CZTCached:
         return np.arange(self.k) * self.binWidth + self.f1
         
     
-
+try:
+    import cupy as cp
     
-class CZTCachedGPU:
-    def __init__(self, xlength, f1, f2, binWidth, fs):
-        self.binWidth = binWidth # Need these 2 for getFreq
-        self.f1 = f1
-        
-        self.k = int((f2-f1)/binWidth + 1) # This is the number of frequency bins
-        self.m = xlength
-        self.nfft = self.m + self.k
-        foundGoodPrimes = False
-        while not foundGoodPrimes:
-            self.nfft = self.nfft + 1
-            if np.max(sympy.primefactors(self.nfft)) <= 7: # change depending on highest tolerable radix
-                foundGoodPrimes = True
-        
-        kk = cp.arange(-self.m+1,np.max([self.k-1,self.m-1])+1)
-        kk2 = kk**2.0 / 2.0
-        self.d_ww = cp.exp(-1j * 2 * cp.pi * (f2-f1+binWidth)/(self.k*fs) * kk2) # Compute in fc128, convert after for better precision
-        chirpfilter = 1 / self.d_ww[:self.k-1+self.m]
-        self.d_fv = cp.fft.fft( chirpfilter, self.nfft )
-        
-        nn = cp.arange(self.m)
-        self.d_aa = cp.exp(1j * 2 * cp.pi * f1/fs * -nn) * self.d_ww[self.m+nn-1]
-        
-        # Convert to 32fc now
-        self.d_ww = self.d_ww.astype(cp.complex64)
-        self.d_fv = self.d_fv.astype(cp.complex64)
-        self.d_aa = self.d_aa.astype(cp.complex64)
-        
-    def getFreq(self):
-        return np.arange(self.k) * self.binWidth + self.f1
-        
-    def run(self, x: cp.ndarray):
-        y = x * self.d_aa
-        
-        fy = cp.fft.fft(y, self.nfft)
-        fy = fy * self.d_fv
-        g = cp.fft.ifft(fy)
-        
-        g = g[self.m-1:self.m+self.k-1] * self.d_ww[self.m-1:self.m+self.k-1]
-        
-        return g
-    
-    def runMany(self, xmany: cp.ndarray, out=None):
-        y = xmany * self.d_aa
-        # FFTs/IFFTs done on each row
-        fy = cp.fft.fft(y, self.nfft, axis=-1) # actually it already does this by default
-        fy = cp.multiply(fy,self.d_fv,out=fy)
-        g = cp.fft.ifft(fy, axis=-1)
-        
-        if out is None:
-            g = g[:,self.m-1:self.m+self.k-1] * self.d_ww[self.m-1:self.m+self.k-1]
+    class CZTCachedGPU:
+        def __init__(self, xlength, f1, f2, binWidth, fs):
+            self.binWidth = binWidth # Need these 2 for getFreq
+            self.f1 = f1
+            
+            self.k = int((f2-f1)/binWidth + 1) # This is the number of frequency bins
+            self.m = xlength
+            self.nfft = self.m + self.k
+            foundGoodPrimes = False
+            while not foundGoodPrimes:
+                self.nfft = self.nfft + 1
+                if np.max(sympy.primefactors(self.nfft)) <= 7: # change depending on highest tolerable radix
+                    foundGoodPrimes = True
+            
+            kk = cp.arange(-self.m+1,np.max([self.k-1,self.m-1])+1)
+            kk2 = kk**2.0 / 2.0
+            self.d_ww = cp.exp(-1j * 2 * cp.pi * (f2-f1+binWidth)/(self.k*fs) * kk2) # Compute in fc128, convert after for better precision
+            chirpfilter = 1 / self.d_ww[:self.k-1+self.m]
+            self.d_fv = cp.fft.fft( chirpfilter, self.nfft )
+            
+            nn = cp.arange(self.m)
+            self.d_aa = cp.exp(1j * 2 * cp.pi * f1/fs * -nn) * self.d_ww[self.m+nn-1]
+            
+            # Convert to 32fc now
+            self.d_ww = self.d_ww.astype(cp.complex64)
+            self.d_fv = self.d_fv.astype(cp.complex64)
+            self.d_aa = self.d_aa.astype(cp.complex64)
+            
+        def getFreq(self):
+            return np.arange(self.k) * self.binWidth + self.f1
+            
+        def run(self, x: cp.ndarray):
+            y = x * self.d_aa
+            
+            fy = cp.fft.fft(y, self.nfft)
+            fy = fy * self.d_fv
+            g = cp.fft.ifft(fy)
+            
+            g = g[self.m-1:self.m+self.k-1] * self.d_ww[self.m-1:self.m+self.k-1]
             
             return g
-        else: # Write direct to output
-            cp.multiply(g[:,self.m-1:self.m+self.k-1],self.d_ww[self.m-1:self.m+self.k-1],
-                        out=out)
-    
-
+        
+        def runMany(self, xmany: cp.ndarray, out=None):
+            y = xmany * self.d_aa
+            # FFTs/IFFTs done on each row
+            fy = cp.fft.fft(y, self.nfft, axis=-1) # actually it already does this by default
+            fy = cp.multiply(fy,self.d_fv,out=fy)
+            g = cp.fft.ifft(fy, axis=-1)
+            
+            if out is None:
+                g = g[:,self.m-1:self.m+self.k-1] * self.d_ww[self.m-1:self.m+self.k-1]
+                
+                return g
+            else: # Write direct to output
+                cp.multiply(g[:,self.m-1:self.m+self.k-1],self.d_ww[self.m-1:self.m+self.k-1],
+                            out=out)
+                
+except:
+    print("Ignoring cupy imports..")
+        
 
 #%%
 def dft(x, freqs, fs):
@@ -204,158 +207,164 @@ def toneSpectrum(f0, freqs, fs, N, phi=0, A=1.0):
     
     return vals
 
-toneSpecKernel = cp.RawKernel(r'''
-#include <cupy/complex.cuh>
-#include <math_constants.h>
-extern "C" __global__
-void toneSpec_kernel(const double phi, const double f0, const double *freqs, int freqslen,
-                     const double fs, const int N, const double A,
-                     complex<double> *out)
-{
-    int tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-    const double pi = 3.141592653589793;
-    double phase;
-    double common;
-    double sinpart, cospart;
-    complex<double> coeff;
-    complex<double> phaseTerm;
-    complex<double> numerator;
+try:
+    import cupy as cp
     
-    // calculate the external phase first
-    phase = phi - pi/2.0;
-    sincos(phase, &sinpart, &cospart);
-    phaseTerm = complex<double>(cospart, sinpart);
-
-    for (int i = tid; i < freqslen; i += gridDim.x * blockDim.x)
+    toneSpecKernel = cp.RawKernel(r'''
+    #include <cupy/complex.cuh>
+    #include <math_constants.h>
+    extern "C" __global__
+    void toneSpec_kernel(const double phi, const double f0, const double *freqs, int freqslen,
+                         const double fs, const int N, const double A,
+                         complex<double> *out)
     {
-        common = 2.0 * (freqs[i] - f0) / fs;
-        coeff = A/(common * pi);
+        int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    
+        const double pi = 3.141592653589793;
+        double phase;
+        double common;
+        double sinpart, cospart;
+        complex<double> coeff;
+        complex<double> phaseTerm;
+        complex<double> numerator;
         
-
-        // calculate the numerator
-        phase = -common * N;
-        sincospi(phase, &sinpart, &cospart);
-        numerator = 1.0 - complex<double>(cospart, sinpart);
-        
-        // final output
-        out[i] = coeff * phaseTerm * numerator;
-
-    }
-}
-''', 'toneSpec_kernel')  
-
-
-def toneSpectrum_gpu(f0, d_freqs, fs, N, phi=0.0, A=1.0):
-    '''
-    Note that using this kernel is way faster than expressing it plainly in pythonic cupy (est ~7-8 times slower).
-    '''
-    out = cp.zeros((d_freqs.size), dtype=cp.complex128)
+        // calculate the external phase first
+        phase = phi - pi/2.0;
+        sincos(phase, &sinpart, &cospart);
+        phaseTerm = complex<double>(cospart, sinpart);
     
-    THREADS_PER_BLOCK = 256
-    NUM_BLOCKS = int(np.ceil(out.size/THREADS_PER_BLOCK) + 1)
-    toneSpecKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), (phi, f0, d_freqs, d_freqs.size, np.float64(fs), int(N), A, out))
-                
-    return out
-
-toneSpecMultiKernel = cp.RawKernel(r'''
-#include <cupy/complex.cuh>
-#include <math_constants.h>
-extern "C" __global__
-void toneSpecMulti_kernel(const double *phi, const double *f0, const double *freqs, int freqslen,
-                     const double fs, const int N, const double *A,
-                     int m, complex<double> *out)
-{
-    int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    int blocksPerRow = freqslen/blockDim.x + ((freqslen % blockDim.x) > 0); // add 1 so that block exceeds the row length
-    int blockLoadIdx = blockIdx.x % blocksPerRow;
-
-    int row = tid/(blocksPerRow*blockDim.x);
-    int col = tid%(blocksPerRow*blockDim.x);
-    
-    // Each block will process m rows * blockDim cols
-    // That means each block need only read (blockDim) global memory values of freqs,
-    // (m) values of phi, f0 and A.
-    // It should be enforced that m < blockDim.
-    
-    // Load these into shared memory
-    extern __shared__ double s[];
-    double *s_phi = s; // (m) doubles
-    double *s_f0 = (double*)&s_phi[m]; // (m) doubles
-    double *s_A = (double*)&s_f0[m]; // (m) doubles
-    double *s_freqs = (double*)&s_A[m]; // (blockDim.x) doubles
-    
-    // load shared memory
-    for (int t = threadIdx.x; t < m; t = t + blockDim.x){
-        s_phi[t] = phi[t];
-    }
-    for (int t = threadIdx.x; t < m; t = t + blockDim.x){
-        s_f0[t] = f0[t];
-    }
-    for (int t = threadIdx.x; t < m; t = t + blockDim.x){
-        s_A[t] = A[t];
-    }
-    for (int t = threadIdx.x; t < min(blockDim.x, freqslen); t = t + blockDim.x){ // either load up to the blockDim, or if freqs is shorter then to the freqslen
-        s_freqs[t] = freqs[blockLoadIdx * blockDim.x + t];
-    }
-    
-    
-    __syncthreads();
-
-    const double pi = 3.141592653589793;
-    double phase;
-    double common;
-    double sinpart, cospart;
-    complex<double> coeff;
-    complex<double> phaseTerm;
-    complex<double> numerator;
-    
-    double u_phi, u_f0, u_A;
-    
-    for (int mi = 0; mi < m; mi++){
-        // broadcast used constants from shared mem for this iteration
-        u_phi = s_phi[mi];
-        u_f0 = s_f0[mi];
-        u_A = s_A[mi];
-            
-        for (int i = threadIdx.x; i < blockDim.x; i += gridDim.x * blockDim.x)
+        for (int i = tid; i < freqslen; i += gridDim.x * blockDim.x)
         {
-            common = 2.0 * (s_freqs[i] - u_f0) / fs; // each thread will read one value from shared mem
-            coeff = u_A/(common * pi);
+            common = 2.0 * (freqs[i] - f0) / fs;
+            coeff = A/(common * pi);
             
-            // calculate the external phase first
-            phase = u_phi - pi/2.0;
-            sincos(phase, &sinpart, &cospart);
-            phaseTerm = complex<double>(cospart, sinpart);
     
             // calculate the numerator
             phase = -common * N;
             sincospi(phase, &sinpart, &cospart);
             numerator = 1.0 - complex<double>(cospart, sinpart);
             
-            // final output to global mem directly if it doesn't overshoot
-            if (col < freqslen){
-                out[mi * freqslen + col] = coeff * phaseTerm * numerator;
+            // final output
+            out[i] = coeff * phaseTerm * numerator;
+    
+        }
+    }
+    ''', 'toneSpec_kernel')  
+    
+    
+    def toneSpectrum_gpu(f0, d_freqs, fs, N, phi=0.0, A=1.0):
+        '''
+        Note that using this kernel is way faster than expressing it plainly in pythonic cupy (est ~7-8 times slower).
+        '''
+        out = cp.zeros((d_freqs.size), dtype=cp.complex128)
+        
+        THREADS_PER_BLOCK = 256
+        NUM_BLOCKS = int(np.ceil(out.size/THREADS_PER_BLOCK) + 1)
+        toneSpecKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), (phi, f0, d_freqs, d_freqs.size, np.float64(fs), int(N), A, out))
+                    
+        return out
+    
+    toneSpecMultiKernel = cp.RawKernel(r'''
+    #include <cupy/complex.cuh>
+    #include <math_constants.h>
+    extern "C" __global__
+    void toneSpecMulti_kernel(const double *phi, const double *f0, const double *freqs, int freqslen,
+                         const double fs, const int N, const double *A,
+                         int m, complex<double> *out)
+    {
+        int tid = blockDim.x * blockIdx.x + threadIdx.x;
+        int blocksPerRow = freqslen/blockDim.x + ((freqslen % blockDim.x) > 0); // add 1 so that block exceeds the row length
+        int blockLoadIdx = blockIdx.x % blocksPerRow;
+    
+        int row = tid/(blocksPerRow*blockDim.x);
+        int col = tid%(blocksPerRow*blockDim.x);
+        
+        // Each block will process m rows * blockDim cols
+        // That means each block need only read (blockDim) global memory values of freqs,
+        // (m) values of phi, f0 and A.
+        // It should be enforced that m < blockDim.
+        
+        // Load these into shared memory
+        extern __shared__ double s[];
+        double *s_phi = s; // (m) doubles
+        double *s_f0 = (double*)&s_phi[m]; // (m) doubles
+        double *s_A = (double*)&s_f0[m]; // (m) doubles
+        double *s_freqs = (double*)&s_A[m]; // (blockDim.x) doubles
+        
+        // load shared memory
+        for (int t = threadIdx.x; t < m; t = t + blockDim.x){
+            s_phi[t] = phi[t];
+        }
+        for (int t = threadIdx.x; t < m; t = t + blockDim.x){
+            s_f0[t] = f0[t];
+        }
+        for (int t = threadIdx.x; t < m; t = t + blockDim.x){
+            s_A[t] = A[t];
+        }
+        for (int t = threadIdx.x; t < min(blockDim.x, freqslen); t = t + blockDim.x){ // either load up to the blockDim, or if freqs is shorter then to the freqslen
+            s_freqs[t] = freqs[blockLoadIdx * blockDim.x + t];
+        }
+        
+        
+        __syncthreads();
+    
+        const double pi = 3.141592653589793;
+        double phase;
+        double common;
+        double sinpart, cospart;
+        complex<double> coeff;
+        complex<double> phaseTerm;
+        complex<double> numerator;
+        
+        double u_phi, u_f0, u_A;
+        
+        for (int mi = 0; mi < m; mi++){
+            // broadcast used constants from shared mem for this iteration
+            u_phi = s_phi[mi];
+            u_f0 = s_f0[mi];
+            u_A = s_A[mi];
+                
+            for (int i = threadIdx.x; i < blockDim.x; i += gridDim.x * blockDim.x)
+            {
+                common = 2.0 * (s_freqs[i] - u_f0) / fs; // each thread will read one value from shared mem
+                coeff = u_A/(common * pi);
+                
+                // calculate the external phase first
+                phase = u_phi - pi/2.0;
+                sincos(phase, &sinpart, &cospart);
+                phaseTerm = complex<double>(cospart, sinpart);
+        
+                // calculate the numerator
+                phase = -common * N;
+                sincospi(phase, &sinpart, &cospart);
+                numerator = 1.0 - complex<double>(cospart, sinpart);
+                
+                // final output to global mem directly if it doesn't overshoot
+                if (col < freqslen){
+                    out[mi * freqslen + col] = coeff * phaseTerm * numerator;
+                }
             }
         }
     }
-}
-''', 'toneSpecMulti_kernel')  
-
-
-def toneSpectrumMulti_gpu(d_f0List, d_freqs, fs, N, d_phiList, d_AList):
-    out = cp.zeros((d_f0List.size, d_freqs.size), dtype=cp.complex128)
+    ''', 'toneSpecMulti_kernel')  
     
-    THREADS_PER_BLOCK = 256
-    NUM_BLOCKS = int(out.size/THREADS_PER_BLOCK) + int((out.size%THREADS_PER_BLOCK)>0)
     
-    if d_f0List.size > THREADS_PER_BLOCK:
-        raise Exception('Reduce parameter size. %d > %d' % (d_f0List.size > THREADS_PER_BLOCK))
+    def toneSpectrumMulti_gpu(d_f0List, d_freqs, fs, N, d_phiList, d_AList):
+        out = cp.zeros((d_f0List.size, d_freqs.size), dtype=cp.complex128)
+        
+        THREADS_PER_BLOCK = 256
+        NUM_BLOCKS = int(out.size/THREADS_PER_BLOCK) + int((out.size%THREADS_PER_BLOCK)>0)
+        
+        if d_f0List.size > THREADS_PER_BLOCK:
+            raise Exception('Reduce parameter size. %d > %d' % (d_f0List.size > THREADS_PER_BLOCK))
+        
+        toneSpecMultiKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), (d_phiList, d_f0List, d_freqs, d_freqs.size, np.float64(fs), int(N), d_AList, d_f0List.size, out),
+                            shared_mem=(THREADS_PER_BLOCK+3*d_f0List.size)*8)
+                    
+        return out
     
-    toneSpecMultiKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), (d_phiList, d_f0List, d_freqs, d_freqs.size, np.float64(fs), int(N), d_AList, d_f0List.size, out),
-                        shared_mem=(THREADS_PER_BLOCK+3*d_f0List.size)*8)
-                
-    return out
+except:
+    print("Ignoring cupy imports..")
 
 
 if __name__=='__main__':

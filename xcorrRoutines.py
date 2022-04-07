@@ -1166,27 +1166,36 @@ class GroupXcorrGPU(GroupXcorr):
           
 #%% Database for storing CAFs
 class CafDb:
-    # Class-wide constants
+    # Class-wide constants, ordered lists are important here for reference
     tableMetadata = ["freqdim", "freq0", "freqstep", "timedim", "time0", "timestep", "dtype", "src0", "src1"]
     tableTypes = ["INTEGER", "REAL", "REAL", "INTEGER", "REAL", "REAL", "TEXT", "TEXT", "TEXT"]
-    metaStructure = {tableMeta: tableType for tableMeta, tableType in zip(tableMetadata, tableTypes)}
-    metaStructure["table"] = "TEXT"
+    dtypeDict = {"32f": np.float32,
+                 "64f": np.float64,
+                 "32fc": np.complex64,
+                 "64fc": np.complex128}
 
     def __init__(self, dbpath="cafs.db"):
         self.dbpath = dbpath
         self.con = sq.connect(self.dbpath)
+        self.con.row_factory = sq.Row
         self.cur = self.con.cursor()
         
         # Placeholders for reference
         self.metadict = {}
 
         self.initMetadata()
-        # self.reloadMetadata()
+        self.reloadMetadata()
 
+    def _getMetadataSubstmt(self, appendTablename=False):
+        base = ["%s %s" % (meta, ttype) for meta,ttype in zip(self.tableMetadata,self.tableTypes)]
+        if appendTablename:
+            base.insert(0,"tablename TEXT")
+        return ', '.join(base)
+    
     def initMetadata(self):
-        stmt = "create table if not exists metadata(%s)" % (", ".join(["%s %s" % (key,val) for key, val in self.metaStructure.items()]))
-        print(stmt)
-        self.cur.execute(stmt) # TODO: fix this failure?
+        stmt = "create table if not exists metadata(%s)" % self._getMetadataSubstmt(appendTablename=True)
+
+        self.cur.execute(stmt)
         self.con.commit()
 
     def reloadMetadata(self):
@@ -1195,10 +1204,10 @@ class CafDb:
         metadata = self.cur.fetchall()
         for meta in metadata:
             self.metadict[meta[0]] = {
-                "freqdim": meta[1],
-                "freq0": meta[2],
+                metaname: metaval for metaname, metaval in zip(self.tableMetadata, meta[1:])
             }
-
+        
+        return metadata
 
     def addTable(self,
         table: str,
@@ -1213,8 +1222,43 @@ class CafDb:
 
         # Then create the empty table
         self.cur.execute("create table if not exists %s(idx INTEGER PRIMARY KEY, caf BLOB, comment TEXT)" % table)
+        # Reload the internal dict
+        self.reloadMetadata()
 
         self.con.commit()
+        
+    def addCaf(self, table: str, caf: np.ndarray, idx: int=None, comment: str=None):
+        if table not in self.metadict:
+            raise ValueError("No such table, please add the table first.")
+        if idx is None:
+            self.cur.execute("select MAX(idx) from %s" % table)
+            r = self.cur.fetchone()
+            if r[0] is None:
+                idx = 0
+            else:
+                idx = r[0] + 1
+            print("Automatically set idx to %d" % idx)
+            
+        stmt = "insert or replace into %s values(?,?,?)" % table
+        self.cur.execute(stmt, (idx, caf.tobytes(), comment))
+        self.con.commit()
+        
+    def dropTable(self, table: str):
+        self.cur.execute("drop table %s" % table)
+        self.cur.execute("delete from metadata where tablename=?", (table,))
+        self.con.commit()
+        self.reloadMetadata()
+        
+    def getCaf(self, table: str, idx: int):
+        self.cur.execute("select caf, comment from %s where idx=?" % table, (idx,))
+        r = self.cur.fetchone()
+        caf, comment = r
+        # Retrieve the dimensions and type
+        caf = np.frombuffer(caf, dtype=self.dtypeDict[self.metadict[table]['dtype']]).reshape(
+            self.metadict[table]['freqdim'],self.metadict[table]['timedim'])
+        
+        return caf, comment
+        
 
     
 

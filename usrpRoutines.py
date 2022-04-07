@@ -77,6 +77,18 @@ def multiBinReadThreaded(filenames, numSamps, in_dtype=np.int16, out_dtype=np.co
             alldata[i*numSamps: (i+1)*numSamps] = future.result() # write to the mass array
             
     return alldata
+    
+def isInt16Clipping(data, threshold=32000):
+    if data.dtype == np.complex64:
+        fdata = data.view(np.float32)
+    elif data.dtype == np.complex128:
+        fdata = data.view(np.float64)
+    else: # If just in int16s, it's just an interleaved real array so it's fine
+        fdata = data
+    
+    return np.any(np.abs(fdata) > threshold)
+        
+    
 
 #%% Convenience classes
 class FolderReader:

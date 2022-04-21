@@ -384,6 +384,13 @@ def sigmaDTO(signalBW, noiseBW, integTime, effSNR):
     s = 1.0/beta / np.sqrt(noiseBW * integTime * effSNR)
     return s
 
+def sigmaDFO(noiseBW, integTime, effSNR):
+    '''
+    Taken from Algorithms for Ambiguity Function Processing. SEYMOUR STEIN. 
+    '''
+    s = 0.55/integTime / np.sqrt(noiseBW * integTime * effSNR)
+    return s
+
 def theoreticalMultiPeak(startIdx1, startIdx2, snr_linear_1=None, snr_linear_2=None):
     '''
     Calculates parameters resulting from cross-correlation of multiple copies of a signal in two receivers.

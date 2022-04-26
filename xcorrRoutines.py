@@ -368,12 +368,23 @@ def convertEffSNRtoQF2(effSNR):
     """For back-conversion."""
     return effSNR/(2 + effSNR)
 
-def expectedEffSNR(snr1, snr2=None):
-    """For calculating expected SNR of two noisy signals."""
-    if snr2 is None:
-        snr2 = snr1
+def expectedEffSNR(snr1, snr2=np.inf, OSR=1):
+    '''
+    Effective SNR is defined as 1/(0.5 * (1/y1 + 1/y2 + 1/y1y2)),
+    where y1 and y2 are the respective SNRs, with respect to the noise BW.
     
+    Example:
+        10 dB, in-band SNR signal.
+        Pure signal. (inf SNR)
+        OSR = 2
+        
+        Effective SNR = 20.0/2 = 10.0
+    
+    Taken from Algorithms for Ambiguity Function Processing. SEYMOUR STEIN. 
+    '''
+
     y = 1.0/(0.5 * (1/snr1 + 1/snr2 + 1/snr1/snr2))
+    y = y/OSR # Scale by OSR
     return y
 
 def sigmaDTO(signalBW, noiseBW, integTime, effSNR):

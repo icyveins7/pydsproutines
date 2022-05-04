@@ -258,3 +258,70 @@ def makeFreq(length, fs):
         if freq[i] >= fs/2:
             freq[i] = freq[i] - fs
     return freq
+
+try:
+    import cupy as cp
+    
+    # Raw kernel for tone creation
+    addPhaseKernel = cp.RawKernel(r''' 
+    extern "C" __global__
+    void addPhase(
+        float *phase,
+        int len,
+        double freq,
+        double tstart,
+        double tstep)
+    {
+         int tidx = blockIdx.x * blockDim.x + threadIdx.x;
+        
+         // constant
+         const double TWO_PI_F = 6.283185307179586 * freq;
+         
+         // grid stride
+         for (int i = tidx; i < len; i = i + gridDim.x * blockDim.x)
+         {
+             // perform the calculation in double (required) but cast to float
+             phase[i] = (float)fma(TWO_PI_F, fma((double)i, tstep, tstart), (double)phase[i]);
+         }
+     
+    }
+    ''', '''addPhase''')
+    
+    def cupyAddTonePhase(phase: cp.ndarray, freq: float, tstart: float, tstep: float):
+        '''
+        Generates the phase values of a tone i.e. 2 pi f t, and adds it to the given array.
+        Is generally ~5-6 times faster than running the equivalent
+        phase = phase + 2 * cp.pi * freq * cp.arange(phase.size) * T
+        
+        Parameters
+        ----------
+        phase : cp.ndarray
+            Input/output array. Is added to in-place.
+        freq : float
+            Frequency value.
+        tstart : float
+            Time value of first sample.
+        tstep : float
+            Time step per sample.
+
+        Raises
+        ------
+        TypeError
+            Expects phase to be 32-bit.
+
+        '''
+        if phase.dtype != cp.float32:
+            raise TypeError("Phase is expected to be 32-bit float.")
+            
+        THREADS_PER_BLOCK = 256
+        NUM_BLOCKS = phase.size // THREADS_PER_BLOCK + 1
+        
+        addPhaseKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                           (phase,
+                            phase.size,
+                            freq,
+                            tstart,
+                            tstep))
+    
+except ModuleNotFoundError as e:
+    print("Cupy not found. Ignoring cupy imports.")

@@ -185,7 +185,7 @@ def propagateSignal(sig, time, fs, freq=None, tone=None):
     
     # generate a tone if no tone is passed in and a freqshift is desired
     if freq is not None and tone is None:
-        print('Generating tone for freq shift..')
+        # print('Generating tone for freq shift..')
         tone = np.exp(1j*2*np.pi*freq*np.arange(sig.shape[1])/fs)
         
     # propagate the signal in time
@@ -200,7 +200,7 @@ def propagateSignal(sig, time, fs, freq=None, tone=None):
         return result
     # otherwise return the freqshifted version with the tone
     else:
-        print('Returning shifted signal + tone used.')
+        # print('Returning shifted signal + tone used.')
         return result * tone, tone
 
 def propagateSignalExact(sig, tau, fs, f_c=0.0):

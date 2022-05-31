@@ -87,6 +87,13 @@ def isInt16Clipping(data, threshold=32000):
         fdata = data
     
     return np.any(np.abs(fdata) > threshold)
+
+def getAvailableSubdirpaths(maindir):
+    contents = os.listdir(maindir)
+    subdirpaths = [os.path.join(maindir,i) for i in contents]
+    subdirpaths = [i for i in subdirpaths if os.path.isdir(i)]
+    
+    return subdirpaths
         
     
 
@@ -235,6 +242,14 @@ class SortedFolderReader(FolderReader):
         # Error check that the values are incremental (no gaps)
         if ensure_incremental:
             assert(np.all(np.diff(self.filetimes)==1))
+            
+    def getPathByTime(self, reqTime):
+        return self.filepaths[np.argwhere(self.filetimes == reqTime).flatten()[0]]
+    
+    def getFileByTime(self, reqTime):
+        path = self.getPathByTime(reqTime)
+        alldata = multiBinReadThreaded([path], self.numSampsPerFile, self.in_dtype, self.out_dtype)
+        return alldata, path
             
     def get(self, numFiles=None, start=None):
         '''

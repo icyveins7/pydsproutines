@@ -86,8 +86,12 @@ class Channeliser:
     
     Internally uses the cpuWola dll.
     """
-    def __init__(self, numTaps, numChannels, Dec, NUM_THREADS=4):
-        self.f_tap = sps.firwin(numTaps, 1.0/Dec).astype(np.float32)
+    def __init__(self, numTaps, numChannels, Dec, NUM_THREADS=4, f_tap=None):
+        if f_tap is None:
+            self.f_tap = sps.firwin(numTaps, 1.0/Dec).astype(np.float32)
+        else:
+            self.f_tap = f_tap.astype(np.float32)
+            
         self.numChannels = int(numChannels)
         self.Dec = int(Dec)
         self.NUM_THREADS = int(NUM_THREADS)

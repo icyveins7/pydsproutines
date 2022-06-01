@@ -122,14 +122,17 @@ def plotSurface(xm, ym, z, cmap='coolwarm'):
     
     return fig, ax
 
-def plotHeatmap(heatmap, x0, y0, width, height, ax=None):
+def plotHeatmap(heatmap, x0, y0, width, height, ax=None, aspect='auto', vmin=None, vmax=None):
     if ax is None:
         fig, ax = plt.subplots(1,1)
     else:
         fig = None
         
-    ax.imshow(heatmap, origin='lower', extent=(x0, x0+width, y0, y0+height))
-    
+    plot = ax.imshow(heatmap, origin='lower', aspect=aspect,
+                     vmin=vmin, vmax=vmax, # this decides the color bar mapping
+                     extent=(x0, x0+width, y0, y0+height))
+    fig.colorbar(plot, ax=ax)
+
     return fig, ax
 
 def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None):

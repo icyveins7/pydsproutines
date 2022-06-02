@@ -153,7 +153,7 @@ def energyDetection(ampSq, medfiltlen, snrReqLinear=4.0, noiseIndices=None, spli
     sampleNoise = medfiltered[noiseIndices]
     meanNoise = np.mean(sampleNoise)
     reqPower = meanNoise * snrReqLinear
-    signalIndices = np.argwhere(medfiltered > reqPower)
+    signalIndices = np.argwhere(medfiltered > reqPower).flatten() # Patched to include .flatten, how was it working before?
     if splitSignalIndices:
         splitIndices = np.argwhere(np.diff(signalIndices)>1).flatten() + 1 # the + 1 is necessary
         signalIndices = np.split(signalIndices, splitIndices)

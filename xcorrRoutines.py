@@ -527,6 +527,9 @@ class GroupXcorr:
             
         return xc, freqpeaks
     
+class GroupXcorrFFT:
+    def __init__(self, ygroups: np.ndarray, starts: np.ndarray, fs: int, autoConj: bool=True):
+        pass
     
 class GroupXcorrCZT:
     def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray,

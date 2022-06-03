@@ -528,9 +528,62 @@ class GroupXcorr:
         return xc, freqpeaks
     
 class GroupXcorrFFT:
-    def __init__(self, ygroups: np.ndarray, starts: np.ndarray, fs: int, autoConj: bool=True):
-        pass
-    
+    def __init__(self, ygroups: np.ndarray, starts: np.ndarray, fs: int,
+                 autoConj: bool=True, fftlen=None):
+        assert(starts.size == ygroups.shape[0])
+        self.starts = starts
+        self.numGroups = self.starts.size
+        self.fs = fs
+        self.ygroups = ygroups
+        self.ygroupLen = self.ygroups.shape[1] # For easy access
+        if fftlen is None:
+            self.fftlen = self.ygroupLen 
+        else:
+            self.fftlen = fftlen # Use for padding for the fft
+            
+        self.ygroupNormSq = np.linalg.norm(self.ygroups.flatten())**2
+        
+        if autoConj:
+            self.ygroups = self.ygroups.conj()
+        
+    def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None):
+        if shifts is None:
+            shifts = np.arange(len(rx)-(self.starts[-1]+self.fftlen)+1)
+        else:
+            assert(shifts[-1] + self.starts[-1] + self.fftlen < rx.size)
+            
+        xc = np.zeros((shifts.size, self.fftlen))
+        fftfreq = makeFreq(self.fftlen, self.fs)
+        groupPhases = np.exp(-1j*2*np.pi*fftfreq*self.starts.reshape((-1,1))/self.fs)
+        
+        for i, shift in enumerate(shifts.size):
+            pdt = np.zeros((self.numGroups, fftfreq.size), rx.dtype)
+            rxgroupNormSqCollect = np.zeros(self.numGroups)
+            
+            for g in np.arange(self.numGroups):
+                ygroup = self.ygroups[g,:]
+                rxgroup = rx[shift + self.starts[g] : shift + self.starts[g] + self.ygroupLen]
+                rxgroupNormSqCollect[g] = np.linalg.norm(rxgroup)**2
+                
+                # pdt[g,:self.ygroupLen] = ygroup * rxgroup
+                np.multiply(ygroup, rxgroup, out=pdt[g,:self.ygroupLen]) # ufunc direct
+                
+            # At the end, run fft once on entire block
+            pdtfft = np.fft.fft(pdt, n=self.fftlen, axis=1) # FFT each row
+            # Then fix the phase
+            np.multiply(pdtfft, groupPhases, out=pdtfft) # in-place
+            # And then sum across the groups (rows)
+            pdtfftCombined = np.sum(pdtfft, axis=0)
+            rxgroupNormSq = np.sum(rxgroupNormSqCollect)
+            # Scale by the normsqs
+            xc[i, :] = np.abs(pdtfftCombined)**2 / rxgroupNormSq / self.ygroupNormSq
+            
+        return xc, fftfreq
+            
+                
+                
+            
+        
 class GroupXcorrCZT:
     def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray,
                  f1: float, f2: float, binWidth: float, fs: int, autoConj: bool=True):

@@ -556,7 +556,7 @@ class GroupXcorrFFT:
         fftfreq = makeFreq(self.fftlen, self.fs)
         groupPhases = np.exp(-1j*2*np.pi*fftfreq*self.starts.reshape((-1,1))/self.fs)
         
-        for i, shift in enumerate(shifts.size):
+        for i, shift in enumerate(shifts):
             pdt = np.zeros((self.numGroups, fftfreq.size), rx.dtype)
             rxgroupNormSqCollect = np.zeros(self.numGroups)
             

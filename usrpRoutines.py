@@ -99,14 +99,15 @@ def getAvailableSubdirpaths(maindir):
 
 #%% Convenience classes
 class FolderReader:
-    def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64):
-        self.folderpath = folderpath
-        self.extension = extension
-        self.refreshFilelists()
-        
+    def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64, ignoreInsufficientData=True):
         self.numSampsPerFile = numSampsPerFile
         self.in_dtype = in_dtype
         self.out_dtype = out_dtype
+
+        self.folderpath = folderpath
+        self.extension = extension
+        self.ignoreInsufficientData = ignoreInsufficientData
+        self.refreshFilelists()
         
         self.reset()
         
@@ -116,7 +117,13 @@ class FolderReader:
         self.maxsizeof = int(8e9) # in bytes, maximum usage
         
     def refreshFilelists(self):
-        self.filenames = fnmatch.filter(os.listdir(self.folderpath), "*"+self.extension)
+        reqMinFilesize = np.zeros(1, dtype=self.in_dtype).itemsize * 2 * self.numSampsPerFile
+
+        dircontents = os.listdir(self.folderpath)
+        if self.ignoreInsufficientData:
+            dircontents = [i for i in dircontents if 
+                            os.path.getsize(os.path.join(self.folderpath,i)) >= reqMinFilesize]
+        self.filenames = fnmatch.filter(dircontents, "*"+self.extension)
         self.filepaths = [os.path.join(self.folderpath, i) for i in self.filenames]
         self.reset() # cannot ensure file indexing after list is reset
         
@@ -247,9 +254,14 @@ class SortedFolderReader(FolderReader):
         return self.filepaths[np.argwhere(self.filetimes == reqTime).flatten()[0]]
     
     def getFileByTime(self, reqTime):
-        path = self.getPathByTime(reqTime)
-        alldata = multiBinReadThreaded([path], self.numSampsPerFile, self.in_dtype, self.out_dtype)
-        return alldata, path
+        if isinstance(reqTime, int):
+            path = self.getPathByTime(reqTime)
+            alldata = multiBinReadThreaded([path], self.numSampsPerFile, self.in_dtype, self.out_dtype)
+            return alldata, path
+        else: # if array-like
+            paths = [self.getPathByTime(i) for i in reqTime]
+            alldata = multiBinReadThreaded(paths, self.numSampsPerFile, self.in_dtype, self.out_dtype)
+            return alldata, paths
             
     def get(self, numFiles=None, start=None):
         '''

@@ -13,14 +13,30 @@ import cupy as cp
 import cupyx.scipy.signal as cpsps
 import cpuWola as cpw
 
-def cp_lfilter(ftap: cp.ndarray, x: cp.ndarray):
+def cp_lfilter(ftap: cp.ndarray, x: cp.ndarray, chunksize: int=None):
     '''
     Note: convert inputs into GPU arrays before passing them in.
     '''
-    
-    c = cpsps.convolve(ftap, x)[:x.size]
-    
-    return c
+    if chunksize is None:
+        c = cpsps.convolve(ftap, x)[:x.size]
+        
+        return c
+
+    else: # May not be worth to do this..
+        ptr = 0
+        c = cp.zeros_like(x)
+        while ptr < x.size:
+            block = min(x.size - ptr, chunksize)
+            if ptr == 0:
+                # Perform full convolution in order to zero-pad
+                c[ptr:ptr+block] = cpsps.convolve(ftap, x[:block], mode='full', method='direct')[:block]
+            else:
+                # Perform in valid range, but cut necessary previous samples for filter, no need to clip
+                c[ptr:ptr+block] = cpsps.convolve(ftap, x[ptr-ftap.size+1:ptr+block], mode='valid', method='direct')
+
+            ptr = ptr + block
+
+        return c
 
 def wola(f_tap, x, Dec, N=None, dtype=np.complex64):
     '''

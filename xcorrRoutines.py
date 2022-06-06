@@ -15,6 +15,7 @@ from musicRoutines import MUSIC
 from numba import jit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sqlite3 as sq
+import concurrent.futures
 
 try:
     import cupy as cp
@@ -525,64 +526,7 @@ class GroupXcorr:
             xc[i] = pfabs[pmaxind]**2 / rxconcatNormSq / self.yconcatNormSq
             freqpeaks[i] = self.freqs[pmaxind]
             
-        return xc, freqpeaks
-    
-class GroupXcorrFFT:
-    def __init__(self, ygroups: np.ndarray, starts: np.ndarray, fs: int,
-                 autoConj: bool=True, fftlen=None):
-        assert(starts.size == ygroups.shape[0])
-        self.starts = starts
-        self.numGroups = self.starts.size
-        self.fs = fs
-        self.ygroups = ygroups
-        self.ygroupLen = self.ygroups.shape[1] # For easy access
-        if fftlen is None:
-            self.fftlen = self.ygroupLen 
-        else:
-            self.fftlen = fftlen # Use for padding for the fft
-            
-        self.ygroupNormSq = np.linalg.norm(self.ygroups.flatten())**2
-        
-        if autoConj:
-            self.ygroups = self.ygroups.conj()
-        
-    def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None):
-        if shifts is None:
-            shifts = np.arange(len(rx)-(self.starts[-1]+self.fftlen)+1)
-        else:
-            assert(shifts[-1] + self.starts[-1] + self.fftlen < rx.size)
-            
-        xc = np.zeros((shifts.size, self.fftlen))
-        fftfreq = makeFreq(self.fftlen, self.fs)
-        groupPhases = np.exp(-1j*2*np.pi*fftfreq*self.starts.reshape((-1,1))/self.fs)
-        
-        for i, shift in enumerate(shifts):
-            pdt = np.zeros((self.numGroups, fftfreq.size), rx.dtype)
-            rxgroupNormSqCollect = np.zeros(self.numGroups)
-            
-            for g in np.arange(self.numGroups):
-                ygroup = self.ygroups[g,:]
-                rxgroup = rx[shift + self.starts[g] : shift + self.starts[g] + self.ygroupLen]
-                rxgroupNormSqCollect[g] = np.linalg.norm(rxgroup)**2
-                
-                # pdt[g,:self.ygroupLen] = ygroup * rxgroup
-                np.multiply(ygroup, rxgroup, out=pdt[g,:self.ygroupLen]) # ufunc direct
-                
-            # At the end, run fft once on entire block
-            pdtfft = np.fft.fft(pdt, n=self.fftlen, axis=1) # FFT each row
-            # Then fix the phase
-            np.multiply(pdtfft, groupPhases, out=pdtfft) # in-place
-            # And then sum across the groups (rows)
-            pdtfftCombined = np.sum(pdtfft, axis=0)
-            rxgroupNormSq = np.sum(rxgroupNormSqCollect)
-            # Scale by the normsqs
-            xc[i, :] = np.abs(pdtfftCombined)**2 / rxgroupNormSq / self.ygroupNormSq
-            
-        return xc, fftfreq
-            
-                
-                
-            
+        return xc, freqpeaks        
         
 class GroupXcorrCZT:
     def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray,
@@ -650,601 +594,769 @@ class GroupXcorrCZT:
         return xc, cztFreq
     
 try:
-	import cupy as cp # Used to raise exception
-	from spectralRoutines import CZTCachedGPU
-	
-	class GroupXcorrCZT_Permutations:
-		'''
-		Purpose of this class is to automatically xcorr different permutations of the groups, without unnecessary repeats.
-		Example case with 2 groups, template looks like
-		
-		T0_____T1_____
-		
-		but each template - T0, T1 - is selected from a set; example 
-		T0 <=> (T0_a, T0_b)
-		T1 <=> (T1_a, T1_b, T1_c)
+    import cupy as cp # Used to raise exception
+    from spectralRoutines import CZTCachedGPU
 
-		where each group may have a different sized set. In this case, there must be 2 X 3 total permutations i.e. 6 total correlations.
-		However, the 5 groups may be correlated individually, and then combined to form the group correlation values.
-		This, in general, reduces the computational load to the size of the sets, rather than the product of the size of the sets.
-		
-		So the class iterates over the group index, and the template index for each group index.
-		Assumption here is that each group has the same length, unlike the previous classes. This is to optimize the size of the czt for re-use.
-		'''
-		def __init__(self, ygroups: np.ndarray, ygroupIdxs: np.ndarray, groupStarts: np.ndarray,
-					 f1: float, f2: float, binWidth: float, fs: int, autoConj: bool=True):
-			
-			assert(ygroups.shape[0] == ygroupIdxs.size) # ensure numTemplates corresponds
-			assert(np.unique(ygroupIdxs).size == groupStarts.size) # ensure numGroups corresponds
-			
-			self.numTemplates = ygroupIdxs.size
-			self.numGroups = groupStarts.size
-			print("Total %d templates, %d groups" % (self.numTemplates, self.numGroups))
-			
-			assert(np.all(np.sort(np.unique(ygroupIdxs)) == np.arange(self.numGroups))) # ensure all groups accounted for and was sorted
-			
-			# Copying inputs
-			self.groupStarts = groupStarts
-			self.ygroupIdxs = ygroupIdxs
-			self.ygroups = ygroups
-			self.fs = fs
-			self.length = ygroups.shape[1]
-			# CZT parameters
-			self.f1 = f1
-			self.f2 = f2
-			self.binWidth = binWidth
-			
-			# Auto conj
-			if autoConj:
-				self.ygroups = self.ygroups.conj()
-			self.ygroupsEnergy = np.linalg.norm(self.ygroups, axis=1)**2
-			
-		def xcorrGPU(self, rx: cp.ndarray, shifts: np.ndarray, batchSz=32):
-			'''
-			This is meant to be a performant GPU implementation based on maximum CZT batched use.
-			As such, it is recommended that rx be converted to complex64, as that is the dtype that will be returned.
-			It is also expected that the rx array is passed in already on the GPU.
-			
-			Since much of the data will be held on the GPU, the user should be aware that using a 
-			long 'shifts' vector will have a massive memory footprint.
-			'''
-			# Check that shifts is not out of range
-			assert(shifts[-1] + self.groupStarts[-1] + self.length < rx.size)
-			
-			# Initialize GPU memory for outputs
-			self.d_xcTemplates = cp.zeros((self.numTemplates, shifts.size, int((self.f2-self.f1)/self.binWidth + 1)), dtype=cp.complex64)
-			self.d_rxgroupNormSq = cp.zeros((self.numGroups, shifts.size), dtype=cp.float32)
-			
-			# Pre-calculate the phases for each group (TODO: i should move to this init?)
-			cztFreq = cp.arange(self.f1, self.f2+self.binWidth/2, self.binWidth) # Compute as doubles
-			groupPhases = cp.exp(-1j*2*cp.pi*cztFreq*cp.array(self.groupStarts.reshape((-1,1)))/self.fs).astype(cp.complex64) # Convert to floats
-			
-			# Instantiate the CZT object
-			cztcg = CZTCachedGPU(self.length, self.f1, self.f2, self.binWidth, self.fs)
-			
-			# Calculate the number to complete per batch
-			numPerBatch = np.hstack((np.zeros(int(shifts.size/batchSz),dtype=np.int32) + batchSz, np.remainder(shifts.size,batchSz,dtype=np.int32)))
-			startIdxPerBatch = np.hstack((0, np.cumsum(numPerBatch[:-1])))
-			
-			# Pre-alloc a batch storage matrices?
-			d_mulMatrix = cp.zeros((batchSz,self.ygroups.shape[1]), dtype=cp.complex64)
-			d_pdtcztMatrix = cp.zeros((batchSz,cztcg.k), dtype=cp.complex64)
-			
-			# Counter for normsq completion?
-			groupNormSqCompleted = np.zeros(self.numGroups, dtype=np.uint8)
-			
-			# Loop over the templates instead of shifts
-			for k in np.arange(self.numTemplates):
-				# Load the current template to device
-				d_template = cp.array(self.ygroups[k,:], dtype=cp.complex64)
-				# Get the group number for the template
-				groupNumber = self.ygroupIdxs[k]
-				# And the groupStart index
-				groupStartIdx = self.groupStarts[groupNumber]
-				
-				# Calculate the norms outside the inner batch loop?
-				if groupNormSqCompleted[groupNumber] == 0:
-					# Calculate the slice for the shift -> absSq
-					d_rxSliceAbsSq = cp.abs(rx[groupStartIdx+shifts[0]:groupStartIdx+shifts[-1]+self.length])**2
-					for i in np.arange(shifts.size):
-						self.d_rxgroupNormSq[groupNumber,i] = cp.sum(d_rxSliceAbsSq[i:i+self.length])
-				
-				# Loop over batches
-				for b in np.arange(numPerBatch.size):
-					for i in np.arange(numPerBatch[b]):
-						shift = shifts[startIdxPerBatch[b] + i]
-						
-						# Multiply the appropriate slice
-						# mulMatrix[:numPerBatch[i]] = rx[shift+groupStartIdx : shift+groupStartIdx+self.length] * d_template
-						cp.multiply(rx[shift+groupStartIdx : shift+groupStartIdx+self.length],
-									d_template,
-									out = d_mulMatrix[i,:]) # Write to memory directly
-						# # Calculate the groupNormSq
-						# if self.d_rxgroupNormSq[groupNumber, i] == 0:
-						#     self.d_rxgroupNormSq[groupNumber,i] = cp.linalg.norm(rx[shift+groupStartIdx : shift+groupStartIdx+self.length])**2
-							
-					# Run czt on the entire batch
-					# d_pdtcztMatrix = cztcg.runMany(d_mulMatrix[:numPerBatch[b]])
-					cztcg.runMany(d_mulMatrix[:numPerBatch[b]], out=d_pdtcztMatrix[:numPerBatch[b]])
-					# Now multiply the phase and save directly
-					# self.d_xcTemplates[k, startIdxPerBatch[b]:startIdxPerBatch[b]+numPerBatch[b], :] = d_pdtcztMatrix * groupPhases[groupNumber,:]
-					cp.multiply(d_pdtcztMatrix[:numPerBatch[b]],
-								groupPhases[groupNumber,:],
-								out=self.d_xcTemplates[k, startIdxPerBatch[b]:startIdxPerBatch[b]+numPerBatch[b], :]) # Write to memory directly
-					
-			return cp.asnumpy(cztFreq)
-			
-		def getCAF_GPU(self, templateIdx: np.ndarray):
-			assert(templateIdx.size == self.numGroups)
-			
-			# Initialize array
-			cafcplx = cp.zeros((self.d_xcTemplates.shape[1],self.d_xcTemplates.shape[2]), dtype=np.complex64)
+    class GroupXcorrFFT:
+        def __init__(self, ygroups: np.ndarray, starts: np.ndarray, fs: int,
+                     autoConj: bool=True, fftlen=None):
+            assert(starts.size == ygroups.shape[0])
+            self.starts = starts
+            self.numGroups = self.starts.size
+            self.fs = fs
+            self.ygroups = ygroups
+            self.ygroupLen = self.ygroups.shape[1] # For easy access
+            if fftlen is None:
+                self.fftlen = self.ygroupLen 
+            else:
+                self.fftlen = fftlen # Use for padding for the fft
+                
+            self.ygroupNormSq = np.linalg.norm(self.ygroups.flatten())**2
+            
+            if autoConj:
+                self.ygroups = self.ygroups.conj()
 
-			rxnormsq = cp.zeros(self.d_rxgroupNormSq.shape[1])
-			ynormsq = np.zeros(1) # we can leave this on cpu
+            # Some pre-computes
+            self.fftfreq = makeFreq(self.fftlen, self.fs)
+            self.groupPhases = np.exp(-1j*2*np.pi*self.fftfreq*self.starts.reshape((-1,1))/self.fs)
+            
+            
+        def _xcorrThread(self, rx: np.ndarray, shifts: np.ndarray):
+            xc_slice = np.zeros((shifts.size, self.fftlen))
 
-			# GPU
-			for groupNumber in np.arange(templateIdx.size):
-				templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]][0] # cupy needs the 0
+            for i, shift in enumerate(shifts):
+                pdt = np.zeros((self.numGroups, self.fftfreq.size), rx.dtype)
+                rxgroupNormSqCollect = np.zeros(self.numGroups)
+                
+                for g in np.arange(self.numGroups):
+                    ygroup = self.ygroups[g,:]
+                    rxgroup = rx[shift + self.starts[g] : shift + self.starts[g] + self.ygroupLen]
+                    rxgroupNormSqCollect[g] = np.linalg.norm(rxgroup)**2
+                    
+                    # pdt[g,:self.ygroupLen] = ygroup * rxgroup
+                    np.multiply(ygroup, rxgroup, out=pdt[g,:self.ygroupLen]) # ufunc direct
+                    
+                # At the end, run fft once on entire block
+                pdtfft = np.fft.fft(pdt, n=self.fftlen, axis=1) # FFT each row
+                # Then fix the phase
+                np.multiply(pdtfft, self.groupPhases, out=pdtfft) # in-place
+                # And then sum across the groups (rows)
+                pdtfftCombined = np.sum(pdtfft, axis=0)
+                rxgroupNormSq = np.sum(rxgroupNormSqCollect)
+                # Scale by the normsqs
+                xc_slice[i, :] = np.abs(pdtfftCombined)**2 / rxgroupNormSq / self.ygroupNormSq
+            
+            return xc_slice
 
-				# cafcplx[:,:] = cafcplx[:,:] + self.d_xcTemplates[templateNumber,:,:] 
-				cp.add(cafcplx, self.d_xcTemplates[templateNumber,:,:], out = cafcplx)
-				# rxnormsq += self.rxgroupNormSq[groupNumber,:]
-				cp.add(rxnormsq, self.d_rxgroupNormSq[groupNumber,:], out=rxnormsq)
-				# ynormsq += self.ygroupsEnergy[templateNumber]
-				np.add(ynormsq, self.ygroupsEnergy[templateNumber], out=ynormsq)
-				
-			caf = cp.abs(cafcplx)**2/rxnormsq.reshape(-1,1)/ynormsq[0]
-			
-			return caf
-		
-		## CPU Methods
-		def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None, numThreads: int=1):
-			# We are returning CAF for this (for now?)
-			if shifts is None:
-				shifts = np.arange(len(rx)-(self.groupStarts[-1]+self.length)+1)
-			else:
-				assert(shifts[-1] + self.groupStarts[-1] + self.length < rx.size) # make sure it can access it
-			
-			# Init memory for outputs
-			self.xcTemplates = np.zeros((self.numTemplates, shifts.size, int((self.f2-self.f1)/self.binWidth + 1)), dtype=np.complex128)
-			self.rxgroupNormSq = np.zeros((self.numGroups, shifts.size))
-			
-			# Pre-calculate the phases for each group
-			cztFreq = np.arange(self.f1, self.f2+self.binWidth/2, self.binWidth)
-			groupPhases = np.exp(-1j*2*np.pi*cztFreq*self.groupStarts.reshape((-1,1))/self.fs)
-			
-			# # Debug single thread
-			# self._xcorrThread(shifts,rx,self.numGroups,self.numTemplates,cztFreq,
-			#                   self.ygroups,self.ygroupsEnergy,self.ygroupIdxs,self.groupStarts,groupPhases,
-			#                   self.length, self.f1, self.f2, self.binWidth,self.fs, 
-			#                   xcTemplates, rxgroupNormSq, 1,0)
-			# Start threads
-			with ThreadPoolExecutor(max_workers=numThreads) as executor:
-				future_x = {executor.submit(self._xcorrThread, shifts, rx, self.numGroups, self.numTemplates, cztFreq,
-											self.ygroups, self.ygroupsEnergy, self.ygroupIdxs, self.groupStarts, groupPhases,
-											self.length, self.f1, self.f2, self.binWidth, self.fs,
-											self.xcTemplates, self.rxgroupNormSq,
-											numThreads, i) : i for i in np.arange(numThreads)}
-			# After threads are done,
-			# breakpoint()
-			
-			return cztFreq
-		
-		def getCAF(self, templateIdx: np.ndarray, numThreads: int=4):
-			assert(templateIdx.size == self.numGroups)
-			
-			# Initialize array
-			cafcplx = np.zeros((self.xcTemplates.shape[1],self.xcTemplates.shape[2]), dtype=np.complex128)
-			rxnormsq = np.zeros(self.rxgroupNormSq.shape[1])
-			ynormsq = np.zeros(1)
+        def xcorrThreads(self, rx: np.ndarray, shifts: np.ndarray=None, NUM_THREADS: int=4):
+            if shifts is None:
+                shifts = np.arange(len(rx)-(self.starts[-1]+self.fftlen)+1)
+            else:
+                assert(shifts[-1] + self.starts[-1] + self.fftlen < rx.size)
 
-			# # V1, unthreaded
-			# for groupNumber in range(templateIdx.size):
-			#     templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]]
-				
-			#     cafcplx[:,:] = cafcplx[:,:] + self.xcTemplates[templateNumber,:,:]
-			#     rxnormsq += self.rxgroupNormSq[groupNumber,:]
-			#     ynormsq += self.ygroupsEnergy[templateNumber]
-			
-			# V2, threaded (but insignificant speedup here..)
-			with ThreadPoolExecutor(max_workers=numThreads) as executor:
-				future_x = {executor.submit(self._getCAFThread, templateIdx,
-											cafcplx, rxnormsq, ynormsq,
-											i, numThreads) : i for i in np.arange(numThreads)}
-				
-			caf = np.abs(cafcplx)**2/rxnormsq.reshape(-1,1)/ynormsq
-			
-			return caf
-				
-		def _getCAFThread(self, templateIdx: np.ndarray, 
-						  cafcplx: np.ndarray, rxnormsq: np.ndarray, ynormsq: np.ndarray,
-						  thIdx: int, numThreads: int):
-			
-			# Define the indices to work on for this thread
-			numPerThread = int(self.xcTemplates.shape[1] / numThreads)
-			numLastThread = self.xcTemplates.shape[1] - numPerThread * (numThreads-1)
-			
-			for groupNumber in np.arange(templateIdx.size):
-				templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]]
-				
-				# First thread computes the norm squared values
-				if thIdx == 0: 
-					rxnormsq += self.rxgroupNormSq[groupNumber,:]
-					ynormsq += self.ygroupsEnergy[templateNumber]
-				
-				# Last thread takes the remainder rows
-				if thIdx == numThreads - 1:
-					cafcplx[-numLastThread:,:] = cafcplx[-numLastThread:,:] + self.xcTemplates[templateNumber,-numLastThread:,:]
-					# np.add(cafcplx[-numLastThread:,:],
-					#        self.xcTemplates[templateNumber,-numLastThread:,:],
-					#        out=cafcplx[-numLastThread:,:])
-				else: # All previous threads compute based on the thread number
-					cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:] = cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:] + self.xcTemplates[templateNumber,thIdx*numPerThread:(thIdx+1)*numPerThread,:]
-					# np.add(cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:],
-					#        self.xcTemplates[templateNumber,thIdx*numPerThread:(thIdx+1)*numPerThread,:],
-					#        out=cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:])
-					
-				
-			
-		@staticmethod
-		# @jit(nopython=True, nogil=True) # make sure it releases the gil?
-		def _xcorrThread(shifts, rx, numGroups, numTemplates, cztFreq,
-						 ygroups, ygroupsEnergy, ygroupIdxs, groupStarts, groupPhases,
-						 length, f1, f2, binWidth, fs,
-						 xcTemplates, rxgroupNormSq, # outputs, written directly to array
-						 numThreads, thIdx):
-			# Create the czt cached object in the thread
-			cztc = CZTCached(length, f1, f2, binWidth, fs)
-			
-			# Loop with numThreads strides over shifts
-			for i in np.arange(thIdx,shifts.size,numThreads):
-				shift = shifts[i]
-				
-				# Loop over the templates
-				for k in np.arange(numTemplates):
-					groupNumber = ygroupIdxs[k] # Get the group number for this template
-					ygroup = ygroups[k, :] # Get the array for this template
-					# Slice the correct start index for this group
-					rxgroup = rx[shift+groupStarts[groupNumber] : shift+groupStarts[groupNumber]+length]
-					if rxgroupNormSq[groupNumber, i] == 0: # Write to the normSq if not yet done i.e. only first template of the group
-						rxgroupNormSq[groupNumber, i] = np.linalg.norm(rxgroup)**2 # may want to wrap this in if-else since re-calculated
+            xc = np.zeros((shifts.size, self.fftlen))
 
-					pdt = ygroup * rxgroup
-					# Run the czt from the cached object
-					pdtczt = cztc.run(pdt)
-					# Shift the czt by a phase appropriate to the group number
-					# But save it to the template index
-					xcTemplates[k, i, :] = pdtczt * groupPhases[groupNumber,:]
-			
-			# END THREAD. Normalisations to be done outside
+            with concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
+                futures = {executor.submit(self._xcorrThread, rx, shifts[i::NUM_THREADS]): i for i in range(NUM_THREADS)}
+                for future in concurrent.futures.as_completed(futures):
+                    i = futures[future]
+                    xc[i::NUM_THREADS, :] = future.result()
 
-			
-			
-		
+            return xc
 
-	#%%
-	group_xcorr_kernel = cp.RawKernel(r'''
-	#include <cupy/complex.cuh>
-	extern "C" __global__
-	void group_xcorr_kernel(const complex<float>* d_rx, 
-							const complex<float>* d_y, const int ylen, const float yNormSq,
-							const float* d_nFreqs, const int numFreqs,
-							const int* d_gIdx, // this has length ylen
-							const int* d_shifts, const int numShifts, const int numShiftsPerBlk,
-							float* d_xc, int* d_freqinds){
-											
-		// allocate shared memory
-		extern __shared__ double s[];
-		
-		complex<float> *s_y = (complex<float>*)s; // (ylen) complex floats
-		float *s_nFreqs = (float*)&s_y[ylen]; // (numFreqs) real floats
-		complex<float> *s_rx = (complex<float>*)&s_nFreqs[numFreqs]; // (ylen) complex floats
-		int *s_gIdx = (int*)&s_rx[ylen]; // (ylen) ints
-		float *s_absVals = (float*)&s_gIdx[ylen]; // (numFreqs) real floats
-		/* Tally: (ylen*2)*32fc + (numFreqs*2)*32f + (ylen)*32s */
-		
-		// load shared memory
-		for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
-			s_y[t] = d_y[t];
-			s_gIdx[t] = d_gIdx[t];
-		}
-		for (int t = threadIdx.x; t < numFreqs; t = t + blockDim.x){
-			s_nFreqs[t] = d_nFreqs[t];
-		}
-		// nothing to load for s_rx, it's a workspace
-		
-		__syncthreads();
-						 
-		// loop over the shifts for this block
-		int shift, shiftIdx;
-		float rxNormSq;
-		double fprod_real, fprod_imag;
-		complex<double> val;
-		int maxIdx;
-		float maxVal;
-		
-		for (int blkShift = 0; blkShift < numShiftsPerBlk; blkShift++){
-			shiftIdx = blockIdx.x * numShiftsPerBlk + blkShift;
-			shift = d_shifts[shiftIdx];
-			
-			// load the values from d_rx appropriately
-			for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
-				s_rx[t] = d_rx[shift + s_gIdx[t]];
-			}
-			
-			__syncthreads(); // sync before calculating normSq otherwise some array values not written yet
-			
-			// each thread just calculates the rxNormSq for itself
-			rxNormSq = 0;
-			for (int i = 0; i < ylen; i++){
-				rxNormSq = fmaf(abs(s_rx[i]), abs(s_rx[i]), rxNormSq);
-			}
-			
-			__syncthreads(); // must sync before multiplying or else some threads will have wrong normSq
-			
-			// multiply y in-place
-			for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
-				s_rx[t] = s_rx[t] * s_y[t];
-			}
-			
-			// now each thread calculates the dot product with an appropriate frequency vector
-			// i.e. thread (t): frequency index, loops over (i): index of rx
-			for (int t = threadIdx.x; t < numFreqs; t = t + blockDim.x){
-				val = 0;
-				for (int i = 0; i < ylen; i++){
-					sincospi(-2.0 * (double)s_nFreqs[t] * (double)s_gIdx[i], &fprod_imag, &fprod_real); // this is extremely slow
-					val = val + complex<double>(fprod_real, fprod_imag) * complex<double>(s_rx[i]); // no FMA intrinsics for complex..
-				}
-				// when val is complete, write it to shared mem array for storage first
-				s_absVals[t] = (float)abs(val); // cast to float when writing
-					
-			}
-			
-			__syncthreads(); // wait for all absVals to be written
-								
-			// use the first thread to scan for the maximum
-			if (threadIdx.x == 0){
-				maxIdx = 0;
-				maxVal = s_absVals[0];
-				for (int i = 1; i < numFreqs; i++){
-					if (s_absVals[i] > maxVal){
-						maxIdx = i;
-						maxVal = s_absVals[i];
-					}
-				}
-				
-				// and write directly to the global mem
-				d_freqinds[shiftIdx] = maxIdx;
-				d_xc[shiftIdx] = maxVal * maxVal / rxNormSq / yNormSq;
-				// d_xc[shiftIdx] = rxNormSq; // cheating debug statement
+        def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None, flattenToTime: bool=True):
+            if shifts is None:
+                shifts = np.arange(len(rx)-(self.starts[-1]+self.fftlen)+1)
+            else:
+                assert(shifts[-1] + self.starts[-1] + self.fftlen < rx.size)
+                
+            if flattenToTime:
+                xc = np.zeros(shifts.size)
+                fi = np.zeros(shifts.size, dtype=np.uint32)
+            else:
+                xc = np.zeros((shifts.size, self.fftlen))
 
-			}
-			
-		}
-		
-	}
-	''','group_xcorr_kernel')
+            for i, shift in enumerate(shifts):
+                pdt = np.zeros((self.numGroups, self.fftfreq.size), rx.dtype)
+                rxgroupNormSqCollect = np.zeros(self.numGroups)
+                
+                for g in np.arange(self.numGroups):
+                    ygroup = self.ygroups[g,:]
+                    rxgroup = rx[shift + self.starts[g] : shift + self.starts[g] + self.ygroupLen]
+                    rxgroupNormSqCollect[g] = np.linalg.norm(rxgroup)**2
+                    
+                    # pdt[g,:self.ygroupLen] = ygroup * rxgroup
+                    np.multiply(ygroup, rxgroup, out=pdt[g,:self.ygroupLen]) # ufunc direct
+                    
+                # At the end, run fft once on entire block
+                pdtfft = np.fft.fft(pdt, n=self.fftlen, axis=1) # FFT each row
+                # Then fix the phase
+                np.multiply(pdtfft, self.groupPhases, out=pdtfft) # in-place
+                # And then sum across the groups (rows)
+                pdtfftCombined = np.sum(pdtfft, axis=0)
+                rxgroupNormSq = np.sum(rxgroupNormSqCollect)
+                # Scale by the normsqs
+                if flattenToTime:
+                    ff = np.abs(pdtfftCombined)**2 / rxgroupNormSq / self.ygroupNormSq
+                    fmi = np.argmax(ff)
+                    xc[i] = ff[fmi]
+                    fi[i] = fmi
+                    
+                else:
+                    xc[i, :] = np.abs(pdtfftCombined)**2 / rxgroupNormSq / self.ygroupNormSq
+                
+            if flattenToTime:
+                return xc, fi
+            else:
+                return xc
 
-	group_xcorr_kernelv2 = cp.RawKernel(r'''
-	#include <cupy/complex.cuh>
-	extern "C" __global__
-	void group_xcorr_kernelv2(const complex<float>* d_rx,
-							const complex<float>* d_y, const int ylen, const float yNormSq,
-							const complex<float>* d_freqMat, const int numFreqs,
-							const int* d_gIdx, // this has length ylen
-							const int* d_shifts, const int numShifts, const int numShiftsPerBlk,
-							float* d_xc, int* d_freqinds){
-											
-		// allocate shared memory
-		extern __shared__ double s[];
-		
-		complex<float> *s_y = (complex<float>*)s; // (ylen) complex floats
-		complex<float> *s_rx = (complex<float>*)&s_y[ylen]; // (ylen) complex floats
-		int *s_gIdx = (int*)&s_rx[ylen]; // (ylen) ints
-		float *s_absVals = (float*)&s_gIdx[ylen]; // (numFreqs) real floats
-		/* Tally: (ylen*2)*32fc + (numFreqs)*32f + (ylen)*32s */
-		
-		// load shared memory
-		for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
-			s_y[t] = d_y[t];
-			s_gIdx[t] = d_gIdx[t];
-		}
-		// nothing to load for s_rx, it's a workspace
-		
-		__syncthreads();
-						 
-		// loop over the shifts for this block
-		int shift, shiftIdx;
-		float rxNormSq;
-		complex<float> val;
-		int maxIdx;
-		float maxVal;
-		
-		for (int blkShift = 0; blkShift < numShiftsPerBlk; blkShift++){
-			shiftIdx = blockIdx.x * numShiftsPerBlk + blkShift;
-			shift = d_shifts[shiftIdx];
-			
-			// load the values from d_rx appropriately
-			for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
-				s_rx[t] = d_rx[shift + s_gIdx[t]];
-			}
-			
-			__syncthreads(); // sync before calculating normSq otherwise some array values not written yet
-			
-			// each thread just calculates the rxNormSq for itself
-			rxNormSq = 0;
-			for (int i = 0; i < ylen; i++){
-				rxNormSq = fmaf(abs(s_rx[i]), abs(s_rx[i]), rxNormSq);
-			}
-			
-			__syncthreads(); // must sync before multiplying or else some threads will have wrong normSq
-			
-			// multiply y in-place
-			for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
-				s_rx[t] = s_rx[t] * s_y[t];
-			}
-			
-			// now each thread calculates the dot product with an appropriate frequency vector
-			// i.e. thread (t): frequency index, loops over (i): index of rx
-			for (int t = threadIdx.x; t < numFreqs; t = t + blockDim.x){
-				val = 0;
-				for (int i = 0; i < ylen; i++){
-					val = val + d_freqMat[t*ylen + i] * s_rx[i];
-				}
-				// when val is complete, write it to shared mem array for storage first
-				s_absVals[t] = abs(val); // cast to float when writing
-			}
-			
-			__syncthreads(); // wait for all absVals to be written
-								
-			// use the first thread to scan for the maximum
-			if (threadIdx.x == 0){
-				maxIdx = 0;
-				maxVal = s_absVals[0];
-				for (int i = 1; i < numFreqs; i++){
-					if (s_absVals[i] > maxVal){
-						maxIdx = i;
-						maxVal = s_absVals[i];
-					}
-				}
-				
-				// and write directly to the global mem
-				d_freqinds[shiftIdx] = maxIdx;
-				d_xc[shiftIdx] = maxVal * maxVal / rxNormSq / yNormSq;
-				// d_xc[shiftIdx] = rxNormSq; // cheating debug statement
+        def xcorrGPU(self, rx: cp.ndarray, shifts: np.ndarray=None, flattenToTime: bool=True):
+            if shifts is None:
+                shifts = np.arange(len(rx)-(self.starts[-1]+self.fftlen)+1)
+            else:
+                assert(shifts[-1] + self.starts[-1] + self.fftlen < rx.size)
+                
+            if flattenToTime:
+                xc = cp.zeros(shifts.size)
+                fi = cp.zeros(shifts.size, dtype=cp.uint32)
+            else:
+                xc = cp.zeros((shifts.size, self.fftlen))
 
-			}
-			
-		}
-		
-	}
-	''','group_xcorr_kernelv2')
+            # GPU pre-alloc
+            pdt = cp.zeros((self.numGroups, self.fftlen), rx.dtype)
+            rxgroups = cp.zeros_like(pdt)
+            d_ygroups = cp.asarray(self.ygroups, dtype=cp.complex64)
+            d_groupPhases = cp.asarray(self.groupPhases)
+
+            for i, shift in enumerate(shifts):
+                # Zero-ing
+                pdt[:,:] = 0
+                rxgroups[:, :] = 0
+                rxgroupNormSqCollect = np.zeros(self.numGroups)
+                
+                # Construct the matrix of all the groups
+                for g in np.arange(self.numGroups):
+                    rxgroups[g, :self.ygroupLen] = rx[shift + self.starts[g] : shift + self.starts[g] + self.ygroupLen]
+
+                # Calculate all the rxgroup norms
+                rxgroupNormSqCollect = cp.linalg.norm(rxgroups, axis=1)**2
+                # Multiply all the groups together element-wise
+                cp.multiply(d_ygroups, rxgroups, out=pdt)
+                    
+                # At the end, run fft once on entire block
+                pdtfft = cp.fft.fft(pdt, n=self.fftlen, axis=1) # FFT each row
+                # Then fix the phase
+                cp.multiply(pdtfft, d_groupPhases, out=pdtfft) # in-place
+                # And then sum across the groups (rows)
+                pdtfftCombined = cp.sum(pdtfft, axis=0)
+                rxgroupNormSq = cp.sum(rxgroupNormSqCollect)
+                # Scale by the normsqs
+                if flattenToTime:
+                    ff = cp.abs(pdtfftCombined)**2 / rxgroupNormSq / self.ygroupNormSq
+                    fmi = cp.argmax(ff)
+                    xc[i] = ff[fmi]
+                    fi[i] = fmi
+                    
+                else:
+                    xc[i, :] = cp.abs(pdtfftCombined)**2 / rxgroupNormSq / self.ygroupNormSq
+                
+            if flattenToTime:
+                return xc, fi
+            else:
+                return xc
+
+    class GroupXcorrCZT_Permutations:
+        '''
+        Purpose of this class is to automatically xcorr different permutations of the groups, without unnecessary repeats.
+        Example case with 2 groups, template looks like
+        
+        T0_____T1_____
+        
+        but each template - T0, T1 - is selected from a set; example 
+        T0 <=> (T0_a, T0_b)
+        T1 <=> (T1_a, T1_b, T1_c)
+
+        where each group may have a different sized set. In this case, there must be 2 X 3 total permutations i.e. 6 total correlations.
+        However, the 5 groups may be correlated individually, and then combined to form the group correlation values.
+        This, in general, reduces the computational load to the size of the sets, rather than the product of the size of the sets.
+        
+        So the class iterates over the group index, and the template index for each group index.
+        Assumption here is that each group has the same length, unlike the previous classes. This is to optimize the size of the czt for re-use.
+        '''
+        def __init__(self, ygroups: np.ndarray, ygroupIdxs: np.ndarray, groupStarts: np.ndarray,
+                     f1: float, f2: float, binWidth: float, fs: int, autoConj: bool=True):
+            
+            assert(ygroups.shape[0] == ygroupIdxs.size) # ensure numTemplates corresponds
+            assert(np.unique(ygroupIdxs).size == groupStarts.size) # ensure numGroups corresponds
+            
+            self.numTemplates = ygroupIdxs.size
+            self.numGroups = groupStarts.size
+            print("Total %d templates, %d groups" % (self.numTemplates, self.numGroups))
+            
+            assert(np.all(np.sort(np.unique(ygroupIdxs)) == np.arange(self.numGroups))) # ensure all groups accounted for and was sorted
+            
+            # Copying inputs
+            self.groupStarts = groupStarts
+            self.ygroupIdxs = ygroupIdxs
+            self.ygroups = ygroups
+            self.fs = fs
+            self.length = ygroups.shape[1]
+            # CZT parameters
+            self.f1 = f1
+            self.f2 = f2
+            self.binWidth = binWidth
+            
+            # Auto conj
+            if autoConj:
+                self.ygroups = self.ygroups.conj()
+            self.ygroupsEnergy = np.linalg.norm(self.ygroups, axis=1)**2
+            
+        def xcorrGPU(self, rx: cp.ndarray, shifts: np.ndarray, batchSz=32):
+            '''
+            This is meant to be a performant GPU implementation based on maximum CZT batched use.
+            As such, it is recommended that rx be converted to complex64, as that is the dtype that will be returned.
+            It is also expected that the rx array is passed in already on the GPU.
+            
+            Since much of the data will be held on the GPU, the user should be aware that using a 
+            long 'shifts' vector will have a massive memory footprint.
+            '''
+            # Check that shifts is not out of range
+            assert(shifts[-1] + self.groupStarts[-1] + self.length < rx.size)
+            
+            # Initialize GPU memory for outputs
+            self.d_xcTemplates = cp.zeros((self.numTemplates, shifts.size, int((self.f2-self.f1)/self.binWidth + 1)), dtype=cp.complex64)
+            self.d_rxgroupNormSq = cp.zeros((self.numGroups, shifts.size), dtype=cp.float32)
+            
+            # Pre-calculate the phases for each group (TODO: i should move to this init?)
+            cztFreq = cp.arange(self.f1, self.f2+self.binWidth/2, self.binWidth) # Compute as doubles
+            groupPhases = cp.exp(-1j*2*cp.pi*cztFreq*cp.array(self.groupStarts.reshape((-1,1)))/self.fs).astype(cp.complex64) # Convert to floats
+            
+            # Instantiate the CZT object
+            cztcg = CZTCachedGPU(self.length, self.f1, self.f2, self.binWidth, self.fs)
+            
+            # Calculate the number to complete per batch
+            numPerBatch = np.hstack((np.zeros(int(shifts.size/batchSz),dtype=np.int32) + batchSz, np.remainder(shifts.size,batchSz,dtype=np.int32)))
+            startIdxPerBatch = np.hstack((0, np.cumsum(numPerBatch[:-1])))
+            
+            # Pre-alloc a batch storage matrices?
+            d_mulMatrix = cp.zeros((batchSz,self.ygroups.shape[1]), dtype=cp.complex64)
+            d_pdtcztMatrix = cp.zeros((batchSz,cztcg.k), dtype=cp.complex64)
+            
+            # Counter for normsq completion?
+            groupNormSqCompleted = np.zeros(self.numGroups, dtype=np.uint8)
+            
+            # Loop over the templates instead of shifts
+            for k in np.arange(self.numTemplates):
+                # Load the current template to device
+                d_template = cp.array(self.ygroups[k,:], dtype=cp.complex64)
+                # Get the group number for the template
+                groupNumber = self.ygroupIdxs[k]
+                # And the groupStart index
+                groupStartIdx = self.groupStarts[groupNumber]
+                
+                # Calculate the norms outside the inner batch loop?
+                if groupNormSqCompleted[groupNumber] == 0:
+                    # Calculate the slice for the shift -> absSq
+                    d_rxSliceAbsSq = cp.abs(rx[groupStartIdx+shifts[0]:groupStartIdx+shifts[-1]+self.length])**2
+                    for i in np.arange(shifts.size):
+                        self.d_rxgroupNormSq[groupNumber,i] = cp.sum(d_rxSliceAbsSq[i:i+self.length])
+                
+                # Loop over batches
+                for b in np.arange(numPerBatch.size):
+                    for i in np.arange(numPerBatch[b]):
+                        shift = shifts[startIdxPerBatch[b] + i]
+                        
+                        # Multiply the appropriate slice
+                        # mulMatrix[:numPerBatch[i]] = rx[shift+groupStartIdx : shift+groupStartIdx+self.length] * d_template
+                        cp.multiply(rx[shift+groupStartIdx : shift+groupStartIdx+self.length],
+                                    d_template,
+                                    out = d_mulMatrix[i,:]) # Write to memory directly
+                        # # Calculate the groupNormSq
+                        # if self.d_rxgroupNormSq[groupNumber, i] == 0:
+                        #     self.d_rxgroupNormSq[groupNumber,i] = cp.linalg.norm(rx[shift+groupStartIdx : shift+groupStartIdx+self.length])**2
+                            
+                    # Run czt on the entire batch
+                    # d_pdtcztMatrix = cztcg.runMany(d_mulMatrix[:numPerBatch[b]])
+                    cztcg.runMany(d_mulMatrix[:numPerBatch[b]], out=d_pdtcztMatrix[:numPerBatch[b]])
+                    # Now multiply the phase and save directly
+                    # self.d_xcTemplates[k, startIdxPerBatch[b]:startIdxPerBatch[b]+numPerBatch[b], :] = d_pdtcztMatrix * groupPhases[groupNumber,:]
+                    cp.multiply(d_pdtcztMatrix[:numPerBatch[b]],
+                                groupPhases[groupNumber,:],
+                                out=self.d_xcTemplates[k, startIdxPerBatch[b]:startIdxPerBatch[b]+numPerBatch[b], :]) # Write to memory directly
+                    
+            return cp.asnumpy(cztFreq)
+            
+        def getCAF_GPU(self, templateIdx: np.ndarray):
+            assert(templateIdx.size == self.numGroups)
+            
+            # Initialize array
+            cafcplx = cp.zeros((self.d_xcTemplates.shape[1],self.d_xcTemplates.shape[2]), dtype=np.complex64)
+
+            rxnormsq = cp.zeros(self.d_rxgroupNormSq.shape[1])
+            ynormsq = np.zeros(1) # we can leave this on cpu
+
+            # GPU
+            for groupNumber in np.arange(templateIdx.size):
+                templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]][0] # cupy needs the 0
+
+                # cafcplx[:,:] = cafcplx[:,:] + self.d_xcTemplates[templateNumber,:,:] 
+                cp.add(cafcplx, self.d_xcTemplates[templateNumber,:,:], out = cafcplx)
+                # rxnormsq += self.rxgroupNormSq[groupNumber,:]
+                cp.add(rxnormsq, self.d_rxgroupNormSq[groupNumber,:], out=rxnormsq)
+                # ynormsq += self.ygroupsEnergy[templateNumber]
+                np.add(ynormsq, self.ygroupsEnergy[templateNumber], out=ynormsq)
+                
+            caf = cp.abs(cafcplx)**2/rxnormsq.reshape(-1,1)/ynormsq[0]
+            
+            return caf
+        
+        ## CPU Methods
+        def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None, numThreads: int=1):
+            # We are returning CAF for this (for now?)
+            if shifts is None:
+                shifts = np.arange(len(rx)-(self.groupStarts[-1]+self.length)+1)
+            else:
+                assert(shifts[-1] + self.groupStarts[-1] + self.length < rx.size) # make sure it can access it
+            
+            # Init memory for outputs
+            self.xcTemplates = np.zeros((self.numTemplates, shifts.size, int((self.f2-self.f1)/self.binWidth + 1)), dtype=np.complex128)
+            self.rxgroupNormSq = np.zeros((self.numGroups, shifts.size))
+            
+            # Pre-calculate the phases for each group
+            cztFreq = np.arange(self.f1, self.f2+self.binWidth/2, self.binWidth)
+            groupPhases = np.exp(-1j*2*np.pi*cztFreq*self.groupStarts.reshape((-1,1))/self.fs)
+            
+            # # Debug single thread
+            # self._xcorrThread(shifts,rx,self.numGroups,self.numTemplates,cztFreq,
+            #                   self.ygroups,self.ygroupsEnergy,self.ygroupIdxs,self.groupStarts,groupPhases,
+            #                   self.length, self.f1, self.f2, self.binWidth,self.fs, 
+            #                   xcTemplates, rxgroupNormSq, 1,0)
+            # Start threads
+            with ThreadPoolExecutor(max_workers=numThreads) as executor:
+                future_x = {executor.submit(self._xcorrThread, shifts, rx, self.numGroups, self.numTemplates, cztFreq,
+                                            self.ygroups, self.ygroupsEnergy, self.ygroupIdxs, self.groupStarts, groupPhases,
+                                            self.length, self.f1, self.f2, self.binWidth, self.fs,
+                                            self.xcTemplates, self.rxgroupNormSq,
+                                            numThreads, i) : i for i in np.arange(numThreads)}
+            # After threads are done,
+            # breakpoint()
+            
+            return cztFreq
+        
+        def getCAF(self, templateIdx: np.ndarray, numThreads: int=4):
+            assert(templateIdx.size == self.numGroups)
+            
+            # Initialize array
+            cafcplx = np.zeros((self.xcTemplates.shape[1],self.xcTemplates.shape[2]), dtype=np.complex128)
+            rxnormsq = np.zeros(self.rxgroupNormSq.shape[1])
+            ynormsq = np.zeros(1)
+
+            # # V1, unthreaded
+            # for groupNumber in range(templateIdx.size):
+            #     templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]]
+                
+            #     cafcplx[:,:] = cafcplx[:,:] + self.xcTemplates[templateNumber,:,:]
+            #     rxnormsq += self.rxgroupNormSq[groupNumber,:]
+            #     ynormsq += self.ygroupsEnergy[templateNumber]
+            
+            # V2, threaded (but insignificant speedup here..)
+            with ThreadPoolExecutor(max_workers=numThreads) as executor:
+                future_x = {executor.submit(self._getCAFThread, templateIdx,
+                                            cafcplx, rxnormsq, ynormsq,
+                                            i, numThreads) : i for i in np.arange(numThreads)}
+                
+            caf = np.abs(cafcplx)**2/rxnormsq.reshape(-1,1)/ynormsq
+            
+            return caf
+                
+        def _getCAFThread(self, templateIdx: np.ndarray, 
+                          cafcplx: np.ndarray, rxnormsq: np.ndarray, ynormsq: np.ndarray,
+                          thIdx: int, numThreads: int):
+            
+            # Define the indices to work on for this thread
+            numPerThread = int(self.xcTemplates.shape[1] / numThreads)
+            numLastThread = self.xcTemplates.shape[1] - numPerThread * (numThreads-1)
+            
+            for groupNumber in np.arange(templateIdx.size):
+                templateNumber = np.argwhere(self.ygroupIdxs == groupNumber)[templateIdx[groupNumber]]
+                
+                # First thread computes the norm squared values
+                if thIdx == 0: 
+                    rxnormsq += self.rxgroupNormSq[groupNumber,:]
+                    ynormsq += self.ygroupsEnergy[templateNumber]
+                
+                # Last thread takes the remainder rows
+                if thIdx == numThreads - 1:
+                    cafcplx[-numLastThread:,:] = cafcplx[-numLastThread:,:] + self.xcTemplates[templateNumber,-numLastThread:,:]
+                    # np.add(cafcplx[-numLastThread:,:],
+                    #        self.xcTemplates[templateNumber,-numLastThread:,:],
+                    #        out=cafcplx[-numLastThread:,:])
+                else: # All previous threads compute based on the thread number
+                    cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:] = cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:] + self.xcTemplates[templateNumber,thIdx*numPerThread:(thIdx+1)*numPerThread,:]
+                    # np.add(cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:],
+                    #        self.xcTemplates[templateNumber,thIdx*numPerThread:(thIdx+1)*numPerThread,:],
+                    #        out=cafcplx[thIdx*numPerThread:(thIdx+1)*numPerThread,:])
+                    
+                
+            
+        @staticmethod
+        # @jit(nopython=True, nogil=True) # make sure it releases the gil?
+        def _xcorrThread(shifts, rx, numGroups, numTemplates, cztFreq,
+                         ygroups, ygroupsEnergy, ygroupIdxs, groupStarts, groupPhases,
+                         length, f1, f2, binWidth, fs,
+                         xcTemplates, rxgroupNormSq, # outputs, written directly to array
+                         numThreads, thIdx):
+            # Create the czt cached object in the thread
+            cztc = CZTCached(length, f1, f2, binWidth, fs)
+            
+            # Loop with numThreads strides over shifts
+            for i in np.arange(thIdx,shifts.size,numThreads):
+                shift = shifts[i]
+                
+                # Loop over the templates
+                for k in np.arange(numTemplates):
+                    groupNumber = ygroupIdxs[k] # Get the group number for this template
+                    ygroup = ygroups[k, :] # Get the array for this template
+                    # Slice the correct start index for this group
+                    rxgroup = rx[shift+groupStarts[groupNumber] : shift+groupStarts[groupNumber]+length]
+                    if rxgroupNormSq[groupNumber, i] == 0: # Write to the normSq if not yet done i.e. only first template of the group
+                        rxgroupNormSq[groupNumber, i] = np.linalg.norm(rxgroup)**2 # may want to wrap this in if-else since re-calculated
+
+                    pdt = ygroup * rxgroup
+                    # Run the czt from the cached object
+                    pdtczt = cztc.run(pdt)
+                    # Shift the czt by a phase appropriate to the group number
+                    # But save it to the template index
+                    xcTemplates[k, i, :] = pdtczt * groupPhases[groupNumber,:]
+            
+            # END THREAD. Normalisations to be done outside
+
+            
+            
+        
+
+    #%%
+    group_xcorr_kernel = cp.RawKernel(r'''
+    #include <cupy/complex.cuh>
+    extern "C" __global__
+    void group_xcorr_kernel(const complex<float>* d_rx, 
+                            const complex<float>* d_y, const int ylen, const float yNormSq,
+                            const float* d_nFreqs, const int numFreqs,
+                            const int* d_gIdx, // this has length ylen
+                            const int* d_shifts, const int numShifts, const int numShiftsPerBlk,
+                            float* d_xc, int* d_freqinds){
+                                            
+        // allocate shared memory
+        extern __shared__ double s[];
+        
+        complex<float> *s_y = (complex<float>*)s; // (ylen) complex floats
+        float *s_nFreqs = (float*)&s_y[ylen]; // (numFreqs) real floats
+        complex<float> *s_rx = (complex<float>*)&s_nFreqs[numFreqs]; // (ylen) complex floats
+        int *s_gIdx = (int*)&s_rx[ylen]; // (ylen) ints
+        float *s_absVals = (float*)&s_gIdx[ylen]; // (numFreqs) real floats
+        /* Tally: (ylen*2)*32fc + (numFreqs*2)*32f + (ylen)*32s */
+        
+        // load shared memory
+        for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
+            s_y[t] = d_y[t];
+            s_gIdx[t] = d_gIdx[t];
+        }
+        for (int t = threadIdx.x; t < numFreqs; t = t + blockDim.x){
+            s_nFreqs[t] = d_nFreqs[t];
+        }
+        // nothing to load for s_rx, it's a workspace
+        
+        __syncthreads();
+                         
+        // loop over the shifts for this block
+        int shift, shiftIdx;
+        float rxNormSq;
+        double fprod_real, fprod_imag;
+        complex<double> val;
+        int maxIdx;
+        float maxVal;
+        
+        for (int blkShift = 0; blkShift < numShiftsPerBlk; blkShift++){
+            shiftIdx = blockIdx.x * numShiftsPerBlk + blkShift;
+            shift = d_shifts[shiftIdx];
+            
+            // load the values from d_rx appropriately
+            for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
+                s_rx[t] = d_rx[shift + s_gIdx[t]];
+            }
+            
+            __syncthreads(); // sync before calculating normSq otherwise some array values not written yet
+            
+            // each thread just calculates the rxNormSq for itself
+            rxNormSq = 0;
+            for (int i = 0; i < ylen; i++){
+                rxNormSq = fmaf(abs(s_rx[i]), abs(s_rx[i]), rxNormSq);
+            }
+            
+            __syncthreads(); // must sync before multiplying or else some threads will have wrong normSq
+            
+            // multiply y in-place
+            for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
+                s_rx[t] = s_rx[t] * s_y[t];
+            }
+            
+            // now each thread calculates the dot product with an appropriate frequency vector
+            // i.e. thread (t): frequency index, loops over (i): index of rx
+            for (int t = threadIdx.x; t < numFreqs; t = t + blockDim.x){
+                val = 0;
+                for (int i = 0; i < ylen; i++){
+                    sincospi(-2.0 * (double)s_nFreqs[t] * (double)s_gIdx[i], &fprod_imag, &fprod_real); // this is extremely slow
+                    val = val + complex<double>(fprod_real, fprod_imag) * complex<double>(s_rx[i]); // no FMA intrinsics for complex..
+                }
+                // when val is complete, write it to shared mem array for storage first
+                s_absVals[t] = (float)abs(val); // cast to float when writing
+                    
+            }
+            
+            __syncthreads(); // wait for all absVals to be written
+                                
+            // use the first thread to scan for the maximum
+            if (threadIdx.x == 0){
+                maxIdx = 0;
+                maxVal = s_absVals[0];
+                for (int i = 1; i < numFreqs; i++){
+                    if (s_absVals[i] > maxVal){
+                        maxIdx = i;
+                        maxVal = s_absVals[i];
+                    }
+                }
+                
+                // and write directly to the global mem
+                d_freqinds[shiftIdx] = maxIdx;
+                d_xc[shiftIdx] = maxVal * maxVal / rxNormSq / yNormSq;
+                // d_xc[shiftIdx] = rxNormSq; // cheating debug statement
+
+            }
+            
+        }
+        
+    }
+    ''','group_xcorr_kernel')
+
+    group_xcorr_kernelv2 = cp.RawKernel(r'''
+    #include <cupy/complex.cuh>
+    extern "C" __global__
+    void group_xcorr_kernelv2(const complex<float>* d_rx,
+                            const complex<float>* d_y, const int ylen, const float yNormSq,
+                            const complex<float>* d_freqMat, const int numFreqs,
+                            const int* d_gIdx, // this has length ylen
+                            const int* d_shifts, const int numShifts, const int numShiftsPerBlk,
+                            float* d_xc, int* d_freqinds){
+                                            
+        // allocate shared memory
+        extern __shared__ double s[];
+        
+        complex<float> *s_y = (complex<float>*)s; // (ylen) complex floats
+        complex<float> *s_rx = (complex<float>*)&s_y[ylen]; // (ylen) complex floats
+        int *s_gIdx = (int*)&s_rx[ylen]; // (ylen) ints
+        float *s_absVals = (float*)&s_gIdx[ylen]; // (numFreqs) real floats
+        /* Tally: (ylen*2)*32fc + (numFreqs)*32f + (ylen)*32s */
+        
+        // load shared memory
+        for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
+            s_y[t] = d_y[t];
+            s_gIdx[t] = d_gIdx[t];
+        }
+        // nothing to load for s_rx, it's a workspace
+        
+        __syncthreads();
+                         
+        // loop over the shifts for this block
+        int shift, shiftIdx;
+        float rxNormSq;
+        complex<float> val;
+        int maxIdx;
+        float maxVal;
+        
+        for (int blkShift = 0; blkShift < numShiftsPerBlk; blkShift++){
+            shiftIdx = blockIdx.x * numShiftsPerBlk + blkShift;
+            shift = d_shifts[shiftIdx];
+            
+            // load the values from d_rx appropriately
+            for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
+                s_rx[t] = d_rx[shift + s_gIdx[t]];
+            }
+            
+            __syncthreads(); // sync before calculating normSq otherwise some array values not written yet
+            
+            // each thread just calculates the rxNormSq for itself
+            rxNormSq = 0;
+            for (int i = 0; i < ylen; i++){
+                rxNormSq = fmaf(abs(s_rx[i]), abs(s_rx[i]), rxNormSq);
+            }
+            
+            __syncthreads(); // must sync before multiplying or else some threads will have wrong normSq
+            
+            // multiply y in-place
+            for (int t = threadIdx.x; t < ylen; t = t + blockDim.x){
+                s_rx[t] = s_rx[t] * s_y[t];
+            }
+            
+            // now each thread calculates the dot product with an appropriate frequency vector
+            // i.e. thread (t): frequency index, loops over (i): index of rx
+            for (int t = threadIdx.x; t < numFreqs; t = t + blockDim.x){
+                val = 0;
+                for (int i = 0; i < ylen; i++){
+                    val = val + d_freqMat[t*ylen + i] * s_rx[i];
+                }
+                // when val is complete, write it to shared mem array for storage first
+                s_absVals[t] = abs(val); // cast to float when writing
+            }
+            
+            __syncthreads(); // wait for all absVals to be written
+                                
+            // use the first thread to scan for the maximum
+            if (threadIdx.x == 0){
+                maxIdx = 0;
+                maxVal = s_absVals[0];
+                for (int i = 1; i < numFreqs; i++){
+                    if (s_absVals[i] > maxVal){
+                        maxIdx = i;
+                        maxVal = s_absVals[i];
+                    }
+                }
+                
+                // and write directly to the global mem
+                d_freqinds[shiftIdx] = maxIdx;
+                d_xc[shiftIdx] = maxVal * maxVal / rxNormSq / yNormSq;
+                // d_xc[shiftIdx] = rxNormSq; // cheating debug statement
+
+            }
+            
+        }
+        
+    }
+    ''','group_xcorr_kernelv2')
 
 
-	class GroupXcorrGPU(GroupXcorr):
-		def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray, freqs: np.ndarray, fs: int):
-			super().__init__(y, starts, lengths, freqs, fs)
-			
-			self.d_yconcat = cp.array(self.yconcat, cp.complex64)
-			self.d_yconcatNormSq = cp.array(self.yconcatNormSq)
-			self.d_freqMat = cp.array(self.freqMat, cp.complex64)
-			self.d_freqs = cp.array(self.freqs)
-			
-		def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None):
-			if shifts is None:
-				shifts = np.arange(len(rx)-(self.starts[-1]+self.lengths[-1])+1)
-			else:
-				assert(shifts[-1] + self.starts[-1] + self.lengths[-1] < rx.size) # make sure it can access it
-				
-			# Move to gpu
-			d_rx = cp.array(rx)
-				
-			d_xc = cp.zeros(shifts.size, cp.float64)
-			d_freqpeaks = cp.zeros(shifts.size, cp.float64)
-			for i in np.arange(shifts.size):
+    class GroupXcorrGPU(GroupXcorr):
+        def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray, freqs: np.ndarray, fs: int):
+            super().__init__(y, starts, lengths, freqs, fs)
+            
+            self.d_yconcat = cp.array(self.yconcat, cp.complex64)
+            self.d_yconcatNormSq = cp.array(self.yconcatNormSq)
+            self.d_freqMat = cp.array(self.freqMat, cp.complex64)
+            self.d_freqs = cp.array(self.freqs)
+            
+        def xcorr(self, rx: np.ndarray, shifts: np.ndarray=None):
+            if shifts is None:
+                shifts = np.arange(len(rx)-(self.starts[-1]+self.lengths[-1])+1)
+            else:
+                assert(shifts[-1] + self.starts[-1] + self.lengths[-1] < rx.size) # make sure it can access it
+                
+            # Move to gpu
+            d_rx = cp.array(rx)
+                
+            d_xc = cp.zeros(shifts.size, cp.float64)
+            d_freqpeaks = cp.zeros(shifts.size, cp.float64)
+            for i in np.arange(shifts.size):
 
-				shift = shifts[i]
-				# Perform slicing of rx
-				d_rxconcat = cp.hstack([d_rx[shift + self.starts[g] : shift + self.starts[g] + self.lengths[g]] for g in np.arange(self.numGroups)])
-				d_rxconcatNormSq = cp.linalg.norm(d_rxconcat)**2
-				# Now multiply by y
-				d_p = d_rxconcat * self.d_yconcat
-				# And the freqmat
-				d_pf = self.d_freqMat @ d_p
-				# Pick the max value
-				d_pfabs = cp.abs(d_pf)
-				d_pmaxind = cp.argmax(d_pfabs)
-				# Save output (with normalisations)
-				d_xc[i] = d_pfabs[d_pmaxind]**2 / d_rxconcatNormSq / self.d_yconcatNormSq
-				d_freqpeaks[i] = self.d_freqs[d_pmaxind]
-				
-			# Move to cpu
-			xc = cp.asnumpy(d_xc)
-			freqpeaks = cp.asnumpy(d_freqpeaks)
-			
-			return xc, freqpeaks
-		
-		def xcorrKernel(self, rx, shifts, numShiftsPerBlk=2, verbTiming=False):
-			'''
-			Experimental. Uses kernel (not fully optimized, but faster than the xcorr call).
-			'''
-			# Host-side computes
-			nFreqs = self.freqs/self.fs
-			gIdx = np.hstack([np.arange(self.starts[i], self.starts[i]+self.lengths[i]) for i in range(self.numGroups)])
-			
-			tg1 = time.time()
-			# Assert shifts factor requirements
-			assert(shifts.size % numShiftsPerBlk == 0)
-			
-			# Check shared memory requirements
-			ylen = int(self.yconcat.size)
-			numFreqs = int(nFreqs.size)
-			d_nFreqs = cp.array(nFreqs, dtype=cp.float32)
-			d_gIdx = cp.array(gIdx, dtype=cp.int32)
+                shift = shifts[i]
+                # Perform slicing of rx
+                d_rxconcat = cp.hstack([d_rx[shift + self.starts[g] : shift + self.starts[g] + self.lengths[g]] for g in np.arange(self.numGroups)])
+                d_rxconcatNormSq = cp.linalg.norm(d_rxconcat)**2
+                # Now multiply by y
+                d_p = d_rxconcat * self.d_yconcat
+                # And the freqmat
+                d_pf = self.d_freqMat @ d_p
+                # Pick the max value
+                d_pfabs = cp.abs(d_pf)
+                d_pmaxind = cp.argmax(d_pfabs)
+                # Save output (with normalisations)
+                d_xc[i] = d_pfabs[d_pmaxind]**2 / d_rxconcatNormSq / self.d_yconcatNormSq
+                d_freqpeaks[i] = self.d_freqs[d_pmaxind]
+                
+            # Move to cpu
+            xc = cp.asnumpy(d_xc)
+            freqpeaks = cp.asnumpy(d_freqpeaks)
+            
+            return xc, freqpeaks
+        
+        def xcorrKernel(self, rx, shifts, numShiftsPerBlk=2, verbTiming=False):
+            '''
+            Experimental. Uses kernel (not fully optimized, but faster than the xcorr call).
+            '''
+            # Host-side computes
+            nFreqs = self.freqs/self.fs
+            gIdx = np.hstack([np.arange(self.starts[i], self.starts[i]+self.lengths[i]) for i in range(self.numGroups)])
+            
+            tg1 = time.time()
+            # Assert shifts factor requirements
+            assert(shifts.size % numShiftsPerBlk == 0)
+            
+            # Check shared memory requirements
+            ylen = int(self.yconcat.size)
+            numFreqs = int(nFreqs.size)
+            d_nFreqs = cp.array(nFreqs, dtype=cp.float32)
+            d_gIdx = cp.array(gIdx, dtype=cp.int32)
 
-			d_rx = cp.array(rx, dtype=cp.complex64)
-			d_shifts = cp.array(shifts, dtype=cp.int32)
-			
-			# smReq = int(2*ylen*8 + numFreqs*2*4 + ylen*4)
-			# if(smReq > 48000): # Maximum 48000 shared memory bytes
-			#     print("y + rx workspace (32fc) total: %d bytes." % (ylen*2*8))
-			#     print("nFreqs + interrim workspace (32f) total: %d bytes." % (numFreqs*2*4))
-			#     print("gIdx (32s) total: %d bytes." % (ylen*4))
-			#     raise MemoryError("Shared memory requested exceeded 48kB.")
-			
-			# For v2, less SM required
-			smReq = int(2*ylen*8 + numFreqs*4 + ylen*4)
-			if(smReq > 48000): # Maximum 48000 shared memory bytes
-				print("y + rx workspace (32fc) total: %d bytes." % (ylen*2*8))
-				print("interrim workspace (32f) total: %d bytes." % (numFreqs*4))
-				print("gIdx (32s) total: %d bytes." % (ylen*4))
-				raise MemoryError("Shared memory requested exceeded 48kB.")
-			
-			# Allocate output
-			d_xc = cp.zeros(shifts.size, dtype=cp.float32)
-			d_freqinds = cp.zeros(shifts.size, dtype=np.int32)
-			
-			THREADS_PER_BLOCK = 128
-			NUM_BLOCKS = int(np.round(shifts.size / numShiftsPerBlk))
-			
-			tg2 = time.time()
-			# group_xcorr_kernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
-			#                    (d_rx, 
-			#                     self.d_yconcat, ylen, self.yconcatNormSq.astype(np.float32),
-			#                     d_nFreqs, numFreqs,
-			#                     d_gIdx, 
-			#                     d_shifts, int(shifts.size), int(numShiftsPerBlk),
-			#                     d_xc, d_freqinds),
-			#                    shared_mem=smReq)
-			
-			group_xcorr_kernelv2((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
-							   (d_rx, 
-								self.d_yconcat, ylen, self.yconcatNormSq.astype(np.float32),
-								self.d_freqMat, numFreqs,
-								d_gIdx, 
-								d_shifts, int(shifts.size), int(numShiftsPerBlk),
-								d_xc, d_freqinds),
-							   shared_mem=smReq)
-			
-			cp.cuda.Stream.null.synchronize()
-			tg3 = time.time()
-			
-			xc = cp.asnumpy(d_xc)
-			freqinds = cp.asnumpy(d_freqinds)
-		
-			tg4 = time.time()
-			
-			if verbTiming:
-				print("Prep time(includes transfers): %fs " %(tg2-tg1))
-				print("Kernel runtime: %fs" % (tg3-tg2))
-				print("Output conversion to CPU: %fs" % (tg4-tg3))
-		
-			return xc, freqinds
+            d_rx = cp.array(rx, dtype=cp.complex64)
+            d_shifts = cp.array(shifts, dtype=cp.int32)
+            
+            # smReq = int(2*ylen*8 + numFreqs*2*4 + ylen*4)
+            # if(smReq > 48000): # Maximum 48000 shared memory bytes
+            #     print("y + rx workspace (32fc) total: %d bytes." % (ylen*2*8))
+            #     print("nFreqs + interrim workspace (32f) total: %d bytes." % (numFreqs*2*4))
+            #     print("gIdx (32s) total: %d bytes." % (ylen*4))
+            #     raise MemoryError("Shared memory requested exceeded 48kB.")
+            
+            # For v2, less SM required
+            smReq = int(2*ylen*8 + numFreqs*4 + ylen*4)
+            if(smReq > 48000): # Maximum 48000 shared memory bytes
+                print("y + rx workspace (32fc) total: %d bytes." % (ylen*2*8))
+                print("interrim workspace (32f) total: %d bytes." % (numFreqs*4))
+                print("gIdx (32s) total: %d bytes." % (ylen*4))
+                raise MemoryError("Shared memory requested exceeded 48kB.")
+            
+            # Allocate output
+            d_xc = cp.zeros(shifts.size, dtype=cp.float32)
+            d_freqinds = cp.zeros(shifts.size, dtype=np.int32)
+            
+            THREADS_PER_BLOCK = 128
+            NUM_BLOCKS = int(np.round(shifts.size / numShiftsPerBlk))
+            
+            tg2 = time.time()
+            # group_xcorr_kernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+            #                    (d_rx, 
+            #                     self.d_yconcat, ylen, self.yconcatNormSq.astype(np.float32),
+            #                     d_nFreqs, numFreqs,
+            #                     d_gIdx, 
+            #                     d_shifts, int(shifts.size), int(numShiftsPerBlk),
+            #                     d_xc, d_freqinds),
+            #                    shared_mem=smReq)
+            
+            group_xcorr_kernelv2((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                               (d_rx, 
+                                self.d_yconcat, ylen, self.yconcatNormSq.astype(np.float32),
+                                self.d_freqMat, numFreqs,
+                                d_gIdx, 
+                                d_shifts, int(shifts.size), int(numShiftsPerBlk),
+                                d_xc, d_freqinds),
+                               shared_mem=smReq)
+            
+            cp.cuda.Stream.null.synchronize()
+            tg3 = time.time()
+            
+            xc = cp.asnumpy(d_xc)
+            freqinds = cp.asnumpy(d_freqinds)
+        
+            tg4 = time.time()
+            
+            if verbTiming:
+                print("Prep time(includes transfers): %fs " %(tg2-tg1))
+                print("Kernel runtime: %fs" % (tg3-tg2))
+                print("Output conversion to CPU: %fs" % (tg4-tg3))
+        
+            return xc, freqinds
 
 except:
-	print("Ignoring cupy-related classes.")
-			  
+    print("Ignoring cupy-related classes.")
+              
 #%% Database for storing CAFs
 class CafDb:
     # Class-wide constants, ordered lists are important here for reference
@@ -1272,7 +1384,7 @@ class CafDb:
         if appendTablename:
             base.insert(0,"tablename TEXT")
         return ', '.join(base)
-    
+
     def initMetadata(self):
         stmt = "create table if not exists metadata(%s)" % self._getMetadataSubstmt(appendTablename=True)
 

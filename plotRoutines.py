@@ -320,10 +320,13 @@ def plotConstellation(syms, fmt='.', ax=None):
     
     return ax
 
-def plotFreqz(taps):
+def plotFreqz(taps, cutoff=None):
     fig, ax = plt.subplots(1,1,num="Filter performance (%d taps)" % taps.size)
     w, h = sps.freqz(taps, 1, taps.size)
     ax.plot(w/np.pi, 20*np.log10(np.abs(h)))
+    if cutoff is not None:
+        yl = ax.get_ylim()
+        ax.vlines([cutoff], yl[0], yl[1], colors='k', linestyle='dashed')
     
     return fig, ax
 

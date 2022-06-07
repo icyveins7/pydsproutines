@@ -11,7 +11,7 @@ import scipy.signal as sps
 import time
 import sympy
 
-from numba import jit
+from numba import jit, njit
 # jit not used if not supported like in randint, or just slower..
 # usually requires loops to be present for some benefit to be seen
 
@@ -173,7 +173,7 @@ def makePulsedCPFSKsyms(bits, baud, g=np.ones(8)/16, m=2, h=0.5, up=8, phase=0.0
     sig = np.exp(1j*css)
     
     return sig, fs, data, css
-    
+
 def propagateSignal(sig, time, fs, freq=None, tone=None):
     # to handle single scalar time shift
     if not isinstance(time, np.ndarray):

@@ -727,19 +727,20 @@ try:
             rxgroups = cp.zeros_like(pdt)
             d_ygroups = cp.asarray(self.ygroups, dtype=cp.complex64)
             d_groupPhases = cp.asarray(self.groupPhases)
+            pdtfftCombined = cp.zeros(self.fftlen, rx.dtype)
 
             for i, shift in enumerate(shifts):
                 # Zero-ing
-                pdt[:,:] = 0
-                rxgroups[:, :] = 0
-                rxgroupNormSqCollect = np.zeros(self.numGroups)
+                pdt[:] = 0
+                rxgroups[:] = 0
                 
+                # Note: creation of this matrix is inefficient on GPU, should multiply directly if possible
                 # Construct the matrix of all the groups
                 for g in np.arange(self.numGroups):
                     rxgroups[g, :self.ygroupLen] = rx[shift + self.starts[g] : shift + self.starts[g] + self.ygroupLen]
 
                 # Calculate all the rxgroup norms
-                rxgroupNormSqCollect = cp.linalg.norm(rxgroups, axis=1)**2
+                # rxgroupNormSqCollect = cp.linalg.norm(rxgroups, axis=1)**2 # Deprecated
                 # Multiply all the groups together element-wise
                 cp.multiply(d_ygroups, rxgroups, out=pdt)
                     
@@ -748,8 +749,10 @@ try:
                 # Then fix the phase
                 cp.multiply(pdtfft, d_groupPhases, out=pdtfft) # in-place
                 # And then sum across the groups (rows)
-                pdtfftCombined = cp.sum(pdtfft, axis=0)
-                rxgroupNormSq = cp.sum(rxgroupNormSqCollect)
+                # pdtfftCombined = cp.sum(pdtfft, axis=0) # deprecated
+                cp.sum(pdtfft, axis=0, out=pdtfftCombined)
+                # rxgroupNormSq = cp.sum(rxgroupNormSqCollect) # Deprecated
+                rxgroupNormSq = cp.sum(cp.abs(rxgroups)**2)
                 # Scale by the normsqs
                 if flattenToTime:
                     ff = cp.abs(pdtfftCombined)**2 / rxgroupNormSq / self.ygroupNormSq

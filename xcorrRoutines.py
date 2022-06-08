@@ -596,6 +596,7 @@ class GroupXcorrCZT:
 try:
     import cupy as cp # Used to raise exception
     from spectralRoutines import CZTCachedGPU
+    from cupyExtensions import *
 
     class GroupXcorrFFT:
         def __init__(self, ygroups: np.ndarray, starts: np.ndarray, fs: int,
@@ -728,16 +729,25 @@ try:
             d_ygroups = cp.asarray(self.ygroups, dtype=cp.complex64)
             d_groupPhases = cp.asarray(self.groupPhases)
             pdtfftCombined = cp.zeros(self.fftlen, rx.dtype)
+            dstarts = cp.asarray(self.starts, dtype=cp.int32)
+            xStarts = cp.zeros(self.numGroups, cp.int32)
+            yStarts = cp.arange(self.numGroups, dtype=cp.int32) * self.fftlen # Constant
+            lengths = cp.zeros(self.numGroups, cp.int32) + self.ygroupLen # Constant
 
             for i, shift in enumerate(shifts):
                 # Zero-ing
                 pdt[:] = 0
                 rxgroups[:] = 0
+                xStarts[:] = 0
                 
                 # Note: creation of this matrix is inefficient on GPU, should multiply directly if possible
                 # Construct the matrix of all the groups
-                for g in np.arange(self.numGroups):
-                    rxgroups[g, :self.ygroupLen] = rx[shift + self.starts[g] : shift + self.starts[g] + self.ygroupLen]
+                # DEPRECATED
+                # for g in np.arange(self.numGroups):
+                #     rxgroups[g, :self.ygroupLen] = rx[shift + self.starts[g] : shift + self.starts[g] + self.ygroupLen]
+                # Use the new kernel copy
+                cp.add(shift, dstarts, out=xStarts)
+                cupyCopyGroups32fc(rx, rxgroups, xStarts, yStarts, lengths)
 
                 # Calculate all the rxgroup norms
                 # rxgroupNormSqCollect = cp.linalg.norm(rxgroups, axis=1)**2 # Deprecated
@@ -755,9 +765,9 @@ try:
                 rxgroupNormSq = cp.sum(cp.abs(rxgroups)**2)
                 # Scale by the normsqs
                 if flattenToTime:
-                    ff = cp.abs(pdtfftCombined)**2 / rxgroupNormSq / self.ygroupNormSq
+                    ff = cp.abs(pdtfftCombined)**2
                     fmi = cp.argmax(ff)
-                    xc[i] = ff[fmi]
+                    xc[i] = ff[fmi] / rxgroupNormSq / self.ygroupNormSq
                     fi[i] = fmi
                     
                 else:

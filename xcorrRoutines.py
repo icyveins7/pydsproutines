@@ -55,14 +55,19 @@ try:
                 d_result = cp.zeros(len(shifts),dtype=cp.float64)
     
                 # first copy the data in
-                d_cutout = cp.asarray(cutout)
+                d_cutout_conj = cp.asarray(cutout).conj()
                 d_rx = cp.asarray(rx)
                 
                 numIter = int(np.ceil(len(shifts)/BATCH))
                 
                 # allocate data arrays on gpu
-                d_pdt_batch = cp.zeros((BATCH,len(cutout)), dtype=cp.complex128) # let's try using it in place all the way
+                d_pdt_batch = cp.zeros((BATCH,len(cutout)), dtype=rx.dtype) # let's try using it in place all the way
                 d_rxNormPartSq_batch = cp.zeros((BATCH), dtype=cp.float64)
+                
+                # new copy method allocs
+                yStarts = cp.arange(BATCH, dtype=cp.int32) * len(cutout)
+                lengths = cp.zeros(BATCH, dtype=cp.int32) + len(cutout)
+                
                 
                 # now iterate over the number of iterations required
                 print("Starting cupy loop")
@@ -75,16 +80,29 @@ try:
                     # print(i)
                     # print (TOTAL_THIS_BATCH)
                         
-                    for k in range(TOTAL_THIS_BATCH):
-                        s = shifts[i*BATCH + k]
+                    # Slice shifts for the batch
+                    xStarts = cp.asarray(shifts[i*BATCH : i*BATCH+TOTAL_THIS_BATCH], dtype=cp.int32)
+                    # Copy groups
+                    cupyCopyGroups32fc(d_rx, d_pdt_batch, xStarts, yStarts[:TOTAL_THIS_BATCH], lengths[:TOTAL_THIS_BATCH])
+                    # Calculate norms
+                    d_rxNormPartSq_batch = cp.linalg.norm(d_pdt_batch, axis=1)**2
+                    # Perform the multiply
+                    cp.multiply(d_pdt_batch, d_cutout_conj, out=d_pdt_batch)
+                    # Then the ffts
+                    d_pdtfft_batch = cp.abs(cp.fft.fft(d_pdt_batch))**2 # already row-wise by default
+                    
+                    
+                    # # Old code, DEPRECATED
+                    # for k in range(TOTAL_THIS_BATCH):
+                        # s = shifts[i*BATCH + k]
                         
-                        d_pdt_batch[k] = d_rx[s:s+len(cutout)] * d_cutout.conj()
+                        # d_pdt_batch[k] = d_rx[s:s+len(cutout)] * d_cutout_conj
                         
-                        d_rxNormPartSq_batch[k] = cp.linalg.norm(d_rx[s:s+len(cutout)])**2.0
+                        # d_rxNormPartSq_batch[k] = cp.linalg.norm(d_rx[s:s+len(cutout)])**2.0
                         
-                    # perform the fft (row-wise is done automatically)
-                    d_pdtfft_batch = cp.fft.fft(d_pdt_batch)
-                    d_pdtfft_batch = cp.abs(d_pdtfft_batch**2.0) # is now abs(pdtfftsq)
+                    # # perform the fft (row-wise is done automatically)
+                    # d_pdtfft_batch = cp.fft.fft(d_pdt_batch)
+                    # d_pdtfft_batch = cp.abs(d_pdtfft_batch**2.0) # is now abs(pdtfftsq)
                     
                     imax = cp.argmax(d_pdtfft_batch, axis=-1) # take the arg max for each row
                     

@@ -226,7 +226,7 @@ def pgPlotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, titl
     
     return win, ax
     
-def plotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None):    
+def plotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None, idxbounds=None):    
     if ax is None: # hurray for python scoping allowing this
         fig = plt.figure(windowTitle)
         ax = fig.add_subplot(111)
@@ -236,6 +236,9 @@ def plotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, title=
     for i, data in enumerate(dataList):
         amp = np.abs(data)
         t = np.arange(data.size) / fs[i]
+        if idxbounds is not None:
+            t = t[idxbounds[i][0]:idxbounds[i][1]]
+            amp = amp[idxbounds[i][0]:idxbounds[i][1]]
         if colors is not None:
             ax.plot(t, amp, colors[i])
         else:

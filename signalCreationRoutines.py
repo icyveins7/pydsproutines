@@ -18,9 +18,12 @@ from numba import jit, njit
 def randBits(length, m):
     return np.random.randint(0,m,length,dtype=np.uint8)
 
+def symsFromBits(bits, m, dtype=np.complex128):
+    return np.exp(1j*2*np.pi*bits/m).astype(dtype)
+    
 def randPSKsyms(length, m, dtype=np.complex128):
-    bits = randBits(length, m).astype(dtype)
-    return np.exp(1j*2*np.pi*bits/m), bits
+    bits = randBits(length, m)
+    return symsFromBits(bits, m, dtype), bits
 
 def randnoise(length, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0):
     basicnoise = (np.random.randn(length) + 1j*np.random.randn(length))/np.sqrt(2) * np.sqrt(sigPwr)

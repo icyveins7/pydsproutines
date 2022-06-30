@@ -200,6 +200,84 @@ def gridSearchTDOA_direct(s1x_list, s2x_list, tdoa_list, td_sigma_list, gridmat,
     
     return cost_grid
 
+def gridSearchTDFD_direct(s1x_list, s2x_list,
+                          tdoa_list, td_sigma_list,
+                          s1v_list, s2v_list,
+                          fdoa_list, fd_sigma_list, fc,
+                          gridmat, verb=True):
+    
+    lightspd = 299792458.0
+    cost_grid = np.zeros(gridmat.shape[0])
+    
+    # Pre-normalize fdoa by the fc
+    nfdoa_list = fdoa_list / fc
+    nfd_sigma_list = fd_sigma_list / fc
+    
+    # Pre-scale by lightspd
+    r_list = (tdoa_list * lightspd).astype(np.float32)
+    r_sigma_list = (td_sigma_list * lightspd).astype(np.float32)
+    drdt_list = (nfdoa_list * lightspd).astype(np.float32)
+    drdt_sigma_list = (nfd_sigma_list * lightspd).astype(np.float32)
+    
+    t1g = time.time()
+    for i in range(len(tdoa_list)):
+        # cpu code
+        s1x = s1x_list[i]
+        s2x = s2x_list[i]
+        # tdoa = tdoa_list[i]
+        r = r_list[i]
+        # td_sigma = td_sigma_list[i]
+        r_sigma = r_sigma_list[i]
+        
+        s1v = s1v_list[i]
+        s2v = s2v_list[i]
+        # fdoa = nfdoa_list[i]
+        drdt = drdt_list[i]
+        # fd_sigma = nfd_sigma_list[i]
+        drdt_sigma = drdt_sigma_list[i]
+        
+        # TD related
+        # r = np.float32(tdoa * lightspd)
+        # r_sigma = np.float32(td_sigma * lightspd)
+        
+        rm = np.linalg.norm(s2x - gridmat, axis=1) - np.linalg.norm(s1x - gridmat, axis=1)
+        # TD cost
+        td_cost = ((r - rm) / r_sigma)**2
+        
+        # FD related
+        # drdt = fdoa * lightspd
+        # drdt_sigma = fd_sigma * lightspd
+        
+        # Calculate direction vectors from the grid
+        dirvecm1 = gridmat - s1x
+        dirvecm2 = gridmat - s2x
+        # Need the normalized versions
+        dirvecm1 = dirvecm1 / np.linalg.norm(dirvecm1, axis=1).reshape((-1,1))
+        dirvecm2 = dirvecm2 / np.linalg.norm(dirvecm2, axis=1).reshape((-1,1))
+        # We want the component of velocity along the direction vectors
+        parvm1 = np.dot(dirvecm1, s1v)
+        parvm2 = np.dot(dirvecm2, s2v) # This should already be negative when direction and velocities are opposed
+        # print(parvm1)
+        # print(parvm2)
+        # For each velocity calculated, compute the range rate difference
+        # as the metric
+        vmdiff = parvm2 - parvm1
+        # print(vmdiff)
+        # FD cost
+        fd_cost = ((drdt - vmdiff) / drdt_sigma)**2
+        # print(np.min(fd_cost))
+        
+        # Accumulate costs
+        np.add(cost_grid, td_cost, out=cost_grid)
+        np.add(cost_grid, fd_cost, out=cost_grid)
+        
+    
+    t2g = time.time()
+    if verb:
+        print("Grid search took %g seconds." % (t2g-t1g))
+    
+    return cost_grid
+
 #%% CRB Routines
 def calcCRB_TD(x, S, sig_r, pairs=None, cmat=None):
     if x.ndim == 1:

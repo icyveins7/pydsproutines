@@ -139,9 +139,9 @@ def gridSearchFDOA(s1x_list, s2x_list, s1v_list, s2v_list, fdoa_list, fd_sigma_l
         # Do we need this?
         rm = np.linalg.norm(s2x - fullmesh, axis=1) - np.linalg.norm(s1x - fullmesh, axis=1)
         
-        # Calculate direction vectors from the grid
-        dirvecm1 = s1x - fullmesh
-        dirvecm2 = s2x - fullmesh
+        # Calculate direction vectors from sensors to the grid
+        dirvecm1 = fullmesh - s1x
+        dirvecm2 = fullmesh - s2x
         # Need the normalized versions
         dirvecm1 = dirvecm1 / np.linalg.norm(dirvecm1, axis=1).reshape((-1,1))
         dirvecm2 = dirvecm2 / np.linalg.norm(dirvecm2, axis=1).reshape((-1,1))
@@ -248,7 +248,7 @@ def gridSearchTDFD_direct(s1x_list, s2x_list,
         # drdt = fdoa * lightspd
         # drdt_sigma = fd_sigma * lightspd
         
-        # Calculate direction vectors from the grid
+        # Calculate direction vectors from sensors to the grid
         dirvecm1 = gridmat - s1x
         dirvecm2 = gridmat - s2x
         # Need the normalized versions
@@ -278,7 +278,7 @@ def gridSearchTDFD_direct(s1x_list, s2x_list,
     
     return cost_grid
 
-#%% CRB Routines
+#%% CRB Routines (conversions from commonMex)
 def calcCRB_TD(x, S, sig_r, pairs=None, cmat=None):
     if x.ndim == 1:
         x = x.reshape((-1,1)) # Reshapes do not alter the external array (the one passed in)
@@ -306,6 +306,53 @@ def calcCRB_TD(x, S, sig_r, pairs=None, cmat=None):
         crb = U @ np.linalg.inv(U.T @ FIM @ U) @ U.T
         
     return crb
+
+def calcCRB_TDFD(x, S, sig_r, xdot, Sdot, sig_r_dot, pairs=None, cmat=None):
+    if x.ndim == 1:
+        x = x.reshape((-1,1)) # Reshapes do not alter the external array (the one passed in)
+    if xdot.ndim == 1:
+        xdot = xdot.reshape((-1,1))
+        
+    m = S.shape[1] # no. of sensors
+    r = np.linalg.norm(x - S, axis=0)
+    r_dx = (x - S) / r
+    
+    rdot = np.sum((xdot - Sdot) * (x - S), axis=0) / r
+    r_dxdot = np.zeros((3,m))
+    rdot_dx = (-r_dx * rdot + xdot - Sdot) / r
+    rdot_dxdot = (x - S) / r
+    
+    if pairs is None: # Assume every pair in S is used with no overlaps
+        pairs = np.arange(m).reshape((-1,2))
+    
+    numPairs = pairs.shape[0]
+    R = np.zeros((6,numPairs))
+    Rdot = np.zeros((6,numPairs))
+    
+    for k in np.arange(numPairs):
+        c1 = pairs[k,0]
+        c2 = pairs[k,1]
+        
+        R[0:3, k] = r_dx[:, c1] - r_dx[:, c2]
+        R[3:6, k] = r_dxdot[:, c1] - r_dxdot[:, c2]
+        Rdot[0:3, k] = rdot_dx[:, c1] - rdot_dx[:, c2]
+        Rdot[3:6, k] = rdot_dxdot[:, c1] - rdot_dxdot[:,c2]
+        
+    SIGR = np.diag(sig_r**-2)
+    SIGRDOT = np.diag(sig_r_dot**-2)
+    FIM_R = R @ SIGR @ R.T
+    FIM_Rdot = Rdot @ SIGRDOT @ Rdot.T
+    FIM = FIM_R + FIM_Rdot
+    
+    if cmat is None:
+        crb = np.linalg.inv(FIM)
+    else:
+        U = sp.linalg.null_space(cmat.T)
+        crb = U @ np.linalg.inv(U.T @ FIM @ U) @ U.T
+        
+    return crb
+
+
 
 def projectCRBtoEllipse(crb, pos, percent, dof=2, theta=None):
     if pos.ndim == 1:

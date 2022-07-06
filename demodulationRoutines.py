@@ -7,7 +7,73 @@ Created on Fri Jun 19 16:21:35 2020
 
 import numpy as np
 from numba import jit
-import cupy as cp
+try:
+    import cupy as cp
+    
+    def cupyDemodulateCP2FSK(syms: cp.ndarray, h: float, up: int):
+        m = cp.array([[-1],
+                      [+1]])
+        
+        tones = cp.exp(1j*np.pi*h*cp.arange(up)/up*m)
+        
+        numSyms = int(np.floor(len(syms) / up))
+        bitCost = cp.zeros((2,numSyms))
+        demodBits = cp.zeros(numSyms, dtype = np.uint8)
+        
+        for i in range(numSyms):
+            symbol = syms[i*up : (i+1)*up]
+            
+            for k in range(2):
+                bitCost[k,i] = cp.abs(cp.vdot(symbol, tones[k]))
+            
+            demodBits[i] = cp.argmax(bitCost[:,i])
+            
+        return demodBits, bitCost, tones
+except:
+    print("Cupy not found.")
+
+#%% Generic simple demodulators
+class SimpleDemodulatorPSK:
+    pskdicts = {
+        2: np.array([1.0, -1.0]),
+        4: np.array([1.0, 1.0j, -1.0, -1.0j]),
+        8: np.array([1.0,
+                     np.sqrt(2)/2 * (1+1j),
+                     1.0j,
+                     np.sqrt(2)/2 * (-1+1j),
+                     -1.0,
+                     np.sqrt(2)/2 * (-1-1j),
+                     -1.0j,
+                     np.sqrt(2)/2 * (1-1j)])
+    }
+    
+    def __init__(self, osr: int, m: int):
+        self.osr = osr
+        self.m = m
+        self.const = pskdicts[self.m]
+        
+        # Interrim output
+        self.xeo = None # Selected eye-opening resample points
+        self.xeo_i = None # Index of eye-opening
+        
+        
+    def getEyeOpening(self, x: np.ndarray):
+        x_rs = x.reshape((-1, self.osr))
+        metric = np.sum(np.abs(x_rs), axis=0)
+        i = np.argmax(metric)
+        return x_rs[:,i], i
+        
+    def demod(self, x: np.ndarray):
+        # Get eye-opening first
+        xeo, xeo_i = self.getEyeOpening(x)
+        
+        # Method A: Convert to phase first then demod
+        
+        # Method B: 
+        
+        
+        
+
 
 #%%
 @jit(nopython=True)
@@ -33,25 +99,7 @@ def demodulateCP2FSK(syms, h, up):
         
     return demodBits, bitCost, tones
 
-def cupyDemodulateCP2FSK(syms: cp.ndarray, h: float, up: int):
-    m = cp.array([[-1],
-                  [+1]])
-    
-    tones = cp.exp(1j*np.pi*h*cp.arange(up)/up*m)
-    
-    numSyms = int(np.floor(len(syms) / up))
-    bitCost = cp.zeros((2,numSyms))
-    demodBits = cp.zeros(numSyms, dtype = np.uint8)
-    
-    for i in range(numSyms):
-        symbol = syms[i*up : (i+1)*up]
-        
-        for k in range(2):
-            bitCost[k,i] = cp.abs(cp.vdot(symbol, tones[k]))
-        
-        demodBits[i] = cp.argmax(bitCost[:,i])
-        
-    return demodBits, bitCost, tones
+
 
 ##
 class BurstyDemodulator:

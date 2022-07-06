@@ -12,6 +12,57 @@ from numba import jit
 import time
 
 #%%
+def gridSearchBlindLinearRTT(
+        tx_list: np.ndarray,
+        rx_list: np.ndarray,
+        time_list: np.ndarray,
+        toa_list: np.ndarray,
+        toa_sigma_list: np.ndarray,
+        grid_list: np.ndarray,
+        verb: bool=True):
+    # Docstring here..
+    
+    # Instantiate output
+    numGridPts = grid_list.shape[0]
+    cost_grid = np.zeros(numGridPts)
+    lightspd = 299792458.0
+    
+    # Change dimensions if necessary
+    N = toa_list.size # numMeasurements
+    if rx_list.ndim == 1:
+        rx_list = np.tile(rx_list, N).reshape((N,-1))
+    if tx_list.ndim == 1:
+        tx_list = np.tile(tx_list, N).reshape((N,-1))
+        
+    # Convert time into matrix for least squares later
+    A = np.hstack((
+        time_list.reshape((-1,1)),
+        np.ones((time_list.size,1))
+    ))
+    
+    # breakpoint()
+    
+    
+    for gi, gridpt in enumerate(grid_list):
+        # Define theoretical time segments for all measurements
+        time_x2rx = np.linalg.norm(rx_list - gridpt, axis=1) / lightspd
+        time_tx2x = np.linalg.norm(tx_list - gridpt, axis=1) / lightspd
+        # Column vector, defines the theoretical total TOA based on distance alone
+        gamma = (time_x2rx + time_tx2x).reshape((-1,1))
+        # Define extra delay (d) as the difference observed
+        d = toa_list.reshape((-1,1)) - gamma
+        # Fit least squares
+        soln, residuals, rank, singulars = np.linalg.lstsq(A, d)
+        
+        # Save residuals
+        cost_grid[gi] = np.sum(residuals)
+        
+    return cost_grid
+    
+    
+    
+
+
 # @jit(nopython=True) # not working until numba includes axis option in linalg.norm
 def gridSearchRTT(
         t_list: np.ndarray,
@@ -280,6 +331,7 @@ def gridSearchTDFD_direct(s1x_list, s2x_list,
 
 #%% CRB Routines (conversions from commonMex)
 def calcCRB_TD(x, S, sig_r, pairs=None, cmat=None):
+    ''' S is presented column-wise i.e. 3 X N array. '''
     if x.ndim == 1:
         x = x.reshape((-1,1)) # Reshapes do not alter the external array (the one passed in)
     
@@ -308,6 +360,7 @@ def calcCRB_TD(x, S, sig_r, pairs=None, cmat=None):
     return crb
 
 def calcCRB_TDFD(x, S, sig_r, xdot, Sdot, sig_r_dot, pairs=None, cmat=None):
+    ''' S is presented column-wise i.e. 3 X N array. '''
     if x.ndim == 1:
         x = x.reshape((-1,1)) # Reshapes do not alter the external array (the one passed in)
     if xdot.ndim == 1:
@@ -343,6 +396,37 @@ def calcCRB_TDFD(x, S, sig_r, xdot, Sdot, sig_r_dot, pairs=None, cmat=None):
     FIM_R = R @ SIGR @ R.T
     FIM_Rdot = Rdot @ SIGRDOT @ Rdot.T
     FIM = FIM_R + FIM_Rdot
+    
+    if cmat is None:
+        crb = np.linalg.inv(FIM)
+    else:
+        U = sp.linalg.null_space(cmat.T)
+        crb = U @ np.linalg.inv(U.T @ FIM @ U) @ U.T
+        
+    return crb
+
+def calcCRB_BlindLinearRTT(x, S, P, t, sig_r, cmat=None):
+    ''' S is presented column-wise i.e. 3 X N array. '''
+    if x.ndim == 1:
+        x = x.reshape((-1,1)) # Reshapes do not alter the external array (the one passed in)
+    if P.ndim == 1:
+        P = P.reshape((-1,1))
+    
+    m = S.shape[1] # no. of sensors
+    rS = np.linalg.norm(x - S, axis=0)
+    rP = np.linalg.norm(x - P, axis=0)
+    r_dx = (x - S) / rS + (x - P) / rP
+    
+    # No need to define r_db, since all ones
+    # No need to define r_da, since it is just the t vector
+    
+    R = np.zeros((5, m))
+    R[0:3] = r_dx
+    R[3] = t
+    R[4] = 1
+        
+    SIGR = np.diag(sig_r**-2)
+    FIM = R @ SIGR @ R.T
     
     if cmat is None:
         crb = np.linalg.inv(FIM)

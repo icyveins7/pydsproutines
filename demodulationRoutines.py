@@ -293,7 +293,7 @@ if __name__ == "__main__":
     m = 4
     syms, bits = randPSKsyms(numBits, m)
     syms_rs = sps.resample_poly(syms,OSR,1)
-    _, rx = addSigToNoise(numBits * OSR, 0, syms_rs, chnBW=OSR, snr_inband_linear=np.inf) # Inf SNR simulates perfect filtering
+    _, rx = addSigToNoise(numBits * OSR, 0, syms_rs, chnBW=OSR, snr_inband_linear=100) # Inf SNR simulates perfect filtering
     randomPhase = np.random.rand() * (2*np.pi/m) # Induce random phase
     rx = rx * np.exp(1j* randomPhase)
     ofig, oax = plt.subplots(2,1,num="Original")
@@ -314,10 +314,19 @@ if __name__ == "__main__":
     # QPSK specific, maybe z = y?
     reim, _ = demodulator.getEyeOpening(rx)
     reimr = np.ascontiguousarray(reim).view(np.float64)
-    reimr = reimr.reshape((-1,2))
-    reimr = np.hstack((reimr, reimr[:,-1].reshape((-1,1)))) # Copy y-val = z-value
+    reimr = reimr.reshape((-1,2)).T
+    # Create rotation matrix
+    rotmat = np.array([
+        [1, 0, 0],
+        [0, np.cos(np.pi/4), -np.sin(np.pi/4)],
+        [0, np.sin(np.pi/4), np.cos(np.pi/4)]
+    ])
+    reimr = np.vstack((reimr, np.zeros(reimr.shape[1])))
+    # reimr = np.hstack((reimr, reimr[:,-1].reshape((-1,1)))) # Copy y-val = z-value
+    # Rotate
+    reimr = rotmat @ reimr
     # Form the square product
-    reimsq = reimr.T @ reimr
+    reimsq = reimr @ reimr.T
     # SVD
     u, s, vh = np.linalg.svd(reimsq) # Don't need vh technically
     # Check the svd metrics
@@ -329,6 +338,8 @@ if __name__ == "__main__":
         ue = u[:2, i] # Can use any of the eigenvectors
         angleCorrection = np.arctan2(ue[1], ue[0])
         print(angleCorrection)
+        # Plot eigenvector
+        aax.plot([0, ue[0]], [0, ue[1]])
         
         
     

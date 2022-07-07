@@ -50,24 +50,30 @@ class SimpleDemodulatorPSK:
     def __init__(self, osr: int, m: int):
         self.osr = osr
         self.m = m
-        self.const = pskdicts[self.m]
+        self.const = self.pskdicts[self.m]
         
         # Interrim output
         self.xeo = None # Selected eye-opening resample points
         self.xeo_i = None # Index of eye-opening
+        self.eo_metric = None # Metrics of eye-opening
         
         
     def getEyeOpening(self, x: np.ndarray):
         x_rs = x.reshape((-1, self.osr))
-        metric = np.sum(np.abs(x_rs), axis=0)
-        i = np.argmax(metric)
+        self.eo_metric = np.sum(np.abs(x_rs), axis=0)
+        i = np.argmax(self.eo_metric)
         return x_rs[:,i], i
         
     def demod(self, x: np.ndarray):
         # Get eye-opening first
         xeo, xeo_i = self.getEyeOpening(x)
         
+        # Correct the global phase first
+        
+        
         # Method A: Convert to phase first then demod
+        
+        
         
         # Method B: 
         
@@ -280,97 +286,121 @@ if __name__ == "__main__":
     from plotRoutines import *
     import matplotlib.pyplot as plt
     
-    plt.close('all')
+    closeAllFigs()
     
-    baud = 10000
-    up = 10
-    fs = baud * up
+    OSR = 4
+    numBits = 1000
+    m = 4
+    syms, bits = randPSKsyms(numBits, m)
+    syms_rs = sps.resample_poly(syms,OSR,1)
+    _, rx = addSigToNoise(numBits * OSR, 0, syms_rs, chnBW=OSR, snr_inband_linear=np.inf) # Inf SNR simulates perfect filtering
+    randomPhase = np.random.rand() * (2*np.pi/m) # Induce random phase
+    rx = rx * np.exp(1j* randomPhase)
+    ofig, oax = plt.subplots(2,1,num="Original")
+    plotConstellation(syms_rs, ax=oax[0])
+    plotConstellation(rx, ax=oax[0])
+    plotSpectra([rx],[1],ax=oax[1])
     
-    numBursts = 99
-    burstBits = 90
-    period = 100
-    guardBits = period - burstBits
-    
-    bits = randBits(burstBits * numBursts, 2).reshape((numBursts,burstBits))
-    sigs = []
-    for i in range(numBursts):
-        sig, _, _, _ = makePulsedCPFSKsyms(bits[i,:], baud, up=up)
-        sigs.append(sig)
+    # Divide into resampled portions
+    rxrs = rx.reshape((-1,OSR))
+    fig, ax = plt.subplots(OSR//2, OSR//2)
+    for i in range(OSR):
+        plotConstellation(rxrs[:,i], ax=ax[i//2, i%2])
         
-    sigStart = int(0.25*sigs[0].size)
-    snr = 10
-    _, rx = addManySigToNoise(int((numBursts+1)*period*up),
-                              np.arange(0,numBursts*period*up,period*up)+sigStart, sigs, bw_signal = baud, chnBW = fs,
-                       snr_inband_linearList = snr+np.zeros(numBursts))
     
-    fig, ax = plt.subplots(2,1)
-    ax[0].plot(np.abs(rx))
-    plotSpectra([rx],[fs],ax=ax[1])
-    
-    # Filter
-    taps = sps.firwin(201, baud/fs*1.5)
-    rxfilt = sps.lfilter(taps,1,rx)
-    ax[0].plot(np.abs(rxfilt))
-    plotSpectra([rxfilt],[fs],ax=ax[1])
-    
-    # Attempt bursty demod
-    searchRange = np.arange(int(0.5*sigs[0].size))
-    
-    bd = BurstyDemodulatorCP2FSK(burstBits, (period-burstBits), up)
-    dbits, dalign = bd.demod(rxfilt, numBursts, searchRange)
-    print("Demodulation index at %d" % dalign)
-    plt.figure("Bursty demod cost")
-    plt.plot(searchRange, bd.dcosts)
-    
-    # # This is the exact actual value
-    # dalign = 327
-    # dbits = bd.demodAtIdx(rxfilt, dalign, numBursts, numBursts * period * up - guardBits * up) # Hard coded correct alignment
-    
-    if np.all(dbits==bits):
-        print("Full demodulation of %d bursts * %d symbols is correct." % (numBursts, burstBits))
         
-    else:
-        print("Full demodulation failed for these bursts:")
-        failedBursts = np.argwhere(np.any(bits != dbits, axis=1)).flatten()
-        for i in range(failedBursts.size):
-            fb = failedBursts[i]
-            rm, _, _, _ = makePulsedCPFSKsyms(dbits[fb,:], baud, up=up)
-            rm = rm[:burstBits * up] # cut it
-            balign = dalign + fb * period * up
-            metric = np.abs(np.vdot(rm, rxfilt[balign:balign+rm.size]))**2 / np.linalg.norm(rm)**2 / np.linalg.norm(rxfilt[balign:balign+rm.size])**2
-            print("Burst %d with QF2 %f, bits %d/%d" % (fb, metric, np.argwhere(bits[fb,:] == dbits[fb,:]).size, burstBits))      
-    
-        print("Full demodulation successful for these bursts:")
-        successBursts = np.argwhere(np.all(bits == dbits, axis=1)).flatten()
-        for i in range(successBursts.size):
-            sb = successBursts[i]
-            rm, _, _, _ = makePulsedCPFSKsyms(dbits[sb,:], baud, up=up)
-            rm = rm[:burstBits * up] # cut it
-            balign = dalign + sb * period * up
-            metric = np.abs(np.vdot(rm, rxfilt[balign:balign+rm.size]))**2 / np.linalg.norm(rm)**2 / np.linalg.norm(rxfilt[balign:balign+rm.size])**2
-            print("Burst %d with QF2 %f, bits %d/%d" % (sb, metric, np.argwhere(bits[sb,:] == dbits[sb,:]).size, burstBits))      
-    
-    
-    # demodBits = np.zeros((searchRange.size, burstBits))
-    # costs = np.zeros(searchRange.size)
-    # for i in range(searchRange.size):
-    #     s = searchRange[i]
-    #     demodBits[i,:], cost, _ = demodulateCP2FSK(rxfilt[s:s+burstBits*up], 0.5, up, 0)
-    #     costs[i] = np.sum(np.max(cost,axis=0))
+    # Projection to log2(m)+1 dimensions
+    demodulator = SimpleDemodulatorPSK(OSR, m)
+    # QPSK specific, maybe z = y?
+    reim, _ = demodulator.getEyeOpening(rx)
+    reimr = np.ascontiguousarray(reim).view(np.float64)
+    reimr = reimr.reshape((-1,2))
+    reimr = np.hstack((reimr, reimr[:,-1].reshape((-1,1)))) # Copy y-val = z-value
+    # Form the square product
+    reimsq = reimr.T @ reimr
+    # SVD
+    u, s, vh = np.linalg.svd(reimsq) # Don't need vh technically
+    # Check the svd metrics
+    svd_metric = s[-1] / s[:-1] # Deal with this later when there is residual frequency
+    # Check the phase correction by looking at the eigenvectors from u
+    afig, aax = plt.subplots(num="Angle Correction")
+    plotConstellation(reim, ax=aax)
+    for i in range(int(np.log2(m))):
+        ue = u[:2, i] # Can use any of the eigenvectors
+        angleCorrection = np.arctan2(ue[1], ue[0])
+        print(angleCorrection)
         
-    # dfig, dax = plt.subplots(1,1)
-    # dax.plot(costs)
+        
     
-    # bc = np.argmax(costs)
-    # bbits = demodBits[bc,:]
-    # print("Bits %d/%d" % (len(np.argwhere(bbits==bits)), bits.size))
-    # print("Demodded at index %d" % bc)    
     
-    # plt.figure("Bits")
-    # plt.plot(bits)
-    # plt.plot(bbits)
     
-    # if len(np.argwhere(bbits==bits)) != bits.size:
-    #     # Attempt re-demod at the exact place to demonstrate
-    #     print("Bits %d/%d at known alignment." % (len(np.argwhere(demodBits[351,:]==bits)), bits.size))
+    
+    #%%
+    # baud = 10000
+    # up = 10
+    # fs = baud * up
+    
+    # numBursts = 99
+    # burstBits = 90
+    # period = 100
+    # guardBits = period - burstBits
+    
+    # bits = randBits(burstBits * numBursts, 2).reshape((numBursts,burstBits))
+    # sigs = []
+    # for i in range(numBursts):
+    #     sig, _, _, _ = makePulsedCPFSKsyms(bits[i,:], baud, up=up)
+    #     sigs.append(sig)
+        
+    # sigStart = int(0.25*sigs[0].size)
+    # snr = 10
+    # _, rx = addManySigToNoise(int((numBursts+1)*period*up),
+    #                           np.arange(0,numBursts*period*up,period*up)+sigStart, sigs, bw_signal = baud, chnBW = fs,
+    #                    snr_inband_linearList = snr+np.zeros(numBursts))
+    
+    # fig, ax = plt.subplots(2,1)
+    # ax[0].plot(np.abs(rx))
+    # plotSpectra([rx],[fs],ax=ax[1])
+    
+    # # Filter
+    # taps = sps.firwin(201, baud/fs*1.5)
+    # rxfilt = sps.lfilter(taps,1,rx)
+    # ax[0].plot(np.abs(rxfilt))
+    # plotSpectra([rxfilt],[fs],ax=ax[1])
+    
+    # # Attempt bursty demod
+    # searchRange = np.arange(int(0.5*sigs[0].size))
+    
+    # bd = BurstyDemodulatorCP2FSK(burstBits, (period-burstBits), up)
+    # dbits, dalign = bd.demod(rxfilt, numBursts, searchRange)
+    # print("Demodulation index at %d" % dalign)
+    # plt.figure("Bursty demod cost")
+    # plt.plot(searchRange, bd.dcosts)
+    
+    # # # This is the exact actual value
+    # # dalign = 327
+    # # dbits = bd.demodAtIdx(rxfilt, dalign, numBursts, numBursts * period * up - guardBits * up) # Hard coded correct alignment
+    
+    # if np.all(dbits==bits):
+    #     print("Full demodulation of %d bursts * %d symbols is correct." % (numBursts, burstBits))
+        
+    # else:
+    #     print("Full demodulation failed for these bursts:")
+    #     failedBursts = np.argwhere(np.any(bits != dbits, axis=1)).flatten()
+    #     for i in range(failedBursts.size):
+    #         fb = failedBursts[i]
+    #         rm, _, _, _ = makePulsedCPFSKsyms(dbits[fb,:], baud, up=up)
+    #         rm = rm[:burstBits * up] # cut it
+    #         balign = dalign + fb * period * up
+    #         metric = np.abs(np.vdot(rm, rxfilt[balign:balign+rm.size]))**2 / np.linalg.norm(rm)**2 / np.linalg.norm(rxfilt[balign:balign+rm.size])**2
+    #         print("Burst %d with QF2 %f, bits %d/%d" % (fb, metric, np.argwhere(bits[fb,:] == dbits[fb,:]).size, burstBits))      
+    
+    #     print("Full demodulation successful for these bursts:")
+    #     successBursts = np.argwhere(np.all(bits == dbits, axis=1)).flatten()
+    #     for i in range(successBursts.size):
+    #         sb = successBursts[i]
+    #         rm, _, _, _ = makePulsedCPFSKsyms(dbits[sb,:], baud, up=up)
+    #         rm = rm[:burstBits * up] # cut it
+    #         balign = dalign + sb * period * up
+    #         metric = np.abs(np.vdot(rm, rxfilt[balign:balign+rm.size]))**2 / np.linalg.norm(rm)**2 / np.linalg.norm(rxfilt[balign:balign+rm.size])**2
+    #         print("Burst %d with QF2 %f, bits %d/%d" % (sb, metric, np.argwhere(bits[sb,:] == dbits[sb,:]).size, burstBits))      
     

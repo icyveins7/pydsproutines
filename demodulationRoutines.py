@@ -308,25 +308,23 @@ if __name__ == "__main__":
         plotConstellation(rxrs[:,i], ax=ax[i//2, i%2])
         
     
-        
     # Projection to log2(m)+1 dimensions
     demodulator = SimpleDemodulatorPSK(OSR, m)
     # QPSK specific, maybe z = y?
     reim, _ = demodulator.getEyeOpening(rx)
     reimr = np.ascontiguousarray(reim).view(np.float64)
     reimr = reimr.reshape((-1,2)).T
-    # Create rotation matrix
-    rotmat = np.array([
-        [1, 0, 0],
-        [0, np.cos(np.pi/4), -np.sin(np.pi/4)],
-        [0, np.sin(np.pi/4), np.cos(np.pi/4)]
-    ])
-    reimr = np.vstack((reimr, np.zeros(reimr.shape[1])))
-    # reimr = np.hstack((reimr, reimr[:,-1].reshape((-1,1)))) # Copy y-val = z-value
-    # Rotate
-    reimr = rotmat @ reimr
+    
+    # Power into BPSK
+    powerup = m // 2
+    reimp = reim**powerup
+    pax = plotConstellation(reim)
+    plotConstellation(reimp, ax=pax)
+    
     # Form the square product
-    reimsq = reimr @ reimr.T
+    reimpr = reimp.view(np.float64).reshape((-1,2)).T
+    reimsq = reimpr @ reimpr.T
+    
     # SVD
     u, s, vh = np.linalg.svd(reimsq) # Don't need vh technically
     # Check the svd metrics
@@ -334,15 +332,12 @@ if __name__ == "__main__":
     # Check the phase correction by looking at the eigenvectors from u
     afig, aax = plt.subplots(num="Angle Correction")
     plotConstellation(reim, ax=aax)
-    for i in range(int(np.log2(m))):
-        ue = u[:2, i] # Can use any of the eigenvectors
-        angleCorrection = np.arctan2(ue[1], ue[0])
-        print(angleCorrection)
-        # Plot eigenvector
-        aax.plot([0, ue[0]], [0, ue[1]])
-        
-        
     
+    angleCorrection = np.arctan2(u[1,0], u[0,0])
+    reimc = reim * np.exp(-1j * angleCorrection / powerup)
+    print(angleCorrection)
+    plotConstellation(reimc, ax=aax)
+    aax.legend(["Original", "Angle corrected"])
     
     
     

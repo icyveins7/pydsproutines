@@ -47,10 +47,10 @@ class SimpleDemodulatorPSK:
                      np.sqrt(2)/2 * (1-1j)])
     }
     
-    def __init__(self, osr: int, m: int):
+    def __init__(self, osr: int, m: int, const: np.ndarray=None):
         self.osr = osr
         self.m = m
-        self.const = self.pskdicts[self.m]
+        self.const = self.pskdicts[self.m] if const is None else const
         
         # Interrim output
         self.xeo = None # Selected eye-opening resample points
@@ -69,6 +69,14 @@ class SimpleDemodulatorPSK:
         xeo, xeo_i = self.getEyeOpening(x)
         
         # Correct the global phase first
+        reimr = np.ascontiguousarray(xeo).view(np.float64)
+        reimr = reimr.reshape((-1,2)).T
+        
+        # Power into BPSK
+        powerup = m // 2
+        reimp = reim**powerup
+        # pax = plotConstellation(reim)
+        # plotConstellation(reimp, ax=pax)
         
         
         # Method A: Convert to phase first then demod
@@ -288,12 +296,12 @@ if __name__ == "__main__":
     
     closeAllFigs()
     
-    OSR = 4
+    OSR = 8
     numBits = 1000
-    m = 4
+    m = 8
     syms, bits = randPSKsyms(numBits, m)
     syms_rs = sps.resample_poly(syms,OSR,1)
-    _, rx = addSigToNoise(numBits * OSR, 0, syms_rs, chnBW=OSR, snr_inband_linear=100) # Inf SNR simulates perfect filtering
+    _, rx = addSigToNoise(numBits * OSR, 0, syms_rs, chnBW=OSR, snr_inband_linear=1000) # Inf SNR simulates perfect filtering
     randomPhase = np.random.rand() * (2*np.pi/m) # Induce random phase
     rx = rx * np.exp(1j* randomPhase)
     ofig, oax = plt.subplots(2,1,num="Original")
@@ -310,7 +318,7 @@ if __name__ == "__main__":
     
     # Projection to log2(m)+1 dimensions
     demodulator = SimpleDemodulatorPSK(OSR, m)
-    # QPSK specific, maybe z = y?
+    # Extract eye-opening
     reim, _ = demodulator.getEyeOpening(rx)
     reimr = np.ascontiguousarray(reim).view(np.float64)
     reimr = reimr.reshape((-1,2)).T
@@ -338,6 +346,23 @@ if __name__ == "__main__":
     print(angleCorrection)
     plotConstellation(reimc, ax=aax)
     aax.legend(["Original", "Angle corrected"])
+    
+    # 8PSK specific, add dimension
+    reimd = reimc.view(np.float64).reshape((-1,2)).T
+    reimd = np.vstack((
+        reimd,
+        (reimd[0]**2 - reimd[1]**2)**2 # np.abs(np.abs(reimd[0]) - np.abs(reimd[1])) 
+    ))
+    
+    fig3 = plt.figure()
+    ax3 = fig3.add_subplot(projection='3d')
+    ax3.scatter(reimd[0], reimd[1], reimd[2])
+    
+    # Most generic demodulator shouldn't use angle to avoid if/else costs
+    # Use the normalised dot product from constellation, then find max across rows
+    rconst = demodulator.const.view(np.float64).reshape((-1,2))
+    reimcr = reimc.view(np.float64).reshape((-1,2)).T
+    constmetric = rconst @ reimcr
     
     
     

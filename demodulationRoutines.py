@@ -35,8 +35,8 @@ except:
 #%% Generic simple demodulators
 class SimpleDemodulatorPSK:
     pskdicts = {
-        2: np.array([1.0, -1.0]),
-        4: np.array([1.0, 1.0j, -1.0, -1.0j]),
+        2: np.array([1.0, -1.0], dtype=np.complex128),
+        4: np.array([1.0, 1.0j, -1.0, -1.0j], dtype=np.complex128),
         8: np.array([1.0,
                      np.sqrt(2)/2 * (1+1j),
                      1.0j,
@@ -44,47 +44,94 @@ class SimpleDemodulatorPSK:
                      -1.0,
                      np.sqrt(2)/2 * (-1-1j),
                      -1.0j,
-                     np.sqrt(2)/2 * (1-1j)])
+                     np.sqrt(2)/2 * (1-1j)], dtype=np.complex128)
     }
     
-    def __init__(self, osr: int, m: int, const: np.ndarray=None):
-        self.osr = osr
+    def __init__(self, m: int, const: np.ndarray=None):
         self.m = m
         self.const = self.pskdicts[self.m] if const is None else const
+        self.normVecs = self.const.view(np.float64).reshape((-1,2))
         
         # Interrim output
         self.xeo = None # Selected eye-opening resample points
         self.xeo_i = None # Index of eye-opening
         self.eo_metric = None # Metrics of eye-opening
+        self.reimc = None # Phase-locked to constellation (complex array)
+        self.svd_metric = None # SVD metric for phase lock
+        self.angleCorrection = None # Angle correction used in phase lock
+        self.syms = None # Output mapping to each symbol (0 to M-1)
         
         
-    def getEyeOpening(self, x: np.ndarray):
-        x_rs = x.reshape((-1, self.osr))
+    def getEyeOpening(self, x: np.ndarray, osr: int):
+        x_rs = x.reshape((-1, osr))
         self.eo_metric = np.sum(np.abs(x_rs), axis=0)
         i = np.argmax(self.eo_metric)
         return x_rs[:,i], i
         
-    def demod(self, x: np.ndarray):
-        # Get eye-opening first
-        xeo, xeo_i = self.getEyeOpening(x)
+    def mapSyms(self, reimc: np.ndarray):
+        reimcr = reimc.view(np.float64).reshape((-1,2)).T
+        constmetric = self.normVecs @ reimcr
+        # Pick the arg max for each column
+        syms = np.argmax(constmetric, axis=0)
         
-        # Correct the global phase first
-        reimr = np.ascontiguousarray(xeo).view(np.float64)
-        reimr = reimr.reshape((-1,2)).T
-        
+        return syms
+    
+    def lockPhase(self, reim: np.ndarray):
         # Power into BPSK
         powerup = m // 2
         reimp = reim**powerup
-        # pax = plotConstellation(reim)
-        # plotConstellation(reimp, ax=pax)
+        
+        # Form the square product
+        reimpr = reimp.view(np.float64).reshape((-1,2)).T
+        reimsq = reimpr @ reimpr.T
+        
+        # SVD
+        u, s, vh = np.linalg.svd(reimsq) # Don't need vh technically
+        # Check the svd metrics
+        svd_metric = s[-1] / s[:-1] # Deal with this later when there is residual frequency
+        # Angle correction
+        angleCorrection = np.arctan2(u[1,0], u[0,0])
+        reimc = reim * np.exp(-1j * angleCorrection / powerup)
+        
+        return reimc, svd_metric, angleCorrection
+        
+    
+    def demod(self, x: np.ndarray, osr: int):
+        # Get eye-opening first
+        xeo, xeo_i = self.getEyeOpening(x, osr)
+        
+        # Correct the global phase first
+        reim = np.ascontiguousarray(xeo)
+        self.reimc, self.svd_metric, self.angleCorrection = self.lockPhase(reim)
+        
+        # Generic method: dot product with the normalised vectors
+        self.syms = self.mapSyms(self.reimc)
+        
+        return self.syms
+    
+class SimpleDemodulator8PSK(SimpleDemodulatorPSK):
+    def __init__(self, const: np.ndarray=None):
+        super().__init__(8, const)
+        
+        self.map8 = None
+        
+    def mapSyms(self, reimc: np.ndarray):
+        # 8PSK specific, add dimensions
+        reimd = reimc.view(np.float64).reshape((-1,2)).T
+        reim_thresh = np.abs(np.abs(np.cos(np.pi/8)) - np.abs(np.sin(np.pi/8))) # TODO: scaling by data amplitude mean
+        xmy = np.abs(reimd[0]) - np.abs(reimd[1])
+        reimd = np.hstack((
+            reimd,
+            np.abs(xmy),
+            xmy
+        ))
+        # TODO: complete the mapping properly..
         
         
-        # Method A: Convert to phase first then demod
         
+        print("8PSK custom mapSyms")
         
-        
-        # Method B: 
-        
+        pass
         
         
 
@@ -293,11 +340,12 @@ if __name__ == "__main__":
     from signalCreationRoutines import *
     from plotRoutines import *
     import matplotlib.pyplot as plt
+    from timingRoutines import Timer
     
     closeAllFigs()
     
     OSR = 8
-    numBits = 1000
+    numBits = 100000
     m = 8
     syms, bits = randPSKsyms(numBits, m)
     syms_rs = sps.resample_poly(syms,OSR,1)
@@ -317,9 +365,9 @@ if __name__ == "__main__":
         
     
     # Projection to log2(m)+1 dimensions
-    demodulator = SimpleDemodulatorPSK(OSR, m)
+    demodulator = SimpleDemodulatorPSK(m)
     # Extract eye-opening
-    reim, _ = demodulator.getEyeOpening(rx)
+    reim, _ = demodulator.getEyeOpening(rx, OSR)
     reimr = np.ascontiguousarray(reim).view(np.float64)
     reimr = reimr.reshape((-1,2)).T
     
@@ -347,22 +395,43 @@ if __name__ == "__main__":
     plotConstellation(reimc, ax=aax)
     aax.legend(["Original", "Angle corrected"])
     
-    # 8PSK specific, add dimension
+    # 8PSK specific, add dimensions
     reimd = reimc.view(np.float64).reshape((-1,2)).T
+    reim_thresh = np.abs(np.abs(np.cos(np.pi/8)) - np.abs(np.sin(np.pi/8)))
     reimd = np.vstack((
         reimd,
-        (reimd[0]**2 - reimd[1]**2)**2 # np.abs(np.abs(reimd[0]) - np.abs(reimd[1])) 
+        np.abs(reimd[0]) - np.abs(reimd[1]) - reim_thresh, # np.abs(np.abs(reimd[0]) - np.abs(reimd[1])) - reim_thresh,  # (reimd[0]**2 - reimd[1]**2)**2 # np.abs(np.abs(reimd[0]) - np.abs(reimd[1])) 
+        np.abs(reimd[0]) - np.abs(reimd[1]) + reim_thresh
     ))
     
     fig3 = plt.figure()
     ax3 = fig3.add_subplot(projection='3d')
     ax3.scatter(reimd[0], reimd[1], reimd[2])
     
+    # Conditionals for 8PSK
+    signs = np.sign(reimd).astype(np.int8)
+    
+    
     # Most generic demodulator shouldn't use angle to avoid if/else costs
     # Use the normalised dot product from constellation, then find max across rows
-    rconst = demodulator.const.view(np.float64).reshape((-1,2))
-    reimcr = reimc.view(np.float64).reshape((-1,2)).T
-    constmetric = rconst @ reimcr
+    timer = Timer()
+    timer.start()
+    genericSyms = demodulator.demod(rx, OSR)
+    rotationalInvariance = (genericSyms - bits) % m
+    assert(np.all(rotationalInvariance == rotationalInvariance[0]))
+    timer.end("Default demodulator")
+    
+    timer.reset()
+    timer.start()
+    _ = demodulator.mapSyms(demodulator.reimc)
+    timer.end("Default mapSyms")
+    
+    timer.reset()
+    demod8 = SimpleDemodulator8PSK()
+    timer.start()
+    demod8.mapSyms(demodulator.reimc)
+    timer.end("8PSK mapSyms")
+    
     
     
     

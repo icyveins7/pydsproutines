@@ -113,19 +113,42 @@ class SimpleDemodulator8PSK(SimpleDemodulatorPSK):
     def __init__(self, const: np.ndarray=None):
         super().__init__(8, const)
         
-        self.map8 = None
+        # For the custom constellation, we don't map to a number but rather to the N-D index,
+        # mirroring the actual bits.
+        self.map8 = np.array([
+            [[1, 2],
+             [3, 4]],
+            [[5, 6],
+             [7, 8]]
+        ])
         
     def mapSyms(self, reimc: np.ndarray):
         # 8PSK specific, add dimensions
-        reimd = reimc.view(np.float64).reshape((-1,2)).T
+        reimd = reimc.view(np.float64).reshape((-1,2))
         reim_thresh = np.abs(np.abs(np.cos(np.pi/8)) - np.abs(np.sin(np.pi/8))) # TODO: scaling by data amplitude mean
-        xmy = np.abs(reimd[0]) - np.abs(reimd[1])
-        reimd = np.hstack((
-            reimd,
-            np.abs(xmy),
-            xmy
-        ))
-        # TODO: complete the mapping properly..
+        # Compute |X| - |Y|
+        xmy = np.abs(reimd[:,0]) - np.abs(reimd[:,1])
+        # And then | |X| - |Y| | + c, this transforms into QPSK box below XY plane
+        # with the new QPSK diamond above XY plane
+        z = np.abs(xmy) - reim_thresh # Do not stack into single array, no difference anyway
+        
+        # C1: Check Z > 0; + check even (diamond), x check odd (QPSK, box)
+        c1z = z > 0
+        
+        # C2: Z+ check XY and end, Z- check |X|-|Y| and C3
+        cx2 = reimd[0] > 0
+        cy2 = reimd[1] > 0
+        cxmy2 = xmy > 0
+        
+        idx0 = c1z
+        idx1 = np.logical_and(np.logical_not(c1z), cx2)
+        idx2 = np.logical_and(np.logical_not(c1z), cy2)
+        
+        # C3: + check X, - check Y
+        cx3 = np.logical_and(cxmy2, cx2)
+        cy3 = np.logical_and(np.logical_not(cxmy2), cy2)
+        
+        # TODO: check correctness, complete
         
         
         
@@ -345,7 +368,7 @@ if __name__ == "__main__":
     closeAllFigs()
     
     OSR = 8
-    numBits = 100000
+    numBits = 10000
     m = 8
     syms, bits = randPSKsyms(numBits, m)
     syms_rs = sps.resample_poly(syms,OSR,1)

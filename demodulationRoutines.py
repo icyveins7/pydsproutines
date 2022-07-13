@@ -129,6 +129,22 @@ class SimpleDemodulatorPSK:
         return self.syms
     
 ###############
+class SimpleDemodulatorBPSK(SimpleDemodulatorPSK):
+    def __init__(self, const: np.ndarray=None):
+        super().__init__(2, const)
+        
+    def mapSyms(self, reimc: np.ndarray):
+        # Simply get the real
+        re = np.real(reimc)
+        
+        # And check sign
+        syms = (re < 0).astype(np.uint8)
+        
+        return syms
+        
+    
+    
+###############
 class SimpleDemodulatorQPSK(SimpleDemodulatorPSK):
     def __init__(self, const: np.ndarray=None):
         super().__init__(4, const)
@@ -427,7 +443,7 @@ if __name__ == "__main__":
     closeAllFigs()
     
     OSR = 8
-    numBits = 100000
+    numBits = 1000
     m = 4
     syms, bits = randPSKsyms(numBits, m)
     syms_rs = sps.resample_poly(syms,OSR,1)

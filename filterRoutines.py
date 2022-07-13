@@ -161,7 +161,7 @@ def energyDetection(ampSq, medfiltlen, snrReqLinear=4.0, noiseIndices=None, spli
         print("Noise indices defaulting to [%d, %d]" % (noiseIndices[0],noiseIndices[-1]))
     
     # Medfilt in gpu as it's usually 1000x faster (not exaggeration)
-    d_ampSq = cp.array(ampSq) # move to gpu
+    d_ampSq = cp.asarray(ampSq) # move to gpu
     d_medfiltered = cpsps.medfilt(d_ampSq, medfiltlen)
     medfiltered = cp.asnumpy(d_medfiltered) # move back
     

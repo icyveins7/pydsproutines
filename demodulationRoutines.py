@@ -82,7 +82,7 @@ class SimpleDemodulatorPSK:
     
     def lockPhase(self, reim: np.ndarray):
         # Power into BPSK
-        powerup = m // 2
+        powerup = self.m // 2
         reimp = reim**powerup
         
         # Form the square product

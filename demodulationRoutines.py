@@ -6,6 +6,7 @@ Created on Fri Jun 19 16:21:35 2020
 """
 
 import numpy as np
+from timingRoutines import Timer
 from numba import jit
 try:
     import cupy as cp
@@ -62,14 +63,17 @@ class SimpleDemodulatorPSK:
         self.syms = None # Output mapping to each symbol (0 to M-1)
         
         
-    def getEyeOpening(self, x: np.ndarray, osr: int):
-        x_rs = x.reshape((-1, osr))
-        self.eo_metric = np.sum(np.abs(x_rs), axis=0)
+    def getEyeOpening(self, x: np.ndarray, osr: int, abs_x: np.ndarray=None):
+        if abs_x is None:
+            abs_x = np.abs(x) # Provide option for pre-computed (often used elsewhere anyway)
+        x_rs_abs = abs_x.reshape((-1, osr))
+        self.eo_metric = np.mean(x_rs_abs, axis=0)
         i = np.argmax(self.eo_metric)
+        x_rs = x.reshape((-1, osr))
         return x_rs[:,i], i
         
     def mapSyms(self, reimc: np.ndarray):
-        reimcr = reimc.view(np.float64).reshape((-1,2)).T
+        reimcr = reimc.view(np.float32).reshape((-1,2)).T
         constmetric = self.normVecs @ reimcr
         # Pick the arg max for each column
         syms = np.argmax(constmetric, axis=0)
@@ -82,7 +86,7 @@ class SimpleDemodulatorPSK:
         reimp = reim**powerup
         
         # Form the square product
-        reimpr = reimp.view(np.float64).reshape((-1,2)).T
+        reimpr = reimp.view(np.float32).reshape((-1,2)).T
         reimsq = reimpr @ reimpr.T
         
         # SVD
@@ -91,70 +95,125 @@ class SimpleDemodulatorPSK:
         svd_metric = s[-1] / s[:-1] # Deal with this later when there is residual frequency
         # Angle correction
         angleCorrection = np.arctan2(u[1,0], u[0,0])
-        reimc = reim * np.exp(-1j * angleCorrection / powerup)
+        reimc = self.correctPhase(reim, -angleCorrection/powerup)
         
         return reimc, svd_metric, angleCorrection
+    
+    def correctPhase(self, reim: np.ndarray, phase: float):
+        return reim * np.exp(1j * phase)
         
     
-    def demod(self, x: np.ndarray, osr: int):
+    def demod(self, x: np.ndarray, osr: int, abs_x: np.ndarray=None, verb: bool=True):
+        if x.dtype != np.complex64:
+            raise TypeError("Input array must be complex64.")
+        
+        timer = Timer()
+        timer.start()
+        
         # Get eye-opening first
-        xeo, xeo_i = self.getEyeOpening(x, osr)
+        xeo, xeo_i = self.getEyeOpening(x, osr, abs_x)
+        timer.evt("Eye-opening")
         
         # Correct the global phase first
         reim = np.ascontiguousarray(xeo)
         self.reimc, self.svd_metric, self.angleCorrection = self.lockPhase(reim)
+        timer.evt("lockPhase")
         
         # Generic method: dot product with the normalised vectors
         self.syms = self.mapSyms(self.reimc)
+        timer.evt("mapSyms")
+        
+        if verb:
+            timer.rpt()
         
         return self.syms
     
+###############
+class SimpleDemodulatorQPSK(SimpleDemodulatorPSK):
+    def __init__(self, const: np.ndarray=None):
+        super().__init__(4, const)
+    
+        self.gray4 = np.zeros((2,2), dtype=np.uint8)
+        self.gray4[1,1] = 0
+        self.gray4[0,1] = 1
+        self.gray4[0,0] = 2
+        self.gray4[1,0] = 3
+        # This is X,Y > 0 gray encoded
+        
+    def mapSyms(self, reimc: np.ndarray):
+        # Reshape
+        reimd = reimc.view(np.float32).reshape((-1,2))
+        
+        # Compute comparators
+        xp = (reimd[:,0] > 0).astype(np.uint8)
+        yp = (reimd[:,1] > 0).astype(np.uint8)
+        
+        # Now map
+        idx = np.vstack((xp,yp))
+        # Convert to constellation integers
+        syms = self.gray4[tuple(idx)]
+        
+        return syms
+    
+    def correctPhase(self, reim: np.ndarray, phase: float):
+        # For gray-coding comparators, we move to the box
+        return reim * np.exp(1j*(phase + np.pi/4)) 
+
+################
 class SimpleDemodulator8PSK(SimpleDemodulatorPSK):
     def __init__(self, const: np.ndarray=None):
         super().__init__(8, const)
         
         # For the custom constellation, we don't map to a number but rather to the N-D index,
         # mirroring the actual bits.
-        self.map8 = np.array([
-            [[1, 2],
-             [3, 4]],
-            [[5, 6],
-             [7, 8]]
-        ])
+        self.map8 = np.zeros((2,2,2), dtype=np.uint8)
+        self.map8[1,1,1] = 0
+        self.map8[0,1,1] = 1
+        self.map8[1,0,1] = 2
+        self.map8[0,0,1] = 3
+        self.map8[1,1,0] = 4
+        self.map8[0,0,0] = 5
+        self.map8[1,0,0] = 6
+        self.map8[0,1,0] = 7
         
     def mapSyms(self, reimc: np.ndarray):
         # 8PSK specific, add dimensions
-        reimd = reimc.view(np.float64).reshape((-1,2))
-        reim_thresh = np.abs(np.abs(np.cos(np.pi/8)) - np.abs(np.sin(np.pi/8))) # TODO: scaling by data amplitude mean
+        reimd = reimc.view(np.float32).reshape((-1,2))
+        scaling = np.max(self.eo_metric) # Assumes eye-opening has been done
+        reim_thresh = np.abs(np.abs(np.cos(np.pi/8)*scaling) - np.abs(np.sin(np.pi/8)*scaling))
         # Compute |X| - |Y|
         xmy = np.abs(reimd[:,0]) - np.abs(reimd[:,1])
         # And then | |X| - |Y| | + c, this transforms into QPSK box below XY plane
         # with the new QPSK diamond above XY plane
         z = np.abs(xmy) - reim_thresh # Do not stack into single array, no difference anyway
         
-        # C1: Check Z > 0; + check even (diamond), x check odd (QPSK, box)
+        # C1: Check Z > 0; if + check even (diamond), if - check odd (QPSK, box)
         c1z = z > 0
         
         # C2: Z+ check XY and end, Z- check |X|-|Y| and C3
-        cx2 = reimd[0] > 0
-        cy2 = reimd[1] > 0
+        cx2 = reimd[:,0] > 0
+        cy2 = reimd[:,1] > 0
         cxmy2 = xmy > 0
-        
-        idx0 = c1z
-        idx1 = np.logical_and(np.logical_not(c1z), cx2)
-        idx2 = np.logical_and(np.logical_not(c1z), cy2)
-        
+
         # C3: + check X, - check Y
         cx3 = np.logical_and(cxmy2, cx2)
         cy3 = np.logical_and(np.logical_not(cxmy2), cy2)
         
-        # TODO: check correctness, complete
+        # Build backwards
+        idx1 = cxmy2
+        idx2 = np.logical_or(cx3, cy3)
         
+        idx1 = np.logical_or(np.logical_and(c1z, idx1), np.logical_and(np.logical_not(c1z), cx2))
+        idx2 = np.logical_or(np.logical_and(c1z, idx2), np.logical_and(np.logical_not(c1z), cy2))
         
+        idx0 = c1z
         
-        print("8PSK custom mapSyms")
+        # Now map
+        idx = np.vstack((idx0.astype(np.uint8),idx1.astype(np.uint8),idx2.astype(np.uint8)))
+        # Converts to the default demodulator constellation integers
+        syms = self.map8[tuple(idx)] # Needs to be vstack, and need the tuple(); need each value to be a column of indices
         
-        pass
+        return syms
         
         
 
@@ -368,8 +427,8 @@ if __name__ == "__main__":
     closeAllFigs()
     
     OSR = 8
-    numBits = 10000
-    m = 8
+    numBits = 100000
+    m = 4
     syms, bits = randPSKsyms(numBits, m)
     syms_rs = sps.resample_poly(syms,OSR,1)
     _, rx = addSigToNoise(numBits * OSR, 0, syms_rs, chnBW=OSR, snr_inband_linear=1000) # Inf SNR simulates perfect filtering
@@ -389,71 +448,54 @@ if __name__ == "__main__":
     
     # Projection to log2(m)+1 dimensions
     demodulator = SimpleDemodulatorPSK(m)
-    # Extract eye-opening
-    reim, _ = demodulator.getEyeOpening(rx, OSR)
-    reimr = np.ascontiguousarray(reim).view(np.float64)
-    reimr = reimr.reshape((-1,2)).T
-    
-    # Power into BPSK
-    powerup = m // 2
-    reimp = reim**powerup
-    pax = plotConstellation(reim)
-    plotConstellation(reimp, ax=pax)
-    
-    # Form the square product
-    reimpr = reimp.view(np.float64).reshape((-1,2)).T
-    reimsq = reimpr @ reimpr.T
-    
-    # SVD
-    u, s, vh = np.linalg.svd(reimsq) # Don't need vh technically
-    # Check the svd metrics
-    svd_metric = s[-1] / s[:-1] # Deal with this later when there is residual frequency
-    # Check the phase correction by looking at the eigenvectors from u
-    afig, aax = plt.subplots(num="Angle Correction")
-    plotConstellation(reim, ax=aax)
-    
-    angleCorrection = np.arctan2(u[1,0], u[0,0])
-    reimc = reim * np.exp(-1j * angleCorrection / powerup)
-    print(angleCorrection)
-    plotConstellation(reimc, ax=aax)
-    aax.legend(["Original", "Angle corrected"])
-    
-    # 8PSK specific, add dimensions
-    reimd = reimc.view(np.float64).reshape((-1,2)).T
-    reim_thresh = np.abs(np.abs(np.cos(np.pi/8)) - np.abs(np.sin(np.pi/8)))
-    reimd = np.vstack((
-        reimd,
-        np.abs(reimd[0]) - np.abs(reimd[1]) - reim_thresh, # np.abs(np.abs(reimd[0]) - np.abs(reimd[1])) - reim_thresh,  # (reimd[0]**2 - reimd[1]**2)**2 # np.abs(np.abs(reimd[0]) - np.abs(reimd[1])) 
-        np.abs(reimd[0]) - np.abs(reimd[1]) + reim_thresh
-    ))
-    
-    fig3 = plt.figure()
-    ax3 = fig3.add_subplot(projection='3d')
-    ax3.scatter(reimd[0], reimd[1], reimd[2])
-    
-    # Conditionals for 8PSK
-    signs = np.sign(reimd).astype(np.int8)
-    
-    
+
     # Most generic demodulator shouldn't use angle to avoid if/else costs
     # Use the normalised dot product from constellation, then find max across rows
     timer = Timer()
     timer.start()
-    genericSyms = demodulator.demod(rx, OSR)
-    rotationalInvariance = (genericSyms - bits) % m
-    assert(np.all(rotationalInvariance == rotationalInvariance[0]))
+    genericSyms = demodulator.demod(rx.astype(np.complex64), OSR)
     timer.end("Default demodulator")
+    rotationalInvariance = (genericSyms - bits) % m
+    rax = plotConstellation(demodulator.reimc)
+    assert(np.all(rotationalInvariance == rotationalInvariance[0]))
     
-    timer.reset()
-    timer.start()
-    _ = demodulator.mapSyms(demodulator.reimc)
-    timer.end("Default mapSyms")
     
-    timer.reset()
-    demod8 = SimpleDemodulator8PSK()
-    timer.start()
-    demod8.mapSyms(demodulator.reimc)
-    timer.end("8PSK mapSyms")
+    # Unit test on pure QPSK
+    if m == 4:
+        pure4 = demodulator.pskdicts[4]
+        
+        rxScaled = rx.astype(np.complex64) * 3
+        rxScaledAbs = np.abs(rxScaled) # Providing the amplitude pre-computed reduces computation significantly
+        
+        timer.reset()
+        demod4 = SimpleDemodulatorQPSK() # Custom symbol mapper is present, about 3-4x
+        timer.start()
+        # demod4.mapSyms(pure4)
+        # demod4.mapSyms(demodulator.reimc)
+        genericSyms4 = demod4.demod(rxScaled, OSR, abs_x=rxScaledAbs)
+        timer.end("QPSK demodulator")
+        rotationalInvariance4 = (genericSyms4 - bits) % m
+        plotConstellation(demod4.reimc, ax=rax)
+        assert(np.all(rotationalInvariance4 == rotationalInvariance4[0]))
+        
+    
+    # Unit test on pure 8PSK
+    if m == 8:
+        pure8 = demodulator.pskdicts[8]
+        
+        timer.reset()
+        demod8 = SimpleDemodulator8PSK() # Custom symbol mapper is present, about 2-4x
+        timer.start()
+        # demod8.mapSyms(pure8)
+        # demod8.mapSyms(demodulator.reimc)
+        genericSyms8 = demod8.demod(rx.astype(np.complex64) * 3, OSR)
+        timer.end("8PSK demodulator")
+        rotationalInvariance8 = (genericSyms8 - bits) % m
+        assert(np.all(rotationalInvariance8 == rotationalInvariance8[0]))
+        
+    
+    
+    
     
     
     

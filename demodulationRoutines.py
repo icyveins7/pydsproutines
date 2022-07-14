@@ -154,6 +154,23 @@ class SimpleDemodulatorPSK:
         
         return self.syms
     
+    def ambleRotate(self, amble: np.ndarray, search: np.ndarray=None, syms: np.ndarray=None):
+        if syms is None:
+            syms = self.syms
+        
+        if search is None:
+            search = np.arange(syms.size - amble.size + 1)
+            
+        # Naive loop
+        length = amble.size
+        matches = np.zeros(search.size, dtype=np.uint32)
+        m_amble = amble + self.m # Scale it up in order to do uint8 math
+        for i, mi in enumerate(search):
+            # matches[i] = np.sum(syms[mi:mi+length] == amble)
+            matches[i] = np.sum(((m_amble - syms[mi:mi+length]) % self.m) > 0) # TODO: incomplete, this doesn't automatically go to 0, as it just ensure they are all same integer
+        
+        return matches
+    
     def symsToBinaryBytes(self, syms: np.ndarray=None):
         '''
         Turns the integer valued output from mapSyms() and/or demod() into

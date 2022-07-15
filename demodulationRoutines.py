@@ -7,7 +7,9 @@ Created on Fri Jun 19 16:21:35 2020
 
 import numpy as np
 from timingRoutines import Timer
-from numba import jit
+from numba import njit, jit
+from xcorrRoutines import *
+
 try:
     import cupy as cp
     
@@ -70,6 +72,7 @@ class SimpleDemodulatorPSK:
         self.svd_metric = None # SVD metric for phase lock
         self.angleCorrection = None # Angle correction used in phase lock
         self.syms = None # Output mapping to each symbol (0 to M-1)
+        self.matches = None # Output from amble rotation search
         
         
     def getEyeOpening(self, x: np.ndarray, osr: int, abs_x: np.ndarray=None):
@@ -163,11 +166,32 @@ class SimpleDemodulatorPSK:
             
         # Naive loop
         length = amble.size
-        matches = np.zeros(search.size, dtype=np.uint32)
         m_amble = amble + self.m # Scale it up in order to do uint8 math
+        
+        # # Pythonic loop
+        # self.matches = np.zeros((search.size, self.m), dtype=np.uint32)
+        # for i, mi in enumerate(search):
+        #     diff = (m_amble - syms[mi:mi+length]) % self.m
+        #     for k in range(self.m):
+        #         self.matches[i, k] = np.sum(diff == k)
+        
+        # Numba loop
+        self.matches = self._ambleSearch(m_amble, search, self.m, syms, length)
+                
+        sample, rotation = argmax2d(self.matches)
+        self.syms = (syms + rotation) % self.m
+        
+        return self.syms, sample, rotation
+    
+    @staticmethod
+    @njit(cache=True, nogil=True)
+    def _ambleSearch(m_amble, search, m, syms, length):
+        matches = np.zeros((search.size, m), dtype=np.uint32)
         for i, mi in enumerate(search):
-            # matches[i] = np.sum(syms[mi:mi+length] == amble)
-            matches[i] = np.sum(((m_amble - syms[mi:mi+length]) % self.m) > 0) # TODO: incomplete, this doesn't automatically go to 0, as it just ensure they are all same integer
+            diff = (m_amble - syms[mi:mi+length]) % m
+            # One-pass loop
+            for k in range(diff.size):
+                matches[i, diff[k]] += 1
         
         return matches
     
@@ -598,6 +622,15 @@ if __name__ == "__main__":
     assert(np.all(rotationalInvariance == rotationalInvariance[0]))
     
     outBits = demodulator.symsToBinaryBytes()
+    
+    # Test preamble detection
+    timer.reset()
+    timer.start()
+    preamble = bits[400:400+32]
+    rotatedSyms, sample, rotation = demodulator.ambleRotate(preamble)
+    timer.end("Preamble search")
+    plt.figure("Preamble matching")
+    plt.plot(demodulator.matches)
     
     
     # Unit test on pure QPSK

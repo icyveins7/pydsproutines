@@ -41,12 +41,13 @@ class SimpleDemodulatorPSK:
     Generic demodulator implementation for BPSK/QPSK/8PSK.
     This uses a dot product method to detect which symbol in the constellation is present.
     
-    The default constellation is an increasing-angle constellation which maps
-    symbol 0 to exp(i 0) and symbol m-1 to exp(i 2 pi (m-1)/m).
-    In general, this may not be desired e.g. gray mapping; the specific constellation
-    should then be provided during construction.
+    The default constellation-bit mappings are provided as gray-mapped bits,
+    but this can be changed.
     '''
-    pskdicts = {
+    
+    # These default psk constellations are provided only for the basic class.
+    # The specialised classes use their own constellations which are optimised for demodulation.
+    pskdicts = { # This is a monotonically increasing index for each increase in angle
         2: np.array([1.0, -1.0], dtype=np.complex128),
         4: np.array([1.0, 1.0j, -1.0, -1.0j], dtype=np.complex128),
         8: np.array([1.0,
@@ -58,11 +59,26 @@ class SimpleDemodulatorPSK:
                      -1.0j,
                      np.sqrt(2)/2 * (1-1j)], dtype=np.complex128)
     }
+    # This is a specific bit mapping for each corresponding index i.e. each angle, in increasing order
+    # E.g. QPSK/8PSK are gray mapped.
+    pskbitmaps = { 
+        2: np.array([0b1, 0b0], dtype=np.uint8),
+        4: np.array([0b11, 0b01, 0b00, 0b10], dtype=np.uint8),
+        8: np.array([0b000,
+                     0b001,
+                     0b011,
+                     0b010,
+                     0b110,
+                     0b111,
+                     0b101,
+                     0b100], dtype=np.uint8)
+    }
     
-    def __init__(self, m: int, const: np.ndarray=None):
+    def __init__(self, m: int, bitmap: np.ndarray=None):
         self.m = m
-        self.const = self.pskdicts[self.m] if const is None else const
+        self.const = self.pskdicts[self.m]
         self.normVecs = self.const.view(np.float64).reshape((-1,2))
+        self.bitmap = self.pskbitmaps[self.m] if bitmap is None else bitmap
         
         # Interrim output
         self.xeo = None # Selected eye-opening resample points
@@ -87,9 +103,11 @@ class SimpleDemodulatorPSK:
     def mapSyms(self, reimc: np.ndarray):
         '''
         Maps symbols to values from 0 to m-1. Note that this may not correspond to the 
-        bit values desired e.g. gray mapping. In such scenarios, the constellation should be amended.
+        bit values desired e.g. gray mapping. In such scenarios, the bitmap should be amended.
 
         This method does not need to be called directly; it is called as part of demod().
+        
+        See symsToBits() for actual bit mapping.
 
         Parameters
         ----------
@@ -195,18 +213,42 @@ class SimpleDemodulatorPSK:
         
         return matches
     
-    def symsToBinaryBytes(self, syms: np.ndarray=None):
+    def symsToBits(self, syms: np.ndarray=None):
         '''
-        Turns the integer valued output from mapSyms() and/or demod() into
+        Maps each symbol (integer array denoting the angle) to its own bit sequence,
+        as specified by the bitmap.
+
+        Parameters
+        ----------
+        syms : np.ndarray, uint8, optional
+            Input symbol sequence. The default is None, which will use the last internally saved
+            syms array output.
+
+        Returns
+        -------
+        bits : np.ndarray
+            Bit sequence stored as individual bytes i.e. length of this array = length of syms.
+
+        '''
+        if syms is None:
+            syms = self.syms
+        
+        return self.bitmap[syms]
+        
+    
+    def unpackToBinaryBytes(self, packed: np.ndarray):
+        '''
+        Turns an integer valued output from mapSyms()/demod()/symsToBits() into
         a binary-valued array with each row corresponding to the binary value
         of the integer.
         
-        Specifically, that means that each binary value occupies one byte in memory,
+        Specifically, that means that each bit now occupies one byte in memory,
         hence the name of the method. Contrast this with the packBinaryBytesToBits()
         method which tends to follow.
         
         Example:
-            Input QPSK symbol array from [0,1,2,3].
+            m = 4.
+            Input array [0,1,2,3].
             Output is [[0,0],
                        [0,1],
                        [1,0],
@@ -214,34 +256,30 @@ class SimpleDemodulatorPSK:
 
         Parameters
         ----------
-        syms : np.ndarray, optional
-            Integer valued symbols, usually output from demod().
-            The default is None, which will use the outputs internally
-            saved from the previous demod() call.
+        packed : np.ndarray
+            Integer valued array.
 
         Returns
         -------
         unpacked : np.ndarray
-            Matrix of N x k binary values, where N is the number of symbols,
-            and k is the number of bits used to represent each symbol,
+            Matrix of N x k binary values, where N is the original length of 'packed',
+            and k is the number of bits used to represent each value of 'packed',
             given by log2(m).
 
         '''
-        if syms is None:
-            syms = self.syms
-            
-        bitsPerSym = int(np.log2(self.m))
+
+        bitsPerVal = int(np.log2(self.m))
         # Unpack as usual
-        unpacked = np.unpackbits(syms).reshape((-1,8))
+        unpacked = np.unpackbits(packed).reshape((-1,8))
         # Slice the ending bits (default is big-endian)
-        unpacked = unpacked[:,-bitsPerSym:]
+        unpacked = unpacked[:,-bitsPerVal:]
         
         return unpacked
     
     def packBinaryBytesToBits(self, unpacked: np.ndarray):
         '''
         This is a simple wrapper around numpy's packbits().
-        In this context, it takes the unpacked matrix from symsToBinaryBytes()
+        In this context, it takes the unpacked matrix from unpackToBinaryBytes()
         and then compresses it to occupy the minimum requirement of bytes storage.
         
         Example:
@@ -255,11 +293,11 @@ class SimpleDemodulatorPSK:
         Parameters
         ----------
         unpacked : np.ndarray
-            Input unpacked bits, usually from symsToBinaryBytes().
+            Input unpacked bits, usually from unpackToBinaryBytes().
 
         Returns
         -------
-        np.ndarray
+        packed : np.ndarray
             Packed bits storage of the input.
         '''
         return np.packbits(unpacked.reshape(-1))
@@ -270,8 +308,8 @@ class SimpleDemodulatorBPSK(SimpleDemodulatorPSK):
     '''
     Faster demodulator implementation specifically for BPSK.
     '''
-    def __init__(self, const: np.ndarray=None):
-        super().__init__(2, const)
+    def __init__(self, bitmap: np.ndarray=None):
+        super().__init__(2, bitmap)
         
     def mapSyms(self, reimc: np.ndarray):
         # Simply get the real
@@ -289,8 +327,8 @@ class SimpleDemodulatorQPSK(SimpleDemodulatorPSK):
     '''
     Faster demodulator implementation specifically for QPSK.
     '''
-    def __init__(self, const: np.ndarray=None):
-        super().__init__(4, const)
+    def __init__(self, bitmap: np.ndarray=None):
+        super().__init__(4, bitmap)
     
         self.gray4 = np.zeros((2,2), dtype=np.uint8)
         self.gray4[1,1] = 0
@@ -323,8 +361,8 @@ class SimpleDemodulator8PSK(SimpleDemodulatorPSK):
     '''
     Faster demodulator implementation specifically for 8PSK.
     '''
-    def __init__(self, const: np.ndarray=None):
-        super().__init__(8, const)
+    def __init__(self, bitmap: np.ndarray=None):
+        super().__init__(8, bitmap)
         
         # For the custom constellation, we don't map to a number but rather to the N-D index,
         # mirroring the actual bits.
@@ -621,7 +659,8 @@ if __name__ == "__main__":
     rax = plotConstellation(demodulator.reimc)
     assert(np.all(rotationalInvariance == rotationalInvariance[0]))
     
-    outBits = demodulator.symsToBinaryBytes()
+    unpackedSyms = demodulator.unpackToBinaryBytes(genericSyms)
+    demodbits = demodulator.symsToBits()
     
     # Test preamble detection
     timer.reset()

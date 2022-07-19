@@ -341,14 +341,17 @@ class SimpleDemodulatorQPSK(SimpleDemodulatorPSK):
         # Reshape
         reimd = reimc.view(np.float32).reshape((-1,2))
         
-        # Compute comparators
-        xp = (reimd[:,0] > 0).astype(np.uint8)
-        yp = (reimd[:,1] > 0).astype(np.uint8)
+        # # Compute comparators
+        # xp = (reimd[:,0] > 0).astype(np.uint8)
+        # yp = (reimd[:,1] > 0).astype(np.uint8)
         
-        # Now map
-        idx = np.vstack((xp,yp))
-        # Convert to constellation integers
-        syms = self.gray4[tuple(idx)]
+        # # Now map
+        # idx = np.vstack((xp,yp))
+        # # Convert to constellation integers
+        # syms = self.gray4[tuple(idx)]
+        
+        # New one-liner, prevents multiple comparator calls hence faster?
+        syms = self.gray4[tuple((reimd > 0).T.astype(np.uint8))]
         
         return syms
     
@@ -627,7 +630,7 @@ if __name__ == "__main__":
     closeAllFigs()
     
     OSR = 8
-    numBits = 1000
+    numBits = 10000
     m = 4
     syms, bits = randPSKsyms(numBits, m)
     syms_rs = sps.resample_poly(syms,OSR,1)

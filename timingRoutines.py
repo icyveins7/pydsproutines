@@ -20,7 +20,9 @@ class Timer:
     def start(self):
         '''
         Convenience function to start the timer (which by definition should have no label).
+        Automatically calls reset() before beginning.
         '''
+        self.reset()
         self.evt()       
         
     def evt(self, label: str=""):
@@ -37,13 +39,16 @@ class Timer:
         self.t.append(time.perf_counter())
         self.labels.append(label)
         
-    def rpt(self):
+    def rpt(self, showTotal: bool=True):
         '''
         Reports times elapsed between events.
         '''
         for i in range(1, len(self.t)):
             print("%d->%d : %fs. %s" % (
                 i-1, i, self.t[i]-self.t[i-1], self.labels[i]))
+            
+        if showTotal:
+            print("Total: %fs." % (self.t[-1] - self.t[0]))
             
     def end(self, label: str=""):
         '''

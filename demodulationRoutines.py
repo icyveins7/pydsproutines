@@ -195,6 +195,9 @@ class SimpleDemodulatorPSK:
         
         # Numba loop
         self.matches = self._ambleSearch(m_amble, search, self.m, syms, length)
+        
+        # # Numba loop v2
+        # self.matches = self._ambleSearch(amble, search, self.m, syms, length)
                 
         sample, rotation = argmax2d(self.matches)
         self.syms = (syms + rotation) % self.m
@@ -205,13 +208,28 @@ class SimpleDemodulatorPSK:
     @njit(cache=True, nogil=True)
     def _ambleSearch(m_amble, search, m, syms, length):
         matches = np.zeros((search.size, m), dtype=np.uint32)
-        for i, mi in enumerate(search):
-            diff = (m_amble - syms[mi:mi+length]) % m
+        for i in np.arange(search.size): # Use np.arange instead of range
+            mi = search[i]
+            diff = np.mod((m_amble - syms[mi:mi+length]), m)
+            
             # One-pass loop
-            for k in range(diff.size):
+            for k in np.arange(diff.size):
                 matches[i, diff[k]] += 1
         
         return matches
+    
+    # @staticmethod
+    # @njit(cache=True, nogil=True) # not well tested yet
+    # def _ambleSearchv2(m_amble, search, m, syms, length):
+    #     matches = np.zeros((search.size, m), dtype=np.uint32)
+    #     for i in np.arange(search.size): # Use np.arange instead of range
+    #         mi = search[i]
+    #         diff = np.bitwise_xor(amble, syms[mi:mi+length])
+    #         # One-pass loop
+    #         for k in np.arange(diff.size):
+    #             matches[i, -1-diff[k]] += 1
+        
+    #     return matches
     
     def symsToBits(self, syms: np.ndarray=None):
         '''

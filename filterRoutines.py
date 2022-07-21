@@ -128,6 +128,29 @@ class Channeliser:
     
 
 #%%
+class BurstDetector:
+    def __init__(self, medfiltlen: int, snrReqLinear: float):
+        self.medfiltlen = medfiltlen
+        self.snrReqLinear = snrReqLinear
+        
+        # Placeholders for later results
+        self.d_absx = None
+        self.d_ampSq = None
+        self.d_medfiltered = None
+        
+    def medfilt(self, x):
+        d_x = cp.asarray(x) # Push to gpu if not currently in it
+        self.d_absx = cp.abs(d_x)
+        self.d_ampSq = self.d_absx * self.d_absx
+        self.d_medfiltered = cpsps.medfilt(self.d_ampSq, self.medfiltlen)
+        
+    def detectViaThreshold(self, threshold: float):
+        signalIndices = cp.argwhere(self.d_medfiltered > threshold).flatten()
+        splitIndices = cp.argwhere(cp.diff(signalIndices)>1).flatten() + 1 # the + 1 is necessary
+        signalIndices = cp.split(signalIndices, splitIndices.get()) # For cupy, need to pull the split indices to host
+        
+        return signalIndices
+
 def energyDetection(ampSq, medfiltlen, snrReqLinear=4.0, noiseIndices=None, splitSignalIndices=True):
     '''
     Parameters

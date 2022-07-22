@@ -205,7 +205,7 @@ class SimpleDemodulatorPSK:
         return self.syms, sample, rotation
     
     @staticmethod
-    @njit(cache=True, nogil=True)
+    @njit('uint32[:,:](uint8[:], int32[:], intc, uint8[:], intc)', cache=True, nogil=True)
     def _ambleSearch(m_amble, search, m, syms, length):
         matches = np.zeros((search.size, m), dtype=np.uint32)
         for i in np.arange(search.size): # Use np.arange instead of range
@@ -684,10 +684,9 @@ if __name__ == "__main__":
     demodbits = demodulator.symsToBits()
     
     # Test preamble detection
-    timer.reset()
-    timer.start()
     preamble = bits[400:400+32]
-    rotatedSyms, sample, rotation = demodulator.ambleRotate(preamble)
+    timer.start()
+    rotatedSyms, sample, rotation = demodulator.ambleRotate(preamble, np.arange(400,400+256))
     timer.end("Preamble search")
     plt.figure("Preamble matching")
     plt.plot(demodulator.matches)

@@ -204,7 +204,7 @@ class SimpleDemodulatorPSK:
         # self.matches = self._ambleSearch(amble, search, self.m, syms, length)
                 
         s, rotation = argmax2d(self.matches)
-        sample = search[s]
+        sample = search[s] # Remember to reference the searched indices
         self.syms = (syms + rotation) % self.m
         
         return self.syms, sample, rotation

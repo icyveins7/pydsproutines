@@ -37,6 +37,83 @@ def cp_lfilter(ftap: cp.ndarray, x: cp.ndarray, chunksize: int=None):
             ptr = ptr + block
 
         return c
+    
+    
+# Raw kernel for tone creation
+upFirdnKernel = cp.RawKernel(r'''
+#include <cupy/complex.cuh>
+extern "C" __global__
+void upfirdn(
+    const complex<float> *d_x, const int len,
+    const float *d_taps, const int tapslen,
+    const int up,
+    const int down,
+    complex<float> *d_out, int outlen)
+{
+    // allocate shared memory
+    extern __shared__ double s[];
+    
+    float *s_taps = (float*)s; // (tapslen) floats
+    /* Tally:  */
+
+    // load shared memory
+    for (int t = threadIdx.x; t < tapslen; t = t + blockDim.x){
+        s_taps[t] = d_taps[t];
+    }
+
+    __syncthreads();
+    
+    // Define the indices to write to for this block
+    int outStart = blockIdx.x * blockDim.x;
+    int outEnd = min((blockIdx.x + 1) * blockDim.x, outlen); // The last block must stop at the length
+    
+    int i0, j;
+    complex<float> z = 0; // Stack-variable for each thread
+    
+    // Loop over the output for this block
+    for (int k = outStart + threadIdx.x; k < outEnd; k += blockDim.x) // technically this loop is pointless, since each thread performs one computation only
+    {
+        i0 = (down*k + tapslen/2) % up;
+        
+        for (int i = i0; i < tapslen; i += up){
+            j = (down * k + tapslen/2 - i) / up;
+            
+            if (j < len && j >= 0)
+            {
+                z = z + s_taps[i] * d_x[j];
+            }
+        }
+        
+        // Write z to global memory
+        d_out[k] = z;
+    }
+ 
+}
+''', '''upfirdn''')
+
+def cupyUpfirdn(x: cp.ndarray, taps: cp.ndarray, up: int, down: int):
+    if x.dtype != cp.complex64:
+        raise TypeError("x is expected to be type complex64.")
+    if taps.dtype != cp.float32:
+        raise TypeError("taps is expected to be type float32.")
+        
+    # Allocate output
+    out = cp.zeros(x.size * up // down, dtype=cp.complex64)
+        
+    # Define just enough blocks to cover the output
+    THREADS_PER_BLOCK = 256
+    NUM_BLOCKS = out.size // THREADS_PER_BLOCK
+    if NUM_BLOCKS * THREADS_PER_BLOCK < out.size:
+        NUM_BLOCKS += 1
+    
+    # Call the kernel
+    upFirdnKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                  (x, x.size,
+                   taps, taps.size,
+                   up, down,
+                   out, out.size))
+    
+    return out
 
 def wola(f_tap, x, Dec, N=None, dtype=np.complex64):
     '''

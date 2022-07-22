@@ -9,6 +9,7 @@ import numpy as np
 from timingRoutines import Timer
 from numba import njit, jit
 from xcorrRoutines import *
+import warnings
 
 try:
     import cupy as cp
@@ -74,11 +75,12 @@ class SimpleDemodulatorPSK:
                      0b100], dtype=np.uint8)
     }
     
-    def __init__(self, m: int, bitmap: np.ndarray=None):
+    def __init__(self, m: int, bitmap: np.ndarray=None, cluster_threshold: float=0.1):
         self.m = m
         self.const = self.pskdicts[self.m]
         self.normVecs = self.const.view(np.float64).reshape((-1,2))
         self.bitmap = self.pskbitmaps[self.m] if bitmap is None else bitmap
+        self.cluster_threshold = cluster_threshold
         
         # Interrim output
         self.xeo = None # Selected eye-opening resample points
@@ -140,6 +142,8 @@ class SimpleDemodulatorPSK:
         u, s, vh = np.linalg.svd(reimsq) # Don't need vh technically
         # Check the svd metrics
         svd_metric = s[-1] / s[:-1] # Deal with this later when there is residual frequency
+        if np.any(svd_metric > self.cluster_threshold):
+            warnings.warn("Constellation not well clustered. There may be residual frequency shifts.")
         # Angle correction
         angleCorrection = np.arctan2(u[1,0], u[0,0])
         reimc = self.correctPhase(reim, -angleCorrection/powerup)
@@ -199,7 +203,8 @@ class SimpleDemodulatorPSK:
         # # Numba loop v2
         # self.matches = self._ambleSearch(amble, search, self.m, syms, length)
                 
-        sample, rotation = argmax2d(self.matches)
+        s, rotation = argmax2d(self.matches)
+        sample = search[s]
         self.syms = (syms + rotation) % self.m
         
         return self.syms, sample, rotation
@@ -326,8 +331,8 @@ class SimpleDemodulatorBPSK(SimpleDemodulatorPSK):
     '''
     Faster demodulator implementation specifically for BPSK.
     '''
-    def __init__(self, bitmap: np.ndarray=None):
-        super().__init__(2, bitmap)
+    def __init__(self, bitmap: np.ndarray=None, cluster_threshold: float=0.1):
+        super().__init__(2, bitmap, cluster_threshold)
         
     def mapSyms(self, reimc: np.ndarray):
         # Simply get the real
@@ -345,8 +350,8 @@ class SimpleDemodulatorQPSK(SimpleDemodulatorPSK):
     '''
     Faster demodulator implementation specifically for QPSK.
     '''
-    def __init__(self, bitmap: np.ndarray=None):
-        super().__init__(4, bitmap)
+    def __init__(self, bitmap: np.ndarray=None, cluster_threshold: float=0.1):
+        super().__init__(4, bitmap, cluster_threshold)
     
         self.gray4 = np.zeros((2,2), dtype=np.uint8)
         self.gray4[1,1] = 0
@@ -382,8 +387,8 @@ class SimpleDemodulator8PSK(SimpleDemodulatorPSK):
     '''
     Faster demodulator implementation specifically for 8PSK.
     '''
-    def __init__(self, bitmap: np.ndarray=None):
-        super().__init__(8, bitmap)
+    def __init__(self, bitmap: np.ndarray=None, cluster_threshold: float=0.1):
+        super().__init__(8, bitmap, cluster_threshold)
         
         # For the custom constellation, we don't map to a number but rather to the N-D index,
         # mirroring the actual bits.

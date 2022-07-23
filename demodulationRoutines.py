@@ -435,6 +435,132 @@ class SimpleDemodulator8PSK(SimpleDemodulatorPSK):
         syms = self.map8[tuple(idx)] # Needs to be vstack, and need the tuple(); need each value to be a column of indices
         
         return syms
+    
+try:
+    import cupy as cp
+    
+    # Kernels
+    eye_opening_kernel = cp.RawKernel(r'''
+    #include <cupy/complex.cuh>
+    extern "C" __global__
+    void eye_opening_kernel(
+        const complex<float> *d_xbatch, 
+        const int numInBatch, // this is not needed?
+        const int xlen,    
+        const float *d_abs_xbatch, const int osr,
+        complex<float> *d_x_rsbatch
+    ){
+                                            
+        // allocate shared memory
+        extern __shared__ double s[];
+        
+        float *s_abs_x = (float*)s; // (blockDim.x * OSR) floats
+        float *s_abs_totals = (float*)&s_abs_x[blockDim.x * OSR]; // (OSR) floats
+        int *s_eo_i = (int*)&s_abs_totals[OSR]; // (1) int
+        
+        // Zero the shared mem
+        for (int i = 0; i < osr; i++){
+            s_abs_x[threadIdx.x * OSR + i] = 0; // each thread zeros its own row        
+        }
+        // no need to sync threads here, each thread will be writing to its own row at first
+        
+        // Each block processes one signal, each thread has (OSR) possible
+        // addresses to write to, depending on which index of the signal it just read
+        // Loop over the length of the signal, but add to the appropriate
+        // OSR index in shared memory for accumulation
+        
+        // Declare variables
+        complex<float> *d_x = &d_xbatch[blockIdx.x * xlen]; // beginning of this block's signal
+        complex<float> *d_abs_x = &d_abs_xbatch[blockIdx.x * xlen]; // beginning of this block's abs signal
+        int t; // used to denote time index
+        int rsi; // used to denote the resample index
+        
+        // Begin loop
+        for (int i = threadIdx.x; i < xlen; i = i + blockDim.x)
+        {
+            t = i / osr;
+            rsi = i % osr;
+            // Accumulate the global memory index into its appropriate resample index
+            s_abs_x[threadIdx.x * osr + rsi] += d_abs_xbatch[i];
+        }
+        
+        __syncthreads(); // Wait for entire signal to be done
+        
+        // Now use the front few threads to accumulate the total
+        
+        if (threadIdx.x < osr)
+        {
+            s_abs_totals[threadIdx.x] = 0; // zero first
+            for (int i = 0; i < blockDim.x; i++){ // sum down the rows
+                s_abs_totals[threadIdx.x] += s_abs_x[i * OSR + threadIdx.x];
+            }
+        }
+        
+        __syncthreads();
+        
+        // Then use the first thread to find the max
+        float curTotal;
+        if (threadIdx.x == 0)
+        {
+            curTotal = s_abs_totals[0];
+            s_eo_i = 0;
+            for (int i = 1; i < osr; i++)
+            {
+                if (s_abs_totals[i] > curTotal)
+                {
+                    curTotal = s_abs_total[i];
+                    s_eo_i = i;
+                }
+            }
+        }
+        
+        __syncthreads();
+        
+        // And finally use the entire block again to write the appropriate resample index out
+        int eo_i = s_eo_i; // every thread reads the index to use
+        int rslen = xlen / osr;
+        complex<float> *d_x_rs = &d_x_rsbatch[blockIdx.x * rslen];
+        for (int i = threadIdx.x; i < rslen; i = i + blockDim.x)
+        {
+            d_x_rs[i] = d_x[i * osr + eo_i];    
+        }
+        
+        
+    }
+    ''','eye_opening_kernel')
+    
+    
+    # Classes
+    class CupyDemodulatorPSK:
+        def __init__(self, m: int):
+            self.m = m
+            
+            # Interrim output
+            self.xeo = None # Selected eye-opening resample points
+            self.xeo_i = None # Index of eye-opening
+            self.eo_metric = None # Metrics of eye-opening
+            self.reimc = None # Phase-locked to constellation (complex array)
+            self.svd_metric = None # SVD metric for phase lock
+            self.angleCorrection = None # Angle correction used in phase lock
+            self.syms = None # Output mapping to each symbol (0 to M-1)
+            self.matches = None # Output from amble rotation search
+            
+        def getEyeOpening(self, x: cp.ndarray, osr: int, abs_x: cp.ndarray=None):
+            if abs_x is None:
+                abs_x = cp.abs(x) # Provide option for pre-computed (often used elsewhere anyway)
+            x_rs_abs = abs_x.reshape((-1, osr))
+            self.eo_metric = cp.mean(x_rs_abs, axis=0)
+            i = cp.argmax(self.eo_metric)
+            x_rs = x.reshape((-1, osr))
+            return x_rs[:,i], i
+        
+        def getEyeOpeningBatch(self, xbatch: cp.ndarray, osr: int, abs_xbatch: cp.ndarray):
+            
+            pass
+        
+    
+except:
+    print("Skipping cupy demodulator imports.")
         
         
 

@@ -644,6 +644,23 @@ def ML_demod_QPSK(y, h, up, numSyms):
         
 #         for b in range(len(i_bits)):
     
+#%% Workspace
+
+# Leaving this reference code here for 2x2 eigvalues, to be converted into cuda kernels
+# Useful shortcut: https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html
+def eig2x2(x):
+    a = 1.0
+    b = -x[0,0] - x[1,1]
+    print(b)
+    c = x[0,0]*x[1,1] - x[0,1] * x[1,0]
+    print(c)
+    f = np.sqrt(b*b - 4 * a * c) / (2 * a)
+    xp = -b/(2*a) + f
+    xm = -b/(2*a) - f
+    return xp, xm
+
+#%% Unit testing
+    
 if __name__ == "__main__":
     from signalCreationRoutines import *
     from plotRoutines import *

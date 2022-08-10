@@ -105,13 +105,19 @@ def cupyUpfirdn(x: cp.ndarray, taps: cp.ndarray, up: int, down: int):
     NUM_BLOCKS = out.size // THREADS_PER_BLOCK
     if NUM_BLOCKS * THREADS_PER_BLOCK < out.size:
         NUM_BLOCKS += 1
+        
+    # Define the shared memory requirement
+    if taps.size * 4 > 48e3:
+        raise MemoryError("Taps length too large for shared memory.")
+    smReq = taps.size * 4
     
     # Call the kernel
     upFirdnKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
                   (x, x.size,
                    taps, taps.size,
                    up, down,
-                   out, out.size))
+                   out, out.size),
+                  shared_mem=smReq)
     
     return out
 

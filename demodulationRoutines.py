@@ -441,7 +441,173 @@ class SimpleDemodulator8PSK(SimpleDemodulatorPSK):
         
         return syms
         
+      
+#%% Cupy version of simple demodulators
+try:
+    import cupy as cp
+    
+    # Raw kernel to lock phase and map syms together
+    # NOTE: assuming the entire signal fits in shared memory
+    lockPhase_mapSyms_singleBlkKernel_qpsk = cp.RawKernel(r'''
+    #include <cupy/complex.cuh>
+    extern "C" __global__
+    void lockPhase_mapSyms_singleBlkKernel_qpsk(
+        const complex<float> *d_x,
+        const int xlength)
+    {
+        // allocate shared memory
+        extern __shared__ double s[];
         
+        complex<float> *s_x = (complex<float>*)s; // (xlength) complex floats
+        float *s_ws = (float*)&s_x[xlength]; // (blockDim.x) floats
+        /* Tally:  */
+    
+        // load shared memory
+        for (int t = threadIdx.x; t < xlength; t = t + blockDim.x){
+            s_x[t] = d_x[t];
+        }
+    
+        __syncthreads();
+        
+        // zero the workspace
+        s_ws[threadIdx.x] = 0;
+        
+        // loop over the signal
+        complex<float> reimp;
+        int widx = threadIdx.x % 4;
+        for (int i = threadIdx.x; i < xlength; i += blockDim.x)
+        {
+            reimp = s_x[i] * s_x[i]; // squared
+            if (widx == 0) // accumulate 0,0
+            {
+                s_ws[threadIdx.x] += reimp.real() * reimp.real();
+            }
+            elif (widx == 3) // accumulate 1,1
+            {
+                s_ws[threadIdx.x] += reimp.imag() * reimp.imag();    
+            }
+            else // accumulate 0,1 or 1,0
+            {
+                s_ws[threadIdx.x] += reimp.real() * reimp.imag();    
+            }
+        }
+        
+        __syncthreads();
+        
+        // gather into 2x2 at the front
+        if (threadIdx.x < 4)
+        {
+            // remember that we can skip the first 2x2 values
+            for (int i = threadIdx.x + 4; i < blockDim.x; i += 4)
+            {
+                s_ws[threadIdx.x] += s_ws[i];
+            }
+            
+            __syncthreads();
+            
+            // perform the 2x2 eigen decomposition
+            
+        }
+
+        
+        
+        
+     
+    }
+    ''', '''lockPhase_mapSyms_singleBlkKernel_qpsk''')
+    
+    class CupyDemodulatorQPSK:
+        def __init__(self):
+            self.m = 4
+            # self.const = self.pskdicts[self.m]
+            # self.normVecs = self.const.view(np.float64).reshape((-1,2))
+            # self.bitmap = self.pskbitmaps[self.m] if bitmap is None else bitmap
+            # self.cluster_threshold = cluster_threshold
+            
+            # # Interrim output
+            # self.xeo = None # Selected eye-opening resample points
+            # self.xeo_i = None # Index of eye-opening
+            # self.eo_metric = None # Metrics of eye-opening
+            # self.reimc = None # Phase-locked to constellation (complex array)
+            # self.svd_metric = None # SVD metric for phase lock
+            # self.angleCorrection = None # Angle correction used in phase lock
+            # self.syms = None # Output mapping to each symbol (0 to M-1)
+            # self.matches = None # Output from amble rotation search
+            
+        def getEyeOpening(self, x: cp.ndarray, osr: int, abs_x: cp.ndarray=None):
+            ## This is just a straight np to cp conversion..
+            if abs_x is None:
+                abs_x = cp.abs(x) # Provide option for pre-computed (often used elsewhere anyway)
+            x_rs_abs = abs_x.reshape((-1, osr))
+            self.eo_metric = cp.mean(x_rs_abs, axis=0)
+            i = cp.argmax(self.eo_metric)
+            x_rs = x.reshape((-1, osr))
+            return x_rs[:,i], i
+            
+        def mapSyms(self, reimc: np.ndarray):
+            pass
+        
+        def lockPhase(self, reim: np.ndarray):
+            # Power into BPSK
+            powerup = self.m // 2
+            reimp = reim**powerup
+            
+            # Form the square product
+            reimpr = reimp.view(np.float32).reshape((-1,2)).T
+            reimsq = reimpr @ reimpr.T
+            
+            # SVD
+            u, s, vh = np.linalg.svd(reimsq) # Don't need vh technically
+            # Check the svd metrics
+            svd_metric = s[-1] / s[:-1] # Deal with this later when there is residual frequency
+            if np.any(svd_metric > self.cluster_threshold):
+                warnings.warn("Constellation not well clustered. There may be residual frequency shifts.")
+            # Angle correction
+            angleCorrection = np.arctan2(u[1,0], u[0,0])
+            reimc = self.correctPhase(reim, -angleCorrection/powerup)
+            
+            return reimc, svd_metric, angleCorrection
+        
+        def correctPhase(self, reim: np.ndarray, phase: float):
+            return reim * np.exp(1j * phase)
+            
+        
+        def demod(self, x: cp.ndarray, osr: int, abs_x: cp.ndarray=None):
+            if x.dtype != cp.complex64:
+                raise TypeError("Input array must be complex64.")
+            
+            # Get eye-opening first
+            xeo, xeo_i = self.getEyeOpening(x, osr, abs_x)
+            
+            # Collect into large batch?
+            
+            
+            # Correct the global phase first
+            reim = np.ascontiguousarray(xeo)
+            self.reimc, self.svd_metric, self.angleCorrection = self.lockPhase(reim)
+
+            # Generic method: dot product with the normalised vectors
+            self.syms = self.mapSyms(self.reimc)
+
+        
+            
+            return self.syms
+        
+        def ambleRotate(self, amble: np.ndarray, search: np.ndarray=None, syms: np.ndarray=None):
+            pass
+        
+        def symsToBits(self, syms: np.ndarray=None):
+            pass
+            
+        def unpackToBinaryBytes(self, packed: np.ndarray):
+            pass
+        
+        def packBinaryBytesToBits(self, unpacked: np.ndarray):
+            pass
+            
+except:
+    print("Skipping imports of cupy demodulators.")
+    
 
 
 #%%
@@ -649,6 +815,9 @@ def ML_demod_QPSK(y, h, up, numSyms):
 # Leaving this reference code here for 2x2 eigvalues, to be converted into cuda kernels
 # Useful shortcut: https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html
 def eig2x2(x):
+    # For better numerical accuracy, ensure determinant is 1.0 by doing this
+    x = x / np.linalg.det(x)**0.5
+    
     a = 1.0
     b = -x[0,0] - x[1,1]
     print(b)
@@ -657,7 +826,14 @@ def eig2x2(x):
     f = np.sqrt(b*b - 4 * a * c) / (2 * a)
     xp = -b/(2*a) + f
     xm = -b/(2*a) - f
-    return xp, xm
+    
+    e1 = np.array([[x[0,1]],[l1 - x[0,0]]])
+    e2 = np.array([[x[0,1]],[l2 - x[0,0]]])
+    # second way
+    e1 = np.array([[l1-x[1,1]],[x[0,1]]])
+    e2 = np.array([[l2-x[1,1]],[x[0,1]]])
+    
+    return xp, xm, e1, e2
 
 #%% Unit testing
     

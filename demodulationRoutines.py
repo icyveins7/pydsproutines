@@ -816,7 +816,8 @@ def ML_demod_QPSK(y, h, up, numSyms):
 # Useful shortcut: https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html
 def eig2x2(x):
     # For better numerical accuracy, ensure determinant is 1.0 by doing this
-    x = x / np.linalg.det(x)**0.5
+    nf = np.linalg.det(x)**0.5
+    x = x / nf
     
     a = 1.0
     b = -x[0,0] - x[1,1]
@@ -827,11 +828,11 @@ def eig2x2(x):
     xp = -b/(2*a) + f
     xm = -b/(2*a) - f
     
-    e1 = np.array([[x[0,1]],[l1 - x[0,0]]])
-    e2 = np.array([[x[0,1]],[l2 - x[0,0]]])
+    e1 = np.array([[x[0,1]],[xp - x[0,0]]])
+    e2 = np.array([[x[0,1]],[xm - x[0,0]]])
     # second way
-    e1 = np.array([[l1-x[1,1]],[x[0,1]]])
-    e2 = np.array([[l2-x[1,1]],[x[0,1]]])
+    e1 = np.array([[xp-x[1,1]],[x[0,1]]])
+    e2 = np.array([[xm-x[1,1]],[x[0,1]]])
     
     return xp, xm, e1, e2
 

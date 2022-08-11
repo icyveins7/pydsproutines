@@ -453,7 +453,8 @@ try:
     extern "C" __global__
     void lockPhase_mapSyms_singleBlkKernel_qpsk(
         const complex<float> *d_x,
-        const int xlength)
+        const int xlength,
+        complex<float> *d_reimc)
     {
         // allocate shared memory
         extern __shared__ double s[];
@@ -475,14 +476,15 @@ try:
         // loop over the signal
         complex<float> reimp;
         int widx = threadIdx.x % 4;
-        for (int i = threadIdx.x; i < xlength; i += blockDim.x)
+        int tidx = threadIdx.x / 4;
+        for (int i = tidx; i < xlength; i += blockDim.x / 4)
         {
             reimp = s_x[i] * s_x[i]; // squared
             if (widx == 0) // accumulate 0,0
             {
                 s_ws[threadIdx.x] += reimp.real() * reimp.real();
             }
-            elif (widx == 3) // accumulate 1,1
+            else if (widx == 3) // accumulate 1,1
             {
                 s_ws[threadIdx.x] += reimp.imag() * reimp.imag();    
             }
@@ -502,23 +504,86 @@ try:
             {
                 s_ws[threadIdx.x] += s_ws[i];
             }
+        }
             
-            __syncthreads();
+        __syncthreads(); // we cannot place syncthreads in a conditional block!
             
+        // hence split the conditional into this next section again
+        if (threadIdx.x < 4)
+        {
             // perform the 2x2 eigen decomposition
+            float T = s_ws[0] + s_ws[3]; // trace
+            float D = s_ws[0] * s_ws[3] - s_ws[1] * s_ws[2]; // determinant
+            
+            float p1 = T/2.0;
+            float p2 = sqrtf(fmaf(p1, p1, -D));
+            
+            // 0 and 2 write the first eigenvector
+            if (threadIdx.x % 2 == 0)
+            {
+                // compute the eigenvalue
+                float l1 = p1 + p2;
+                
+                // 0 writes the eigenvalue
+                if (threadIdx.x == 0){s_ws[4] = l1;}
+                
+                // compute the eigenvector
+                s_ws[6+threadIdx.x] = (threadIdx.x == 0) ? (l1 - s_ws[3]) : s_ws[2];
+            }
+            else // 1 and 3 write the second eigenvector
+            {
+                // compute the eigenvalue
+                float l2 = p1 - p2;
+                
+                // 1 writes the eigenvalue
+                if (threadIdx.x == 1){s_ws[5] = l2;}
+                
+                // compute the eigenvector
+                s_ws[6+threadIdx.x] = (threadIdx.x == 1) ? (l2 - s_ws[3]) : s_ws[2];
+            }
             
         }
+        
+        __syncthreads();
+        
+        // at this point, the shared memory contains
+        // s_ws[0:4] = square matrix
+        // s_ws[4:6] = eigenvalues
+        // s_ws[6:10] = eigenvectors, columnwise, i.e. 6,8 is e1 // 7,9 is e2
+        
+        // use first thread to calculate svd_metric
+        // note that this is positive semi-definite, so eigvals are always positive
+        // hence the first eigenval is by definition the larger one (since the sqrt is positive)
+        if (threadIdx.x == 0)
+        {
+            s_ws[10] = s_ws[5] / s_ws[4];
+        }
+        
+        // all threads compute the same phase
+        float angleCorrection = atan2f(s_ws[8], s_ws[6]);
 
+        // correct the phase in place
+        float real, imag;
+        sincosf(-angleCorrection/2.0 + 0.78539816340, &imag, &real); // we shift it to pi/4 for gray coding later
+        complex<float> e(real, imag);
+        for (int i = threadIdx.x; i < xlength; i += blockDim.x)
+        {
+            s_x[i] = s_x[i] * e;
+            
+            // write out
+            d_reimc[i] = s_x[i]; // okay up to here!
+        }
         
         
-        
+
      
     }
     ''', '''lockPhase_mapSyms_singleBlkKernel_qpsk''')
     
     class CupyDemodulatorQPSK:
-        def __init__(self):
+        def __init__(self, cluster_threshold: float=0.1):
             self.m = 4
+            self.cluster_threshold = cluster_threshold
             # self.const = self.pskdicts[self.m]
             # self.normVecs = self.const.view(np.float64).reshape((-1,2))
             # self.bitmap = self.pskbitmaps[self.m] if bitmap is None else bitmap
@@ -535,7 +600,7 @@ try:
             # self.matches = None # Output from amble rotation search
             
         def getEyeOpening(self, x: cp.ndarray, osr: int, abs_x: cp.ndarray=None):
-            ## This is just a straight np to cp conversion..
+            ## This is just a straight np to cp conversion.. Verified!
             if abs_x is None:
                 abs_x = cp.abs(x) # Provide option for pre-computed (often used elsewhere anyway)
             x_rs_abs = abs_x.reshape((-1, osr))
@@ -547,26 +612,43 @@ try:
         def mapSyms(self, reimc: np.ndarray):
             pass
         
-        def lockPhase(self, reim: np.ndarray):
-            # Power into BPSK
-            powerup = self.m // 2
-            reimp = reim**powerup
+        def lockPhase(self, reim: cp.ndarray): 
+            # Allocate output
+            d_reimc = cp.zeros(reim.size, dtype=cp.complex64)
             
-            # Form the square product
-            reimpr = reimp.view(np.float32).reshape((-1,2)).T
-            reimsq = reimpr @ reimpr.T
+            THREADS_PER_BLOCK = 128
+            NUM_BLOCKS = 1
             
-            # SVD
-            u, s, vh = np.linalg.svd(reimsq) # Don't need vh technically
-            # Check the svd metrics
-            svd_metric = s[-1] / s[:-1] # Deal with this later when there is residual frequency
-            if np.any(svd_metric > self.cluster_threshold):
-                warnings.warn("Constellation not well clustered. There may be residual frequency shifts.")
-            # Angle correction
-            angleCorrection = np.arctan2(u[1,0], u[0,0])
-            reimc = self.correctPhase(reim, -angleCorrection/powerup)
+            # Check shared memory requirements
+            smReq = THREADS_PER_BLOCK * 4 + reim.nbytes
+            if smReq > 48000:
+                raise MemoryError("Shared memory requested exceeded 48kB.")
             
-            return reimc, svd_metric, angleCorrection
+            lockPhase_mapSyms_singleBlkKernel_qpsk((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                               (reim, reim.size, d_reimc),
+                               shared_mem=smReq)
+            
+            return d_reimc
+            
+            # # Power into BPSK
+            # powerup = self.m // 2
+            # reimp = reim**powerup
+            
+            # # Form the square product
+            # reimpr = reimp.view(np.float32).reshape((-1,2)).T
+            # reimsq = reimpr @ reimpr.T
+            
+            # # SVD
+            # u, s, vh = np.linalg.svd(reimsq) # Don't need vh technically
+            # # Check the svd metrics
+            # svd_metric = s[-1] / s[:-1] # Deal with this later when there is residual frequency
+            # if np.any(svd_metric > self.cluster_threshold):
+            #     warnings.warn("Constellation not well clustered. There may be residual frequency shifts.")
+            # # Angle correction
+            # angleCorrection = np.arctan2(u[1,0], u[0,0])
+            # reimc = self.correctPhase(reim, -angleCorrection/powerup)
+            
+            # return reimc, svd_metric, angleCorrection
         
         def correctPhase(self, reim: np.ndarray, phase: float):
             return reim * np.exp(1j * phase)

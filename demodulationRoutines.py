@@ -454,18 +454,36 @@ try:
     void lockPhase_mapSyms_singleBlkKernel_qpsk(
         const complex<float> *d_x,
         const int xlength,
-        complex<float> *d_reimc)
+        const int *d_amble,
+        const int amblelength,
+        const int searchstart,
+        const int searchlength,
+        complex<float> *d_reimc,
+        int *d_syms,
+        int *d_matches,
+        int *d_rotation)
     {
+        /* Note that in the batch, the blockIdx is the batch index */
+     
         // allocate shared memory
         extern __shared__ double s[];
         
         complex<float> *s_x = (complex<float>*)s; // (xlength) complex floats
-        float *s_ws = (float*)&s_x[xlength]; // (blockDim.x) floats
-        /* Tally:  */
+        float *s_ws = (float*)&s_x[xlength]; // (workspace length) floats
+        /* workspace length >= blockDim.x*/
+        
+        // reinterpret for later use as well
+        complex<int> *s_syms = (complex<int>*)s; // (xlength) complex ints
+        
+        // for later use, we also point the reused workspace to other things
+        int *s_amble = (int*)&s_ws[0]; // (amblelength) ints
+        int *s_matches = (int*)&s_amble[amblelength]; // (searchlength) ints
+        int *s_rotation = (int*)&s_matches[searchlength]; // (searchlength) ints
+        
     
         // load shared memory
         for (int t = threadIdx.x; t < xlength; t = t + blockDim.x){
-            s_x[t] = d_x[t];
+            s_x[t] = d_x[t + blockIdx.x*xlength];
         }
     
         __syncthreads();
@@ -554,10 +572,11 @@ try:
         // use first thread to calculate svd_metric
         // note that this is positive semi-definite, so eigvals are always positive
         // hence the first eigenval is by definition the larger one (since the sqrt is positive)
-        if (threadIdx.x == 0)
-        {
-            s_ws[10] = s_ws[5] / s_ws[4];
-        }
+        // if (threadIdx.x == 0)
+        //{
+        //    s_ws[10] = s_ws[5] / s_ws[4];
+        //}
+        // no dire need to output this, let's ignore for now
         
         // all threads compute the same phase
         float angleCorrection = atan2f(s_ws[8], s_ws[6]);
@@ -571,23 +590,147 @@ try:
             s_x[i] = s_x[i] * e;
             
             // write out
-            d_reimc[i] = s_x[i]; // okay up to here!
+            d_reimc[i + blockIdx.x*xlength] = s_x[i]; // okay up to here!
         }
         
+        // finally, we interpret the symbols
+        int xsign, ysign;
+        int *intptr;
+        const int rotChain[4] = {2,0,3,1};
+        for (int i = threadIdx.x; i < xlength; i += blockDim.x)
+        {
+            xsign = signbit(s_x[i].real());
+            ysign = signbit(s_x[i].imag());
+            
+            // for our particular gray coding, we flip the 1<->0
+            xsign = xsign ^ 1;
+            ysign = ysign ^ 1;
+            
+            // and then we can just combine and write it out
+            xsign = (xsign << 1) | ysign;
+            
+            // we overwrite into the real part
+            s_syms[i] = complex<int>(xsign);
+        }
         
+        // load the amble, reuse the workspace
+        for (int t = threadIdx.x; t < amblelength; t += blockDim.x)
+        {
+            s_amble[t] = d_amble[t];
+        }
+        __syncthreads();
+        
+        // then we scan over the search, with rotations
+        int si; // search index
+        int matches[4];
+        int sym;
+        
+        for (int i = threadIdx.x; i < searchlength; i += blockDim.x)
+        {
+            si = i + searchstart;
+            
+            // manual zeroing
+            matches[0] = 0;
+            matches[1] = 0;
+            matches[2] = 0;
+            matches[3] = 0;
+            
+            
+            for (int j = 0; j < amblelength; j++)
+            {
+                // read and move to stack
+                sym = s_syms[si + j].real(); // remember we wrote into the real part
+                
+                for (int r = 0; r < 4; r++)
+                {
+                    if (r != 0){
+                        // rotate it
+                        sym = rotChain[sym];
+                    }
+                    
+                    // compare the (rotated) symbol to the amble
+                    matches[r] += ((sym == d_amble[j])? 1 : 0);
+
+                } // end of rotations
+            } // end of amble matches accumulation
+            
+            // get the maximum of the matches and write it out
+            int bestRot = 0;
+            int bestMatches = matches[0];
+            for (int m = 1; m < 4; m++)
+            {
+                if (matches[m] > bestMatches)
+                {
+                    bestRot = m;
+                    bestMatches = matches[m];
+                }
+            }
+            s_matches[i] = bestMatches;
+            s_rotation[i] = bestRot;
+            
+        }
+        
+        __syncthreads(); // must sync before comparisons to find best match
+        
+        //// write out
+        //for (int i = threadIdx.x; i < searchlength; i += blockDim.x)
+        //{
+        //    d_matches[i] = s_matches[i];
+        //    d_rotation[i] = s_rotation[i];
+        //}
+        // let's only write out the best value?
+        
+        // get the best match
+        int finalRot = s_rotation[0];
+        int finalMatch = s_matches[0];
+        for (int i = 1; i < searchlength; i++)
+        {
+            if (s_matches[i] > finalMatch)
+            {
+                finalRot = s_rotation[i];
+                finalMatch = s_matches[i];
+            }
+        }
+        
+        // write only the best rotation/match out
+        if (threadIdx.x == 0)
+        {
+            d_matches[blockIdx.x] = finalMatch;
+            d_rotation[blockIdx.x] = finalRot;
+        } 
+        
+        // write the correct rotation back out
+        for (int i = threadIdx.x; i < xlength; i += blockDim.x)
+        {
+            sym = s_syms[i].real();
+            for (int r = 0; r < finalRot; r++)
+            {
+                sym = rotChain[sym];
+            }
+            d_syms[i + blockIdx.x*xlength] = sym;
+            
+        }
 
      
     }
     ''', '''lockPhase_mapSyms_singleBlkKernel_qpsk''')
     
     class CupyDemodulatorQPSK:
-        def __init__(self, cluster_threshold: float=0.1):
+        def __init__(self, batchLength: int, cluster_threshold: float=0.1, batch_size: int=4096):
             self.m = 4
             self.cluster_threshold = cluster_threshold
-            # self.const = self.pskdicts[self.m]
-            # self.normVecs = self.const.view(np.float64).reshape((-1,2))
-            # self.bitmap = self.pskbitmaps[self.m] if bitmap is None else bitmap
-            # self.cluster_threshold = cluster_threshold
+            self.batch_size = batch_size
+            self.batchLength = batchLength
+            
+            # One-time pre-allocation
+            self.d_reim_batch = cp.zeros((batch_size, batchLength), dtype=cp.complex64)
+            self.d_reimc_batch = cp.zeros((batch_size, batchLength), dtype=cp.complex64)
+            self.d_syms_batch = cp.zeros((batch_size, batchLength), dtype=cp.int32)
+            self.d_bestMatches = cp.zeros((batch_size), dtype=cp.int32)
+            self.d_bestRotations = cp.zeros((batch_size), dtype=cp.int32)
+            
+            # Counter for batching
+            self.bctr = 0
             
             # # Interrim output
             # self.xeo = None # Selected eye-opening resample points
@@ -599,84 +742,62 @@ try:
             # self.syms = None # Output mapping to each symbol (0 to M-1)
             # self.matches = None # Output from amble rotation search
             
-        def getEyeOpening(self, x: cp.ndarray, osr: int, abs_x: cp.ndarray=None):
+        def getEyeOpening(self, x: cp.ndarray, osr: int, abs_x: cp.ndarray):
             ## This is just a straight np to cp conversion.. Verified!
-            if abs_x is None:
-                abs_x = cp.abs(x) # Provide option for pre-computed (often used elsewhere anyway)
+
             x_rs_abs = abs_x.reshape((-1, osr))
             self.eo_metric = cp.mean(x_rs_abs, axis=0)
             i = cp.argmax(self.eo_metric)
             x_rs = x.reshape((-1, osr))
             return x_rs[:,i], i
-            
-        def mapSyms(self, reimc: np.ndarray):
-            pass
         
-        def lockPhase(self, reim: cp.ndarray): 
-            # Allocate output
-            d_reimc = cp.zeros(reim.size, dtype=cp.complex64)
+        def gather(self, reim: cp.ndarray):
+            self.d_reim_batch[self.bctr,:] = reim
+            self.bctr = self.bctr + 1
             
+        def resetBatch(self):
+            self.bctr = 0
+            
+        def demodBatch(self, amble: cp.ndarray, searchStart: int=0, searchlength: int=128):
             THREADS_PER_BLOCK = 128
-            NUM_BLOCKS = 1
+            NUM_BLOCKS = self.bctr
             
             # Check shared memory requirements
-            smReq = THREADS_PER_BLOCK * 4 + reim.nbytes
+            workspaceSize = np.max([THREADS_PER_BLOCK * 4, (searchlength*2 + amble.size)*4])
+            smReq = self.batchLength * 8 + workspaceSize # THREADS_PER_BLOCK * 4 + reim.nbytes
             if smReq > 48000:
                 raise MemoryError("Shared memory requested exceeded 48kB.")
             
             lockPhase_mapSyms_singleBlkKernel_qpsk((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
-                               (reim, reim.size, d_reimc),
+                               (self.d_reim_batch, self.batchLength, amble, amble.size, 0, 128,
+                                self.d_reimc_batch, self.d_syms_batch,
+                                self.d_bestMatches, self.d_bestRotations),
                                shared_mem=smReq)
             
-            return d_reimc
-            
-            # # Power into BPSK
-            # powerup = self.m // 2
-            # reimp = reim**powerup
-            
-            # # Form the square product
-            # reimpr = reimp.view(np.float32).reshape((-1,2)).T
-            # reimsq = reimpr @ reimpr.T
-            
-            # # SVD
-            # u, s, vh = np.linalg.svd(reimsq) # Don't need vh technically
-            # # Check the svd metrics
-            # svd_metric = s[-1] / s[:-1] # Deal with this later when there is residual frequency
-            # if np.any(svd_metric > self.cluster_threshold):
-            #     warnings.warn("Constellation not well clustered. There may be residual frequency shifts.")
-            # # Angle correction
-            # angleCorrection = np.arctan2(u[1,0], u[0,0])
-            # reimc = self.correctPhase(reim, -angleCorrection/powerup)
-            
-            # return reimc, svd_metric, angleCorrection
+            return self.d_reimc_batch, self.d_syms_batch, self.d_bestMatches, self.d_bestRotations
         
-        def correctPhase(self, reim: np.ndarray, phase: float):
-            return reim * np.exp(1j * phase)
+        # def demod(self, reim: cp.ndarray, amble: cp.ndarray, searchStart: int=0, searchlength: int=128):
+        #     # Allocate output
+        #     d_reimc = cp.zeros(reim.size, dtype=cp.complex64)
+        #     d_syms = cp.zeros(reim.size, dtype=cp.int32)
+        #     d_matches = cp.zeros(searchlength, dtype=cp.int32)
+        #     d_rotation = cp.zeros(searchlength, dtype=cp.int32)
             
+        #     THREADS_PER_BLOCK = 128
+        #     NUM_BLOCKS = 1
+            
+        #     # Check shared memory requirements
+        #     workspaceSize = np.max([THREADS_PER_BLOCK * 4, (searchlength*2 + amble.size)*4])
+        #     smReq = reim.nbytes + workspaceSize # THREADS_PER_BLOCK * 4 + reim.nbytes
+        #     if smReq > 48000:
+        #         raise MemoryError("Shared memory requested exceeded 48kB.")
+            
+        #     lockPhase_mapSyms_singleBlkKernel_qpsk((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+        #                        (reim, reim.size, amble, amble.size, 0, 128, d_reimc, d_syms, d_matches, d_rotation),
+        #                        shared_mem=smReq)
+            
+        #     return d_reimc, d_syms, d_matches, d_rotation
         
-        def demod(self, x: cp.ndarray, osr: int, abs_x: cp.ndarray=None):
-            if x.dtype != cp.complex64:
-                raise TypeError("Input array must be complex64.")
-            
-            # Get eye-opening first
-            xeo, xeo_i = self.getEyeOpening(x, osr, abs_x)
-            
-            # Collect into large batch?
-            
-            
-            # Correct the global phase first
-            reim = np.ascontiguousarray(xeo)
-            self.reimc, self.svd_metric, self.angleCorrection = self.lockPhase(reim)
-
-            # Generic method: dot product with the normalised vectors
-            self.syms = self.mapSyms(self.reimc)
-
-        
-            
-            return self.syms
-        
-        def ambleRotate(self, amble: np.ndarray, search: np.ndarray=None, syms: np.ndarray=None):
-            pass
         
         def symsToBits(self, syms: np.ndarray=None):
             pass

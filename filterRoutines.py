@@ -92,10 +92,10 @@ void upfirdn(
 ''', '''upfirdn''')
 
 def cupyUpfirdn(x: cp.ndarray, taps: cp.ndarray, up: int, down: int):
-    if x.dtype != cp.complex64:
-        raise TypeError("x is expected to be type complex64.")
-    if taps.dtype != cp.float32:
-        raise TypeError("taps is expected to be type float32.")
+    # if x.dtype != cp.complex64:
+    #     raise TypeError("x is expected to be type complex64.")
+    # if taps.dtype != cp.float32:
+    #     raise TypeError("taps is expected to be type float32.")
         
     # Allocate output
     out = cp.zeros(x.size * up // down, dtype=cp.complex64)

@@ -445,6 +445,12 @@ class SimpleDemodulator8PSK(SimpleDemodulatorPSK):
 #%% Cupy version of simple demodulators
 try:
     import cupy as cp
+    import os
+
+    
+    # Raw kernel to get many eye openings at once as a batch
+    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "eyeOpeningKernel.cu"), "r") as fid:    
+        eyeOpeningBatchKernel = cp.RawKernel(fid.read(), '''getEyeOpening_batch''')
     
     # Raw kernel to lock phase and map syms together
     # NOTE: assuming the entire signal fits in shared memory
@@ -730,7 +736,9 @@ try:
             self.d_bestRotations = cp.zeros((batch_size), dtype=cp.int32)
             
             # Counter for batching
-            self.bctr = 0
+            # self.actr = 0 # Batching for eye-opening
+            self.bctr = 0 # Batching for demodulation
+            # Note that they should be the same at the end
             
             # # Interrim output
             # self.xeo = None # Selected eye-opening resample points
@@ -742,14 +750,32 @@ try:
             # self.syms = None # Output mapping to each symbol (0 to M-1)
             # self.matches = None # Output from amble rotation search
             
+        def getEyeOpeningBatch(self, xbatch: cp.ndarray, osr: int, abs_xbatch: cp.ndarray, count: int=None):
+            THREADS_PER_BLOCK = 128
+            NUM_BLOCKS = count if count is not None else xbatch.shape[0]
+            # Update the counter
+            self.bctr = NUM_BLOCKS
+            
+            # simple shared memory requirements
+            smReq = THREADS_PER_BLOCK * osr * 4
+            
+            # Invoke kernel
+            eyeOpeningBatchKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                               (abs_xbatch, abs_xbatch.shape[1], osr, xbatch,
+                                self.d_reim_batch),
+                               shared_mem=smReq)
+            
+            
+            
         def getEyeOpening(self, x: cp.ndarray, osr: int, abs_x: cp.ndarray):
             ## This is just a straight np to cp conversion.. Verified!
 
             x_rs_abs = abs_x.reshape((-1, osr))
-            self.eo_metric = cp.mean(x_rs_abs, axis=0)
-            i = cp.argmax(self.eo_metric)
-            x_rs = x.reshape((-1, osr))
-            return x_rs[:,i], i
+            self.eo_metric = cp.sum(x_rs_abs, axis=0)
+            # i = cp.argmax(self.eo_metric)
+            # i = np.argmax(self.eo_metric.get()) # This is definitely slower
+            # x_rs = x.reshape((-1, osr))
+            # return x_rs[:,i], i
         
         def gather(self, reim: cp.ndarray):
             self.d_reim_batch[self.bctr,:] = reim
@@ -808,8 +834,8 @@ try:
         def packBinaryBytesToBits(self, unpacked: np.ndarray):
             pass
             
-except:
-    print("Skipping imports of cupy demodulators.")
+except Exception as e:
+    print("%s\nSkipping imports of cupy demodulators." % str(e))
     
 
 

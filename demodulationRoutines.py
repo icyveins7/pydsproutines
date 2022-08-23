@@ -458,19 +458,21 @@ try:
         lockPhase_mapSyms_singleBlkKernel_qpsk = cp.RawKernel(fid.read(), '''lockPhase_mapSyms_singleBlkKernel_qpsk''')
     
     class CupyDemodulatorQPSK:
-        def __init__(self, batchLength: int, cluster_threshold: float=0.1, batch_size: int=4096):
+        def __init__(self, batchLength: int, numBitsPerBurst: int, cluster_threshold: float=0.1, batch_size: int=4096):
             self.m = 4
             self.cluster_threshold = cluster_threshold
             self.batch_size = batch_size
             self.batchLength = batchLength
+            self.numBitsPerBurst = numBitsPerBurst # Note that this number is twice the number of symbols used, since QPSK
             
             # One-time pre-allocation
             self.d_reim_batch = cp.zeros((batch_size, batchLength), dtype=cp.complex64)
             self.d_reimc_batch = cp.zeros((batch_size, batchLength), dtype=cp.complex64)
-            self.d_syms_batch = cp.zeros((batch_size, batchLength), dtype=cp.int32)
+            self.d_syms_batch = cp.zeros((batch_size, batchLength), dtype=cp.uint32)
             self.d_bestMatches = cp.zeros((batch_size), dtype=cp.int32)
             self.d_bestRotations = cp.zeros((batch_size), dtype=cp.int32)
             self.d_bestMatchIdx = cp.zeros((batch_size), dtype=cp.int32)
+            self.d_bits_batch = cp.zeros((batch_size, numBitsPerBurst), dtype=cp.uint8)
             
             # Counter for batching
             # self.actr = 0 # Batching for eye-opening
@@ -534,10 +536,11 @@ try:
             lockPhase_mapSyms_singleBlkKernel_qpsk((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
                                (self.d_reim_batch, self.batchLength, amble, amble.size, 0, 128,
                                 self.d_reimc_batch, self.d_syms_batch,
-                                self.d_bestMatches, self.d_bestRotations, self.d_bestMatchIdx),
+                                self.d_bestMatches, self.d_bestRotations, self.d_bestMatchIdx,
+                                self.d_bits_batch, self.numBitsPerBurst),
                                shared_mem=smReq)
             
-            return self.d_reimc_batch, self.d_syms_batch, self.d_bestMatches, self.d_bestRotations, self.d_bestMatchIdx
+            return self.d_reimc_batch, self.d_syms_batch, self.d_bestMatches, self.d_bestRotations, self.d_bestMatchIdx, self.d_bits_batch
         
         # def demod(self, reim: cp.ndarray, amble: cp.ndarray, searchStart: int=0, searchlength: int=128):
         #     # Allocate output

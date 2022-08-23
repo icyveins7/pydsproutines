@@ -1,4 +1,5 @@
 #include <cupy/complex.cuh>
+
 extern "C" __global__
 void lockPhase_mapSyms_singleBlkKernel_qpsk(
     const complex<float> *d_x,
@@ -8,10 +9,11 @@ void lockPhase_mapSyms_singleBlkKernel_qpsk(
     const int searchstart,
     const int searchlength,
     complex<float> *d_reimc,
-    int *d_syms,
+    unsigned int *d_syms,
     int *d_matches,
     int *d_rotation,
-    int *d_matchIdx)
+    int *d_matchIdx,
+    unsigned char *d_bits, int bitslen)
 {
     /* Note that in the batch, the blockIdx is the batch index */
  
@@ -252,9 +254,30 @@ void lockPhase_mapSyms_singleBlkKernel_qpsk(
         {
             sym = rotChain[sym];
         }
+        // for use later, we overwrite in the shared memory as well
+        s_syms[i].real(sym);
+        
+        // finally write it out to global
         d_syms[i + blockIdx.x*xlength] = sym;
         
     }
+    
+    __syncthreads(); // must sync as each thread accesses a different bank in the following section
+    
+    // For QPSK, each symbol (which occupies 32 bits now) is 2 bits (which we are saving unpacked to 2*8=16 bits)
+    // Each thread reads 1 bank ie 32 bits, writes 16 bits (coalesced, but not fully optimal)
+    unsigned short twobits;
+    unsigned short *write_ptr;
+    for (int i = threadIdx.x; i < bitslen / 2; i += blockDim.x) // don't forget /2 for QPSK here
+    {
+        sym = s_syms[i + finalIdx + amblelength].real();
+        // twobits = ((sym & 0x2) << 7) | (sym & 0x1); // the second bit only needs to move by 7
+        twobits = ((sym & 0x1) << 8) | ((sym & 0x2) >> 1) ; // may be this, depending on endianness?
+        write_ptr = (unsigned short*)&d_bits[blockIdx.x*bitslen + i*2]; // cast it to a short
+        *write_ptr = twobits; // write the 16 bits
+    }
+    
+    
 
  
 }

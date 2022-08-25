@@ -250,6 +250,9 @@ class SortedFolderReader(FolderReader):
         if ensure_incremental:
             assert(np.all(np.diff(self.filetimes)==1))
             
+    def skipToTime(self, start):
+        self.fidx = np.argwhere(self.filetimes == start)[0,0]
+            
     def getPathByTime(self, reqTime):
         return self.filepaths[np.argwhere(self.filetimes == reqTime).flatten()[0]]
     

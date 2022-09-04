@@ -135,7 +135,7 @@ def plotHeatmap(heatmap, x0, y0, width, height, ax=None, aspect='auto', vmin=Non
 
     return fig, ax
 
-def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None):
+def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None, autoBorder=False):
     '''
     This is a useful tool to overlay heatmaps onto normal scatter plots,
     in the mathematical x-y axis (unlike the conventional image axis which has y-axis flipped).
@@ -144,9 +144,19 @@ def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None):
     x0,y0 : coordinates of bottom-left most point.
     width, height: scale of the heatmap.
     imgLvls: list_like, passed to img.setLevels(), specifies colour limits to values
+    autoBorder: configures whether to pad half a bin width around the image, usually the data is generated around the bin 'centres', so this is required
     '''
     if window is None:
         window = pg.plot()
+    
+    if autoBorder:
+        # Correct for half the bin widths
+        xstep = width / heatmap.shape[0]
+        ystep = height / heatmap.shape[1]
+        width = width + xstep
+        height = height + ystep
+        x0 = x0 - xstep/2
+        y0 = y0 - ystep/2
     
     # create image item
     img = pg.ImageItem(heatmap)

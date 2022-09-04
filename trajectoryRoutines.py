@@ -227,6 +227,34 @@ class Transmitter(Transceiver):
         range2 = np.linalg.norm(rx2.x - self.x, axis=1)
         return range2 - range1
     
+    def plotHyperbolaFlat(self, rx1: Receiver, rx2: Receiver, rangediff: float=None, z: float=0):
+        if rangediff is None:
+            rangediff = self.theoreticalRangeDiff(rx1, rx2)
+            
+        # Spawn points around the 'closer' receiver
+        crx = rx2 if rangediff < 0 else rx1
+        startpt = np.array([crx.x[0,0], crx.x[0,1], z])
+        
+        # Find the gradient of the range diff function
+        # r2 - r1 - rd = f(x)
+        # grad f(x) = (x-s2)/r2 - (x-s1)/r1
+        s2x = rx2.x[0]
+        s1x = rx1.x[0]
+        grad = lambda x: ((x-s2x)/np.linalg.norm(s2x) - (x-s1x)/np.linalg.norm(s1x)) * (np.linalg.norm(s2x-x) - np.linalg.norm(s1x-x) - rangediff) / np.abs((np.linalg.norm(s2x-x) - np.linalg.norm(s1x-x) - rangediff))
+        
+        print(grad(startpt))
+        
+        step = 0.1
+        epsilon = 1e-10
+        # Gradient descent to the point
+        # TODO: THIS SEEMS CORRECT, BUT NEED TO ADAPT STEP SIZE
+        while np.linalg.norm(grad(startpt)) > epsilon:
+            startpt = startpt - step * grad(startpt)
+            print(startpt)
+            breakpoint()
+        print(startpt)
+        
+    
 #%%
 if __name__ == "__main__":
     from plotRoutines import *
@@ -242,12 +270,15 @@ if __name__ == "__main__":
     
     from localizationRoutines import *
     lightspd = 299792458.0
+    xr = np.arange(-5,5,0.1)
+    yr = np.arange(-3,3,0.1)
     costgrid = gridSearchTDOA(rxA.x, rxB.x, rd / lightspd, np.array([1e-9]),
-                            np.arange(-5,5,0.1),
-                            np.arange(-5,5,0.1),
-                            0)
+                            xr, yr, 0)
     
-    pgPlotHeatmap(np.exp(-costgrid.reshape((100,100)).T), -5, -5, 10, 10, window=ax)
+    pgPlotHeatmap(np.exp(-costgrid.reshape((yr.size,xr.size)).T), xr[0], yr[0], xr[-1]-xr[0], yr[-1]-yr[0], window=ax, autoBorder=True)
+    
+    # Test hyperbola plots
+    tx.plotHyperbolaFlat(rxA, rxB)
     
     
     

@@ -245,14 +245,64 @@ class Transmitter(Transceiver):
         print(grad(startpt))
         
         step = 0.1
-        epsilon = 1e-10
+        epsilon = 1e-8
+        initgrad = np.zeros(3)
+        
+        history = [startpt]
         # Gradient descent to the point
         # TODO: THIS SEEMS CORRECT, BUT NEED TO ADAPT STEP SIZE
-        while np.linalg.norm(grad(startpt)) > epsilon:
-            startpt = startpt - step * grad(startpt)
+        while np.abs((np.linalg.norm(s2x-startpt) - np.linalg.norm(s1x-startpt) - rangediff)) != 0 and np.linalg.norm(grad(startpt)) * step > epsilon:
+            newgrad = grad(startpt)
+            if np.dot(initgrad, newgrad) < 0:
+                print('gradient reversed')
+                # Lower stepsize a bit
+                step = step / 2 # TODO: to optimise
+            startpt = startpt - step * newgrad
+            history.append(startpt)
+            initgrad = newgrad
+            
             print(startpt)
-            breakpoint()
-        print(startpt)
+            
+        print(grad(startpt))
+        
+        # Find an orthogonal vector to the gradient in the plane
+        hz = 0 # This is constant for our flat, non-angled plane, regardless of z-value
+        # Vector satisfies g . h = 0, so gx * hx + gy * hy = 0
+        # Hence hy = -gx/gy hx
+        hx = 1.0
+        g = grad(startpt)
+        if g[1] == 0.0:
+            hy = 1.0
+            hx = 0.0
+        else:
+            hy = -g[0] / g[1]
+        
+        h = np.array([hx, hy, hz])
+        h = h / np.linalg.norm(h) # Normalise
+        print(h)
+        
+        # Move by the orthogonal vector in a certain step, then gradient descent again
+        ortho_step = 0.1
+        pt = startpt + h * ortho_step
+        
+        # New gradient descent
+        initgrad = np.zeros(3)
+        step = 0.1
+        while np.abs((np.linalg.norm(s2x-pt) - np.linalg.norm(s1x-pt) - rangediff)) != 0 and np.linalg.norm(grad(pt)) * step > epsilon:
+            newgrad = grad(pt)
+            if np.dot(initgrad, newgrad) < 0:
+                # print('gradient reversed')
+                # Lower stepsize a bit
+                step = step / 2 # TODO: to optimise
+            pt = pt - step * newgrad
+            # history.append(startpt)
+            initgrad = newgrad
+            
+        print(pt)
+            
+        
+        
+        return history, startpt, pt
         
     
 #%%
@@ -261,7 +311,7 @@ if __name__ == "__main__":
     closeAllFigs()
     rxA = Receiver.asStationary(np.array([[-1,0,0]]), np.array([0]))
     rxB = Receiver.asStationary(np.array([[+1,0,0]]), np.array([0]))
-    tx = Transmitter.asStationary(np.array([[0.5,0,0]]), np.array([0]))
+    tx = Transmitter.asStationary(np.array([[0.51,0,0]]), np.array([0]))
     
     rd = tx.theoreticalRangeDiff(rxA, rxB)
     print(rd)
@@ -278,7 +328,9 @@ if __name__ == "__main__":
     pgPlotHeatmap(np.exp(-costgrid.reshape((yr.size,xr.size)).T), xr[0], yr[0], xr[-1]-xr[0], yr[-1]-yr[0], window=ax, autoBorder=True)
     
     # Test hyperbola plots
-    tx.plotHyperbolaFlat(rxA, rxB)
+    history, startpt, pt = tx.plotHyperbolaFlat(rxA, rxB)
+    ax.plot([startpt[0]], [startpt[1]], pen=None, symbol='x')
+    ax.plot([pt[0]], [pt[1]], pen=None, symbol='x')
     
     
     

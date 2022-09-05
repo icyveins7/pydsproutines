@@ -11,6 +11,46 @@ from scipy.stats.distributions import chi2
 from numba import jit
 import time
 
+#%% Hyperbola routines
+def hyperbolaGradDesc(pt, s1, s2, rangediff, step, epsilon):
+    # Define the gradient function for the hyperbola cost
+    grad = lambda x: ((x-s2)/np.linalg.norm(s2) - (x-s1)/np.linalg.norm(s1)) * (np.linalg.norm(s2-x) - np.linalg.norm(s1-x) - rangediff) / np.abs((np.linalg.norm(s2-x) - np.linalg.norm(s1-x) - rangediff))
+    
+    history = [pt]
+    initgrad = np.zeros(3)
+    while np.abs((np.linalg.norm(s2-pt) - np.linalg.norm(s1-pt) - rangediff)) != 0 and np.linalg.norm(grad(pt)) * step > epsilon:
+        newgrad = grad(pt)
+        if np.dot(initgrad, newgrad) < 0:
+            print('gradient reversed')
+            # Lower stepsize a bit
+            step = step / 2 # TODO: to optimise
+        pt = pt - step * newgrad
+        history.append(pt)
+        initgrad = newgrad
+
+    return history
+
+def generateHyperbolaFlat(
+        rangediff: float,
+        s1: np.ndarray, s2: np.ndarray, z: float=0, startpt: np.ndarray=None,
+        initstep: float=0.1, epsilon: float=1e-8, orthostep:float = 0.1):
+    
+    if startpt is None:
+        # Generate a start point by the mid-point of the two sensors
+        startpt = (s1+s2) / 2.0
+        startpt[2] = z # Fix the z-value
+       
+    # Begin the gradient descent for the start point
+    startHistory = hyperbolaGradDesc(startpt, s1, s2, rangediff, initstep, epsilon)
+    
+    
+    
+    
+    
+    
+    
+
+
 #%%
 def gridSearchBlindLinearRTT(
         tx_list: np.ndarray,

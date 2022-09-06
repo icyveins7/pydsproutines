@@ -218,7 +218,7 @@ class Receiver(Transceiver):
 ##########################    
 class Transmitter(Transceiver):
     def __init__(self, x: np.ndarray, xdot: np.ndarray, t: np.ndarray,
-                 symbol: str='x', symbolBrush: str='b', symbolPen: str='b'):
+                 symbol: str='o', symbolBrush: str='b', symbolPen: str='b'):
         super().__init__(x, xdot, t, symbol, symbolBrush, symbolPen)
     
     def theoreticalRangeDiff(self, rx1: Receiver, rx2: Receiver):
@@ -248,9 +248,10 @@ class Transmitter(Transceiver):
 if __name__ == "__main__":
     from plotRoutines import *
     closeAllFigs()
-    rxA = Receiver.asStationary(np.array([[-1,0,0]]), np.array([0]))
-    rxB = Receiver.asStationary(np.array([[+1,0,0]]), np.array([0]))
-    tx = Transmitter.asStationary(np.array([[-0.51,0,0]]), np.array([0]))
+    rxHeight = 1
+    rxA = Receiver.asStationary(np.array([[-1,0,rxHeight]]), np.array([0]))
+    rxB = Receiver.asStationary(np.array([[+1,0,rxHeight]]), np.array([0]))
+    tx = Transmitter.asStationary(np.array([[2.51,0,0]]), np.array([0]))
     
     rd = tx.theoreticalRangeDiff(rxA, rxB)
     print(rd)

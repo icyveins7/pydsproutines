@@ -21,6 +21,7 @@ def hyperbolaGradDesc(pt, s1, s2, rangediff, step, epsilon, verb=True):
     count = 0
     while np.abs((np.linalg.norm(s2-pt) - np.linalg.norm(s1-pt) - rangediff)) != 0 and np.linalg.norm(hyperboloidGradient(pt, s1, s2, rangediff)) * step > epsilon:
         newgrad = hyperboloidGradient(pt, s1, s2, rangediff)
+        print(newgrad)
         if np.dot(initgrad, newgrad) < 0:
             # print('gradient reversed')
             # Lower stepsize a bit

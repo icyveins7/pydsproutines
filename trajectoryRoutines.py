@@ -8,6 +8,7 @@ Created on Thu Apr 30 11:59:47 2020
 import time
 import numpy as np
 import pyqtgraph as pg
+from localizationRoutines import *
 
 try:
     import cupy as cp
@@ -227,82 +228,20 @@ class Transmitter(Transceiver):
         range2 = np.linalg.norm(rx2.x - self.x, axis=1)
         return range2 - range1
     
-    def plotHyperbolaFlat(self, rx1: Receiver, rx2: Receiver, rangediff: float=None, z: float=0):
+    def plotHyperbolaFlat(self, rx1: Receiver, rx2: Receiver, rangediff: float=None, z: float=0, ax: pg.PlotItem=None):
         if rangediff is None:
             rangediff = self.theoreticalRangeDiff(rx1, rx2)
             
-        # Spawn points around the 'closer' receiver
-        crx = rx2 if rangediff < 0 else rx1
-        startpt = np.array([crx.x[0,0], crx.x[0,1], z])
+        hyperbola = generateHyperbolaXY(20, rangediff, rx1.x[0], rx2.x[0])
         
-        # Find the gradient of the range diff function
-        # r2 - r1 - rd = f(x)
-        # grad f(x) = (x-s2)/r2 - (x-s1)/r1
-        s2x = rx2.x[0]
-        s1x = rx1.x[0]
-        grad = lambda x: ((x-s2x)/np.linalg.norm(s2x) - (x-s1x)/np.linalg.norm(s1x)) * (np.linalg.norm(s2x-x) - np.linalg.norm(s1x-x) - rangediff) / np.abs((np.linalg.norm(s2x-x) - np.linalg.norm(s1x-x) - rangediff))
-        
-        print(grad(startpt))
-        
-        step = 0.1
-        epsilon = 1e-8
-        initgrad = np.zeros(3)
-        
-        history = [startpt]
-        # Gradient descent to the point
-        # TODO: THIS SEEMS CORRECT, BUT NEED TO ADAPT STEP SIZE
-        while np.abs((np.linalg.norm(s2x-startpt) - np.linalg.norm(s1x-startpt) - rangediff)) != 0 and np.linalg.norm(grad(startpt)) * step > epsilon:
-            newgrad = grad(startpt)
-            if np.dot(initgrad, newgrad) < 0:
-                print('gradient reversed')
-                # Lower stepsize a bit
-                step = step / 2 # TODO: to optimise
-            startpt = startpt - step * newgrad
-            history.append(startpt)
-            initgrad = newgrad
+        if ax is None:
+            fig = pg.GraphicsLayoutWidget()
+            ax = fig.addPlot()
             
-            print(startpt)
-            
-        print(grad(startpt))
+        hypItem = ax.plot(hyperbola[:,0], hyperbola[:,1], pen='k')
+        hypItem.setSymbol
         
-        # Find an orthogonal vector to the gradient in the plane
-        hz = 0 # This is constant for our flat, non-angled plane, regardless of z-value
-        # Vector satisfies g . h = 0, so gx * hx + gy * hy = 0
-        # Hence hy = -gx/gy hx
-        hx = 1.0
-        g = grad(startpt)
-        if g[1] == 0.0:
-            hy = 1.0
-            hx = 0.0
-        else:
-            hy = -g[0] / g[1]
-        
-        h = np.array([hx, hy, hz])
-        h = h / np.linalg.norm(h) # Normalise
-        print(h)
-        
-        # Move by the orthogonal vector in a certain step, then gradient descent again
-        ortho_step = 0.1
-        pt = startpt + h * ortho_step
-        
-        # New gradient descent
-        initgrad = np.zeros(3)
-        step = 0.1
-        while np.abs((np.linalg.norm(s2x-pt) - np.linalg.norm(s1x-pt) - rangediff)) != 0 and np.linalg.norm(grad(pt)) * step > epsilon:
-            newgrad = grad(pt)
-            if np.dot(initgrad, newgrad) < 0:
-                # print('gradient reversed')
-                # Lower stepsize a bit
-                step = step / 2 # TODO: to optimise
-            pt = pt - step * newgrad
-            # history.append(startpt)
-            initgrad = newgrad
-            
-        print(pt)
-            
-        
-        
-        return history, startpt, pt
+        return hyperbola, hypItem
         
     
 #%%
@@ -311,7 +250,7 @@ if __name__ == "__main__":
     closeAllFigs()
     rxA = Receiver.asStationary(np.array([[-1,0,0]]), np.array([0]))
     rxB = Receiver.asStationary(np.array([[+1,0,0]]), np.array([0]))
-    tx = Transmitter.asStationary(np.array([[0.51,0,0]]), np.array([0]))
+    tx = Transmitter.asStationary(np.array([[-0.51,0,0]]), np.array([0]))
     
     rd = tx.theoreticalRangeDiff(rxA, rxB)
     print(rd)
@@ -328,9 +267,8 @@ if __name__ == "__main__":
     pgPlotHeatmap(np.exp(-costgrid.reshape((yr.size,xr.size)).T), xr[0], yr[0], xr[-1]-xr[0], yr[-1]-yr[0], window=ax, autoBorder=True)
     
     # Test hyperbola plots
-    history, startpt, pt = tx.plotHyperbolaFlat(rxA, rxB)
-    ax.plot([startpt[0]], [startpt[1]], pen=None, symbol='x')
-    ax.plot([pt[0]], [pt[1]], pen=None, symbol='x')
+    hyperbola, hypItem = tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
+    hypItem.setSymbol('x')
     
     
     

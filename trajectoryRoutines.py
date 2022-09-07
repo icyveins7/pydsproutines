@@ -246,12 +246,14 @@ class Transmitter(Transceiver):
     
 #%%
 if __name__ == "__main__":
+    from timingRoutines import Timer
+    timer = Timer()
     from plotRoutines import *
     closeAllFigs()
     rxHeight = 1
-    rxA = Receiver.asStationary(np.array([[-1,0,rxHeight]]), np.array([0]))
-    rxB = Receiver.asStationary(np.array([[+1,0,rxHeight]]), np.array([0]))
-    tx = Transmitter.asStationary(np.array([[2.51,0,0]]), np.array([0]))
+    rxA = Receiver.asStationary(np.array([[0,-1,rxHeight]]), np.array([0]))
+    rxB = Receiver.asStationary(np.array([[0,+1,rxHeight]]), np.array([0]))
+    tx = Transmitter.asStationary(np.array([[0, 1.51, 0]]), np.array([0]))
     
     rd = tx.theoreticalRangeDiff(rxA, rxB)
     print(rd)
@@ -268,7 +270,9 @@ if __name__ == "__main__":
     pgPlotHeatmap(np.exp(-costgrid.reshape((yr.size,xr.size)).T), xr[0], yr[0], xr[-1]-xr[0], yr[-1]-yr[0], window=ax, autoBorder=True)
     
     # Test hyperbola plots
+    timer.start()
     hyperbola, hypItem = tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
+    timer.end()
     hypItem.setSymbol('x')
     
     

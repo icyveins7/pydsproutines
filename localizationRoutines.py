@@ -12,16 +12,40 @@ from numba import jit
 import time
 
 #%% Hyperbola routines
-def hyperboloidGradient(x, s1, s2, rangediff):
-    return ((x-s2)/np.linalg.norm(s2) - (x-s1)/np.linalg.norm(s1)) * (np.linalg.norm(s2-x) - np.linalg.norm(s1-x) - rangediff) / np.abs((np.linalg.norm(s2-x) - np.linalg.norm(s1-x) - rangediff))
+def rangeOfArrival(x, s_i):
+    rho = np.linalg.norm(x-s_i)
+    return rho
 
-def hyperbolaGradDesc(pt, s1, s2, rangediff, step, epsilon, verb=True):
+def rangeOfArrivalGradient(x, s_i):
+    rho = rangeOfArrival(x, s_i)
+    return (x - s_i) / rho
+
+def hyperboloidGradient(x, s1, s2, rangediff):
+    rho1 = rangeOfArrival(x, s1)
+    rho2 = rangeOfArrival(x, s2)
+    g = 2*(rho2 - rho1 - rangediff) * (rangeOfArrivalGradient(x, s2) - rangeOfArrivalGradient(x, s1))
+    return g
+
+# def hyperboloidGradient(x, s1, s2, rangediff):
+#     return ((x-s2)/np.linalg.norm(s2) - (x-s1)/np.linalg.norm(s1)) * (np.linalg.norm(s2-x) - np.linalg.norm(s1-x) - rangediff) / np.abs((np.linalg.norm(s2-x) - np.linalg.norm(s1-x) - rangediff))
+
+def hyperbolaGradDesc(pt, s1, s2, rangediff, step, epsilon, surfaceNorm=np.array([0,0,1]), verb=False):
+    # Note that default surface normal vector is parallel to axis,
+    # ie the default is planes parallel to XY.
+    
+    # Ensure surfaceNorm is unit vector
+    surfaceNorm = surfaceNorm / np.linalg.norm(surfaceNorm)
+    
     history = [pt]
     initgrad = np.zeros(3)
     count = 0
     while np.abs((np.linalg.norm(s2-pt) - np.linalg.norm(s1-pt) - rangediff)) != 0 and np.linalg.norm(hyperboloidGradient(pt, s1, s2, rangediff)) * step > epsilon:
         newgrad = hyperboloidGradient(pt, s1, s2, rangediff)
-        print(newgrad)
+        # Project onto the surface
+        newgrad = newgrad - np.dot(surfaceNorm, newgrad)*surfaceNorm
+        # Re-normalise (wow)
+        newgrad = newgrad / np.linalg.norm(newgrad)
+        # print(newgrad)
         if np.dot(initgrad, newgrad) < 0:
             # print('gradient reversed')
             # Lower stepsize a bit

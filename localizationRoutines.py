@@ -55,35 +55,10 @@ def hyperbolaGradDesc(pt, s1, s2, rangediff, step, epsilon, surfaceNorm=np.array
     g = hyperboloidGradient(pt, s1, s2, rangediff) # Calculate gradient at the point, use as a line
     g = g - np.dot(surfaceNorm, g)*surfaceNorm # Project onto surface
     result = sp.optimize.minimize(hyperboloidLineIntersectCostFunc, 0, args=(pt, s1, s2, rangediff, g))
-    val = [result.x*g+pt]
-    # breakpoint()
+    val = result.x*g+pt
+
     return val
     
-    
-    # #### OLD CODE
-    # history = [pt]
-    # initgrad = np.zeros(3)
-    # count = 0
-    # while np.abs((np.linalg.norm(s2-pt) - np.linalg.norm(s1-pt) - rangediff)) != 0 and np.linalg.norm(hyperboloidGradient(pt, s1, s2, rangediff)) * step > epsilon:
-    #     newgrad = hyperboloidGradient(pt, s1, s2, rangediff)
-    #     # Project onto the surface
-    #     newgrad = newgrad - np.dot(surfaceNorm, newgrad)*surfaceNorm
-    #     # Re-normalise (wow)
-    #     newgrad = newgrad / np.linalg.norm(newgrad)
-    #     # print(newgrad)
-    #     if np.dot(initgrad, newgrad) < 0:
-    #         # print('gradient reversed')
-    #         # Lower stepsize a bit
-    #         step = step * 0.25 # TODO: to optimise
-    #     pt = pt - step * newgrad
-    #     history.append(pt)
-    #     initgrad = newgrad
-        
-    #     count += 1
-
-    # if verb:
-    #     print(count)
-    # return history
 
 def hyperbolaTangentXY(pt, s1, s2, rangediff):
     hz = 0 # This is constant for our flat, non-angled plane, regardless of z-value
@@ -113,10 +88,8 @@ def generateHyperbolaXY(
         startpt[2] = z # Fix the z-value
        
     # Begin the gradient descent for the start point
-    startHistory = hyperbolaGradDesc(startpt, s1, s2, rangediff, initstep, epsilon)
+    startpt = hyperbolaGradDesc(startpt, s1, s2, rangediff, initstep, epsilon)
     
-    # Take the final point as the start
-    startpt = startHistory[-1]
     
     # Find the two tangent vectors to it, in the plane
     h_1 = hyperbolaTangentXY(startpt, s1, s2, rangediff)
@@ -125,17 +98,16 @@ def generateHyperbolaXY(
     # Propagate for the number of points
     h = h_1 # Initial tangent vector
     pt = startpt # Initial point
-    pts_1 = []
+    pts_1 = np.zeros((halfNumPts, 3))
     for i in np.arange(halfNumPts):
         # First move by the tangent vector
         pt = pt + h * orthostep
         
         # Then descent back to the hyperbola
-        ptHistory = hyperbolaGradDesc(pt, s1, s2, rangediff, initstep, epsilon)
+        pt = hyperbolaGradDesc(pt, s1, s2, rangediff, initstep, epsilon)
         
         # Accumulate the point
-        pts_1.insert(0,ptHistory[-1]) # For this one we append to the front, due to the way we combine later
-        pt = ptHistory[-1]
+        pts_1[-i-1] = pt
         
         # Get the new tangent vector
         hnew = hyperbolaTangentXY(pt, s1, s2, rangediff)
@@ -149,17 +121,16 @@ def generateHyperbolaXY(
     # Propagate for the number of points on other side as well
     h = h_2 # Initial tangent vector
     pt = startpt # Initial point
-    pts_2 = []
+    pts_2 = np.zeros((halfNumPts, 3))
     for i in np.arange(halfNumPts):
         # First move by the tangent vector
         pt = pt + h * orthostep
         
         # Then descent back to the hyperbola
-        ptHistory = hyperbolaGradDesc(pt, s1, s2, rangediff, initstep, epsilon)
+        pt = hyperbolaGradDesc(pt, s1, s2, rangediff, initstep, epsilon)
         
         # Accumulate the point
-        pts_2.append(ptHistory[-1]) # For this one append to the back
-        pt = ptHistory[-1]
+        pts_2[i] = pt
         
         # Get the new tangent vector
         hnew = hyperbolaTangentXY(pt, s1, s2, rangediff)

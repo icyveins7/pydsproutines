@@ -11,6 +11,21 @@ from scipy.stats.distributions import chi2
 from numba import jit
 import time
 
+#%% Coordinate transformations
+def geodeticLLA2ecef(lat_rad, lon_rad, h):
+    # This should replicate wgs84.latlon().itrs_xyz.m (which also works on arrays)
+    # Speedwise, this is about 2-3x faster, since it skips all the object instantiations
+    # Reference https://en.wikipedia.org/wiki/Geodetic_coordinates
+    a = 6378137.0
+    b = 6356752.314245 # WGS84 constants, reference https://en.wikipedia.org/wiki/World_Geodetic_System
+    N = a**2 / np.sqrt(a**2 * np.cos(lat_rad)**2 + b**2 * np.sin(lat_rad)**2)
+    
+    x = (N+h)*np.cos(lat_rad)*np.cos(lon_rad)
+    y = (N+h)*np.cos(lat_rad)*np.sin(lon_rad)
+    z = (b**2/a**2 * N + h) * np.sin(lat_rad)
+    
+    return np.vstack((x,y,z))
+
 #%% Hyperbola routines
 def rangeOfArrival(x, s_i):
     rho = np.linalg.norm(x-s_i)
@@ -20,14 +35,14 @@ def rangeOfArrivalGradient(x, s_i):
     rho = rangeOfArrival(x, s_i)
     return (x - s_i) / rho
 
+def hyperboloidLineIntersectCostFunc(delta, x0, s1, s2, rangediff, g):
+    return (rangeOfArrival(x0+g*delta, s2) - rangeOfArrival(x0+g*delta, s1) - rangediff)**2
+    
 def hyperboloidGradient(x, s1, s2, rangediff):
     rho1 = rangeOfArrival(x, s1)
     rho2 = rangeOfArrival(x, s2)
     g = 2*(rho2 - rho1 - rangediff) * (rangeOfArrivalGradient(x, s2) - rangeOfArrivalGradient(x, s1))
     return g
-
-# def hyperboloidGradient(x, s1, s2, rangediff):
-#     return ((x-s2)/np.linalg.norm(s2) - (x-s1)/np.linalg.norm(s1)) * (np.linalg.norm(s2-x) - np.linalg.norm(s1-x) - rangediff) / np.abs((np.linalg.norm(s2-x) - np.linalg.norm(s1-x) - rangediff))
 
 def hyperbolaGradDesc(pt, s1, s2, rangediff, step, epsilon, surfaceNorm=np.array([0,0,1]), verb=False):
     # Note that default surface normal vector is parallel to axis,
@@ -36,29 +51,39 @@ def hyperbolaGradDesc(pt, s1, s2, rangediff, step, epsilon, surfaceNorm=np.array
     # Ensure surfaceNorm is unit vector
     surfaceNorm = surfaceNorm / np.linalg.norm(surfaceNorm)
     
-    history = [pt]
-    initgrad = np.zeros(3)
-    count = 0
-    while np.abs((np.linalg.norm(s2-pt) - np.linalg.norm(s1-pt) - rangediff)) != 0 and np.linalg.norm(hyperboloidGradient(pt, s1, s2, rangediff)) * step > epsilon:
-        newgrad = hyperboloidGradient(pt, s1, s2, rangediff)
-        # Project onto the surface
-        newgrad = newgrad - np.dot(surfaceNorm, newgrad)*surfaceNorm
-        # Re-normalise (wow)
-        newgrad = newgrad / np.linalg.norm(newgrad)
-        # print(newgrad)
-        if np.dot(initgrad, newgrad) < 0:
-            # print('gradient reversed')
-            # Lower stepsize a bit
-            step = step * 0.25 # TODO: to optimise
-        pt = pt - step * newgrad
-        history.append(pt)
-        initgrad = newgrad
+    # Use scipy.optimize to minimize, seems like a 33% reduction in calculation time compared to the old code
+    g = hyperboloidGradient(pt, s1, s2, rangediff) # Calculate gradient at the point, use as a line
+    g = g - np.dot(surfaceNorm, g)*surfaceNorm # Project onto surface
+    result = sp.optimize.minimize(hyperboloidLineIntersectCostFunc, 0, args=(pt, s1, s2, rangediff, g))
+    val = [result.x*g+pt]
+    # breakpoint()
+    return val
+    
+    
+    # #### OLD CODE
+    # history = [pt]
+    # initgrad = np.zeros(3)
+    # count = 0
+    # while np.abs((np.linalg.norm(s2-pt) - np.linalg.norm(s1-pt) - rangediff)) != 0 and np.linalg.norm(hyperboloidGradient(pt, s1, s2, rangediff)) * step > epsilon:
+    #     newgrad = hyperboloidGradient(pt, s1, s2, rangediff)
+    #     # Project onto the surface
+    #     newgrad = newgrad - np.dot(surfaceNorm, newgrad)*surfaceNorm
+    #     # Re-normalise (wow)
+    #     newgrad = newgrad / np.linalg.norm(newgrad)
+    #     # print(newgrad)
+    #     if np.dot(initgrad, newgrad) < 0:
+    #         # print('gradient reversed')
+    #         # Lower stepsize a bit
+    #         step = step * 0.25 # TODO: to optimise
+    #     pt = pt - step * newgrad
+    #     history.append(pt)
+    #     initgrad = newgrad
         
-        count += 1
+    #     count += 1
 
-    if verb:
-        print(count)
-    return history
+    # if verb:
+    #     print(count)
+    # return history
 
 def hyperbolaTangentXY(pt, s1, s2, rangediff):
     hz = 0 # This is constant for our flat, non-angled plane, regardless of z-value

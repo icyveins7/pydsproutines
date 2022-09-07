@@ -271,9 +271,10 @@ if __name__ == "__main__":
     
     # Test hyperbola plots
     timer.start()
-    hyperbola, hypItem = tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
+    # hyperbola, hypItem = tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
+    tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
     timer.end()
-    hypItem.setSymbol('x')
+    # hypItem.setSymbol('x')
     
     
     

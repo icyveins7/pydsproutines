@@ -9,6 +9,7 @@ import time
 import numpy as np
 import pyqtgraph as pg
 from localizationRoutines import *
+from timingRoutines import Timer
 
 try:
     import cupy as cp
@@ -232,7 +233,10 @@ class Transmitter(Transceiver):
         if rangediff is None:
             rangediff = self.theoreticalRangeDiff(rx1, rx2)
             
-        hyperbola = generateHyperbolaXY(200, rangediff, rx1.x[0], rx2.x[0], orthostep=0.01)
+        timer = Timer()
+        timer.start()
+        hyperbola = generateHyperbolaXY(200, rangediff, rx1.x[0], rx2.x[0], orthostep=0.1)
+        timer.end()
         
         if ax is None:
             fig = pg.GraphicsLayoutWidget()
@@ -253,7 +257,7 @@ if __name__ == "__main__":
     rxHeight = 1
     rxA = Receiver.asStationary(np.array([[0,-1,rxHeight]]), np.array([0]))
     rxB = Receiver.asStationary(np.array([[0,+1,rxHeight]]), np.array([0]))
-    tx = Transmitter.asStationary(np.array([[0, 1.51, 0]]), np.array([0]))
+    tx = Transmitter.asStationary(np.array([[0, 0.51, 0]]), np.array([0]))
     
     rd = tx.theoreticalRangeDiff(rxA, rxB)
     print(rd)
@@ -262,18 +266,18 @@ if __name__ == "__main__":
     
     from localizationRoutines import *
     lightspd = 299792458.0
-    xr = np.arange(-5,5,0.1)
-    yr = np.arange(-3,3,0.1)
+    xr = np.arange(-10,10,0.1)
+    yr = np.arange(-12,12,0.1)
     costgrid = gridSearchTDOA(rxA.x, rxB.x, rd / lightspd, np.array([1e-9]),
                             xr, yr, 0)
     
     pgPlotHeatmap(np.exp(-costgrid.reshape((yr.size,xr.size)).T), xr[0], yr[0], xr[-1]-xr[0], yr[-1]-yr[0], window=ax, autoBorder=True)
     
     # Test hyperbola plots
-    timer.start()
+    # timer.start()
     hyperbola, hypItem = tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
     # tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
-    timer.end()
+    # timer.end()
     # hypItem.setSymbol('x')
     
     # Checking

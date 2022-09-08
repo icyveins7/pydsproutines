@@ -54,8 +54,14 @@ def hyperbolaGradDesc(pt, s1, s2, rangediff, step, epsilon, surfaceNorm=np.array
     # Use scipy.optimize to minimize, seems like a 33% reduction in calculation time compared to the old code
     g = hyperboloidGradient(pt, s1, s2, rangediff) # Calculate gradient at the point, use as a line
     g = g - np.dot(surfaceNorm, g)*surfaceNorm # Project onto surface
+    g = g/np.linalg.norm(g)
     result = sp.optimize.minimize(hyperboloidLineIntersectCostFunc, 0, args=(pt, s1, s2, rangediff, g))
     val = result.x*g+pt
+    # if result.x[0] == 0:
+    #     print("EH?")
+    #     print(np.linalg.norm(g))
+
+    # breakpoint()
 
     return val
     
@@ -98,23 +104,27 @@ def generateHyperbolaXY(
     # Propagate for the number of points
     h = h_1 # Initial tangent vector
     pt = startpt # Initial point
+    oldpt = np.zeros(3, dtype=np.float64)
     pts_1 = np.zeros((halfNumPts, 3))
     for i in np.arange(halfNumPts):
+        oldpt[:] = pt[:]
         # First move by the tangent vector
         pt = pt + h * orthostep
         
         # Then descent back to the hyperbola
         pt = hyperbolaGradDesc(pt, s1, s2, rangediff, initstep, epsilon)
+        # print(rangeOfArrival(pt, s2)-rangeOfArrival(pt,s1))
         
         # Accumulate the point
         pts_1[-i-1] = pt
         
         # Get the new tangent vector
-        hnew = hyperbolaTangentXY(pt, s1, s2, rangediff)
-        if np.dot(hnew, h) > 0:
-            h = hnew
-        else: # If the returned tangent is pointing backwards we must reverse it
-            h = -hnew
+        hnew = pt - oldpt # We can move by just extension instead of calculating tangent
+        h = hnew/np.linalg.norm(hnew)
+        # print(h)
+        
+        # hnew = hyperbolaTangentXY(pt, s1, s2, rangediff)
+        # h = hnew * np.sign(np.dot(hnew,h))
             
     # End of loop
         
@@ -123,6 +133,7 @@ def generateHyperbolaXY(
     pt = startpt # Initial point
     pts_2 = np.zeros((halfNumPts, 3))
     for i in np.arange(halfNumPts):
+        oldpt[:] = pt[:]
         # First move by the tangent vector
         pt = pt + h * orthostep
         
@@ -133,12 +144,13 @@ def generateHyperbolaXY(
         pts_2[i] = pt
         
         # Get the new tangent vector
-        hnew = hyperbolaTangentXY(pt, s1, s2, rangediff)
-        if np.dot(hnew, h) > 0:
-            h = hnew
-        else: # If the returned tangent is pointing backwards we must reverse it
-            h = -hnew
-            
+        hnew = pt - oldpt # We can move by just extension instead of calculating tangent
+        h = hnew/np.linalg.norm(hnew)
+        
+        
+        # hnew = hyperbolaTangentXY(pt, s1, s2, rangediff)
+        # h = hnew * np.sign(np.dot(hnew,h))
+        
     # End of loop
     
     # Attach all the points together (already sorted)

@@ -232,7 +232,7 @@ class Transmitter(Transceiver):
         if rangediff is None:
             rangediff = self.theoreticalRangeDiff(rx1, rx2)
             
-        hyperbola = generateHyperbolaXY(20, rangediff, rx1.x[0], rx2.x[0])
+        hyperbola = generateHyperbolaXY(200, rangediff, rx1.x[0], rx2.x[0], orthostep=0.01)
         
         if ax is None:
             fig = pg.GraphicsLayoutWidget()
@@ -271,10 +271,14 @@ if __name__ == "__main__":
     
     # Test hyperbola plots
     timer.start()
-    # hyperbola, hypItem = tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
-    tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
+    hyperbola, hypItem = tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
+    # tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
     timer.end()
     # hypItem.setSymbol('x')
+    
+    # Checking
+    plt.plot(np.linalg.norm(hyperbola - rxB.x[0], axis=1) - np.linalg.norm(hyperbola - rxA.x[0], axis=1))
+    plt.hlines([rd], 0, hyperbola.shape[0], colors='r', linestyles='dashed')
     
     
     

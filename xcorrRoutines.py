@@ -483,7 +483,9 @@ def calcQF2(x: np.ndarray, y: np.ndarray):
 
 #%%
 class GroupXcorr:
-    def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray, freqs: np.ndarray, fs: int, autoConj: bool=True):
+    def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray,
+                 freqs: np.ndarray, fs: int,
+                 autoConj: bool=True, autoZeroStarts: bool=True):
         '''
         Parameters
         ----------
@@ -499,10 +501,15 @@ class GroupXcorr:
             Sampling rate of y.
         autoConj : bool
             Conjugates the y array for use in xcorr. Default is True.
+        autoZeroStarts : bool
+            Automatically zeros the 'starts' array based on the first start
+            (to ensure that the signal 'starts from 0'). Default is True.
         '''
         assert(starts.size == lengths.size) # this is the number of groups
         
         self.starts = starts
+        if autoZeroStarts:
+            self.starts = self.starts - self.starts[0]
         self.lengths = lengths
         self.numGroups = self.starts.size # easy referencing
         self.freqs = freqs
@@ -548,10 +555,12 @@ class GroupXcorr:
         
 class GroupXcorrCZT:
     def __init__(self, y: np.ndarray, starts: np.ndarray, lengths: np.ndarray,
-                 f1: float, f2: float, binWidth: float, fs: int, autoConj: bool=True):
+                 f1: float, f2: float, binWidth: float, fs: int, autoConj: bool=True, autoZeroStarts: bool=True):
         
         assert(starts.size == lengths.size)
         self.starts = starts
+        if autoZeroStarts:
+            self.starts = self.starts - self.starts[0]
         self.lengths = lengths
         self.numGroups = self.starts.size # easy referencing
         self.fs = fs
@@ -618,9 +627,11 @@ try:
 
     class GroupXcorrFFT:
         def __init__(self, ygroups: np.ndarray, starts: np.ndarray, fs: int,
-                     autoConj: bool=True, fftlen=None):
+                     autoConj: bool=True, fftlen=None, autoZeroStarts: bool=True):
             assert(starts.size == ygroups.shape[0])
             self.starts = starts
+            if autoZeroStarts:
+                self.starts = self.starts - self.starts[0]
             self.numGroups = self.starts.size
             self.fs = fs
             self.ygroups = ygroups

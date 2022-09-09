@@ -567,7 +567,142 @@ try:
 except:
     print("Skipping cupy demodulator imports.")
         
+      
+#%% Cupy version of simple demodulators
+try:
+    import cupy as cp
+    import os
+
+    
+    # Raw kernel to get many eye openings at once as a batch
+    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "eyeOpeningKernel.cu"), "r") as fid:    
+        eyeOpeningBatchKernel = cp.RawKernel(fid.read(), '''getEyeOpening_batch''')
+    
+    # Raw kernel to lock phase and map syms together
+    # NOTE: assuming the entire signal fits in shared memory
+    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "lockPhase_mapSyms_singleBlkKernel_qpsk.cu"), "r") as fid:
+        lockPhase_mapSyms_singleBlkKernel_qpsk = cp.RawKernel(fid.read(), '''lockPhase_mapSyms_singleBlkKernel_qpsk''')
+    
+    class CupyDemodulatorQPSK:
+        def __init__(self, batchLength: int, numBitsPerBurst: int, cluster_threshold: float=0.1, batch_size: int=4096):
+            self.m = 4
+            self.cluster_threshold = cluster_threshold
+            self.batch_size = batch_size
+            self.batchLength = batchLength
+            self.numBitsPerBurst = numBitsPerBurst # Note that this number is twice the number of symbols used, since QPSK
+            
+            # One-time pre-allocation
+            self.d_reim_batch = cp.zeros((batch_size, batchLength), dtype=cp.complex64)
+            self.d_reimc_batch = cp.zeros((batch_size, batchLength), dtype=cp.complex64)
+            self.d_syms_batch = cp.zeros((batch_size, batchLength), dtype=cp.uint32)
+            self.d_bestMatches = cp.zeros((batch_size), dtype=cp.int32)
+            self.d_bestRotations = cp.zeros((batch_size), dtype=cp.int32)
+            self.d_bestMatchIdx = cp.zeros((batch_size), dtype=cp.int32)
+            self.d_bits_batch = cp.zeros((batch_size, numBitsPerBurst), dtype=cp.uint8)
+            
+            # Counter for batching
+            # self.actr = 0 # Batching for eye-opening
+            self.bctr = 0 # Batching for demodulation
+            # Note that they should be the same at the end
+            
+            # # Interrim output
+            # self.xeo = None # Selected eye-opening resample points
+            # self.xeo_i = None # Index of eye-opening
+            # self.eo_metric = None # Metrics of eye-opening
+            # self.reimc = None # Phase-locked to constellation (complex array)
+            # self.svd_metric = None # SVD metric for phase lock
+            # self.angleCorrection = None # Angle correction used in phase lock
+            # self.syms = None # Output mapping to each symbol (0 to M-1)
+            # self.matches = None # Output from amble rotation search
+            
+        def getEyeOpeningBatch(self, xbatch: cp.ndarray, osr: int, abs_xbatch: cp.ndarray, count: int=None):
+            THREADS_PER_BLOCK = 128
+            NUM_BLOCKS = count if count is not None else xbatch.shape[0]
+            # Update the counter
+            self.bctr = NUM_BLOCKS
+            
+            # simple shared memory requirements
+            smReq = THREADS_PER_BLOCK * osr * 4
+            
+            # Invoke kernel
+            eyeOpeningBatchKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                               (abs_xbatch, abs_xbatch.shape[1], osr, xbatch,
+                                self.d_reim_batch),
+                               shared_mem=smReq)
+            
+            
+            
+        def getEyeOpening(self, x: cp.ndarray, osr: int, abs_x: cp.ndarray):
+            ## This is just a straight np to cp conversion.. Verified!
+
+            x_rs_abs = abs_x.reshape((-1, osr))
+            self.eo_metric = cp.sum(x_rs_abs, axis=0)
+            # i = cp.argmax(self.eo_metric)
+            # i = np.argmax(self.eo_metric.get()) # This is definitely slower
+            # x_rs = x.reshape((-1, osr))
+            # return x_rs[:,i], i
         
+        def gather(self, reim: cp.ndarray):
+            self.d_reim_batch[self.bctr,:] = reim
+            self.bctr = self.bctr + 1
+            
+        def resetBatch(self):
+            self.bctr = 0
+            
+        def demodBatch(self, amble: cp.ndarray, searchStart: int=0, searchlength: int=128):
+            THREADS_PER_BLOCK = 128
+            NUM_BLOCKS = self.bctr
+            
+            # Check shared memory requirements
+            workspaceSize = np.max([THREADS_PER_BLOCK * 4, (searchlength*2 + amble.size)*4])
+            smReq = self.batchLength * 8 + workspaceSize # THREADS_PER_BLOCK * 4 + reim.nbytes
+            if smReq > 48000:
+                raise MemoryError("Shared memory requested exceeded 48kB.")
+            
+            lockPhase_mapSyms_singleBlkKernel_qpsk((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                               (self.d_reim_batch, self.batchLength, amble, amble.size, 0, 128,
+                                self.d_reimc_batch, self.d_syms_batch,
+                                self.d_bestMatches, self.d_bestRotations, self.d_bestMatchIdx,
+                                self.d_bits_batch, self.numBitsPerBurst),
+                               shared_mem=smReq)
+            
+            return self.d_reimc_batch, self.d_syms_batch, self.d_bestMatches, self.d_bestRotations, self.d_bestMatchIdx, self.d_bits_batch
+        
+        # def demod(self, reim: cp.ndarray, amble: cp.ndarray, searchStart: int=0, searchlength: int=128):
+        #     # Allocate output
+        #     d_reimc = cp.zeros(reim.size, dtype=cp.complex64)
+        #     d_syms = cp.zeros(reim.size, dtype=cp.int32)
+        #     d_matches = cp.zeros(searchlength, dtype=cp.int32)
+        #     d_rotation = cp.zeros(searchlength, dtype=cp.int32)
+            
+        #     THREADS_PER_BLOCK = 128
+        #     NUM_BLOCKS = 1
+            
+        #     # Check shared memory requirements
+        #     workspaceSize = np.max([THREADS_PER_BLOCK * 4, (searchlength*2 + amble.size)*4])
+        #     smReq = reim.nbytes + workspaceSize # THREADS_PER_BLOCK * 4 + reim.nbytes
+        #     if smReq > 48000:
+        #         raise MemoryError("Shared memory requested exceeded 48kB.")
+            
+        #     lockPhase_mapSyms_singleBlkKernel_qpsk((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+        #                        (reim, reim.size, amble, amble.size, 0, 128, d_reimc, d_syms, d_matches, d_rotation),
+        #                        shared_mem=smReq)
+            
+        #     return d_reimc, d_syms, d_matches, d_rotation
+        
+        
+        def symsToBits(self, syms: np.ndarray=None):
+            pass
+            
+        def unpackToBinaryBytes(self, packed: np.ndarray):
+            pass
+        
+        def packBinaryBytesToBits(self, unpacked: np.ndarray):
+            pass
+            
+except Exception as e:
+    print("%s\nSkipping imports of cupy demodulators." % str(e))
+    
 
 
 #%%
@@ -769,6 +904,34 @@ def ML_demod_QPSK(y, h, up, numSyms):
 #         print(i_bits)
         
 #         for b in range(len(i_bits)):
+    
+#%% Workspace
+
+# Leaving this reference code here for 2x2 eigvalues, to be converted into cuda kernels
+# Useful shortcut: https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html
+def eig2x2(x):
+    # For better numerical accuracy, ensure determinant is 1.0 by doing this
+    nf = np.linalg.det(x)**0.5
+    x = x / nf
+    
+    a = 1.0
+    b = -x[0,0] - x[1,1]
+    print(b)
+    c = x[0,0]*x[1,1] - x[0,1] * x[1,0]
+    print(c)
+    f = np.sqrt(b*b - 4 * a * c) / (2 * a)
+    xp = -b/(2*a) + f
+    xm = -b/(2*a) - f
+    
+    e1 = np.array([[x[0,1]],[xp - x[0,0]]])
+    e2 = np.array([[x[0,1]],[xm - x[0,0]]])
+    # second way
+    e1 = np.array([[xp-x[1,1]],[x[0,1]]])
+    e2 = np.array([[xm-x[1,1]],[x[0,1]]])
+    
+    return xp, xm, e1, e2
+
+#%% Unit testing
     
 if __name__ == "__main__":
     from signalCreationRoutines import *

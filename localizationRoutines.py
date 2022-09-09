@@ -8,8 +8,206 @@ Created on Thu Apr  1 13:47:58 2021
 import numpy as np
 import scipy as sp
 from scipy.stats.distributions import chi2
-from numba import jit
+from numba import jit, njit
 import time
+
+#%% Coordinate transformations
+def geodeticLLA2ecef(lat_rad, lon_rad, h):
+    # This should replicate wgs84.latlon().itrs_xyz.m (which also works on arrays)
+    # Speedwise, this is about 2-3x faster, since it skips all the object instantiations
+    # Reference https://en.wikipedia.org/wiki/Geodetic_coordinates
+    a = 6378137.0
+    b = 6356752.314245 # WGS84 constants, reference https://en.wikipedia.org/wiki/World_Geodetic_System
+    N = a**2 / np.sqrt(a**2 * np.cos(lat_rad)**2 + b**2 * np.sin(lat_rad)**2)
+    
+    x = (N+h)*np.cos(lat_rad)*np.cos(lon_rad)
+    y = (N+h)*np.cos(lat_rad)*np.sin(lon_rad)
+    z = (b**2/a**2 * N + h) * np.sin(lat_rad)
+    
+    return np.vstack((x,y,z))
+
+#%% Hyperbola routines
+# @njit(nogil=True)
+def rangeOfArrival(x, s_i):
+    rho = np.linalg.norm(x-s_i)
+    return rho
+
+# @njit(nogil=True)
+def rangeDifferenceOfArrival(x, s1, s2):
+    return rangeOfArrival(x,s2) - rangeOfArrival(x,s1)
+
+# @njit(nogil=True)
+def rangeOfArrivalGradient(x, s_i):
+    rho = rangeOfArrival(x, s_i)
+    return (x - s_i) / rho
+
+def hyperboloidLineIntersectCostFunc(delta, x0, s1, s2, rangediff, g):
+    return (rangeOfArrival(x0+g*delta, s2) - rangeOfArrival(x0+g*delta, s1) - rangediff)**2
+   
+# @njit(nogil=True) 
+def hyperboloidGradient(x, s1, s2, rangediff):
+    rho1 = rangeOfArrival(x, s1)
+    rho2 = rangeOfArrival(x, s2)
+    g = 2*(rho2 - rho1 - rangediff) * (rangeOfArrivalGradient(x, s2) - rangeOfArrivalGradient(x, s1))
+    return g
+
+# @njit(nogil=True)
+def hyperbolaGradDesc(pt, s1, s2, rangediff, step, epsilon, surfaceNorm=np.array([0,0,1],dtype=np.float64), verb=False):
+    # Note that default surface normal vector is parallel to axis,
+    # ie the default is planes parallel to XY.
+    
+    # Ensure surfaceNorm is unit vector
+    surfaceNorm = surfaceNorm / np.linalg.norm(surfaceNorm)
+    
+    # Use scipy.optimize to minimize, seems like a 33% reduction in calculation time compared to the old code
+    g = hyperboloidGradient(pt, s1, s2, rangediff) # Calculate gradient at the point, use as a line
+    g = g - np.dot(surfaceNorm, g)*surfaceNorm # Project onto surface
+    
+    
+    # ### MANUAL LOOP
+    # cnt = 0
+    # while (np.linalg.norm(step * g) > epsilon) and (rangeDifferenceOfArrival(pt,s1,s2) != rangediff):
+    #     pt = pt - step*g
+    #     gnew = hyperboloidGradient(pt, s1, s2, rangediff) # Calculate gradient at the point, use as a line
+    #     gnew = gnew - np.dot(surfaceNorm, gnew)*surfaceNorm # Project onto surface
+    #     if np.dot(gnew, g) < 0:
+    #         # print('reversal')
+    #         step = step * 0.25
+    #     g = gnew
+    #     # print(pt)
+    #     # breakpoint()
+    #     cnt += 1
+    
+    # # print(cnt)
+    # return pt
+    
+    ### SCIPY.OPTIMIZE VERSION
+    g = g/np.linalg.norm(g)
+    result = sp.optimize.minimize(hyperboloidLineIntersectCostFunc, 0, args=(pt, s1, s2, rangediff, g))
+    
+    val = result.x*g+pt
+    # if result.x[0] == 0:
+    #     print(result.nit)
+    #     print("EH?")
+    #     print(np.linalg.norm(g))
+
+    # breakpoint()
+
+    return val
+    
+# @njit(nogil=True)
+def hyperbolaTangentXY(pt, s1, s2, rangediff):
+    hz = 0 # This is constant for our flat, non-angled plane, regardless of z-value
+    # Vector satisfies g . h = 0, so gx * hx + gy * hy = 0
+    # Hence hy = -gx/gy hx
+    hx = 1.0
+    g = hyperboloidGradient(pt, s1, s2, rangediff)
+    if g[1] == 0.0:
+        hy = 1.0
+        hx = 0.0
+    else:
+        hy = -g[0] / g[1]
+    
+    h = np.array([hx, hy, hz])
+    h = h / np.linalg.norm(h) # Normalise
+    
+    return h
+
+# @njit(nogil=True)
+def generateHyperbolaXY(
+        halfNumPts: int, rangediff: float,
+        s1: np.ndarray, s2: np.ndarray, z: float=0, startpt: np.ndarray=None,
+        initstep: float=0.1, epsilon: float=1e-8, orthostep:float = 0.1):
+    
+    if startpt is None:
+        # Generate a start point by the mid-point of the two sensors
+        startpt = (s1+s2) / 2.0
+        startpt[2] = z # Fix the z-value
+       
+    # Begin the gradient descent for the start point
+    startpt = hyperbolaGradDesc(startpt, s1, s2, rangediff, initstep, epsilon)
+    
+    
+    # Find the two tangent vectors to it, in the plane
+    h_1 = hyperbolaTangentXY(startpt, s1, s2, rangediff)
+    h_2 = -h_1
+    
+    # Propagate for the number of points
+    h = h_1 # Initial tangent vector
+    pt = startpt # Initial point
+    
+    # Temporary vectors
+    oldpt = np.zeros(3, dtype=np.float64)
+    hnew = np.zeros(3, dtype=np.float64)
+    
+    # Output vector
+    hyperbola = np.zeros((2*halfNumPts+1, 3),dtype=np.float64)
+    hyperbola[halfNumPts,:] = startpt[:] # Initial point
+    
+    # pts_1 = np.zeros((halfNumPts, 3))
+    for i in np.arange(halfNumPts):
+        oldpt[:] = pt[:]
+        # First move by the tangent vector
+        pt = pt + h * orthostep
+        
+        # Then descent back to the hyperbola
+        pt = hyperbolaGradDesc(pt, s1, s2, rangediff, initstep, epsilon)
+        # print(rangeOfArrival(pt, s2)-rangeOfArrival(pt,s1))
+        
+        # Accumulate the point
+        hyperbola[halfNumPts-i-1,:] = pt
+        # pts_1[-i-1] = pt
+        
+        # Get the new tangent vector
+        np.subtract(pt, oldpt, out=hnew)
+        # hnew = pt - oldpt # We can move by just extension instead of calculating tangent
+        h = hnew/np.linalg.norm(hnew)
+        # print(h)
+        
+        # hnew = hyperbolaTangentXY(pt, s1, s2, rangediff)
+        # h = hnew * np.sign(np.dot(hnew,h))
+            
+    # End of loop
+        
+    # Propagate for the number of points on other side as well
+    h = h_2 # Initial tangent vector
+    pt = startpt # Initial point
+    # pts_2 = np.zeros((halfNumPts, 3))
+    for i in np.arange(halfNumPts):
+        oldpt[:] = pt[:]
+        # First move by the tangent vector
+        pt = pt + h * orthostep
+        
+        # Then descent back to the hyperbola
+        pt = hyperbolaGradDesc(pt, s1, s2, rangediff, initstep, epsilon)
+        
+        # Accumulate the point
+        hyperbola[halfNumPts+i+1,:] = pt
+        # pts_2[i] = pt
+        
+        # Get the new tangent vector
+        np.subtract(pt, oldpt, out=hnew)
+        # hnew = pt - oldpt # We can move by just extension instead of calculating tangent
+        h = hnew/np.linalg.norm(hnew)
+        
+        
+        # hnew = hyperbolaTangentXY(pt, s1, s2, rangediff)
+        # h = hnew * np.sign(np.dot(hnew,h))
+        
+    # End of loop
+    
+    # Attach all the points together (already sorted)
+    # hyperbola = np.vstack((pts_1, startpt, pts_2))
+    
+    return hyperbola
+    
+    
+    
+    
+    
+    
+    
+
 
 #%%
 def gridSearchBlindLinearRTT(

@@ -7,7 +7,46 @@ Created on Thu Apr 30 11:59:47 2020
 
 import time
 import numpy as np
-import cupy as cp
+import pyqtgraph as pg
+from localizationRoutines import *
+from timingRoutines import Timer
+
+try:
+    import cupy as cp
+    
+    def calcFOA(r_x, r_xdot, t_x, t_xdot, freq=30e6):
+        '''
+        Expects individual row vectors.
+        All numpy array shapes expected to match.
+        
+        Assumed that arrays are either all cupy arrays or all numpy arrays,
+        operates agnostically using cupy/numpy.
+        '''
+        xp = cp.get_array_module(r_x)
+        
+        lightspd = 299792458.0
+        
+        radial = t_x - r_x # convention pointing towards transmitter
+        radial_n = radial / xp.linalg.norm(radial,axis=1).reshape((-1,1)) # don't remove this reshape, nor the axis arg
+        
+        if radial_n.ndim == 1:
+            vradial = xp.dot(radial_n, r_xdot) - xp.dot(radial_n, t_xdot) # minus or plus?
+        else:
+            # vradial = np.zeros(len(radial_n))
+            # for i in range(len(radial_n)):
+            #     vradial[i] = np.dot(radial_n[i,:],r_xdot[i,:]) - np.dot(radial_n[i,:], t_xdot[i,:])
+            
+            # make distinct numpy calls instead of the loop
+            dot_radial_r = xp.sum(radial_n * r_xdot, axis=1)
+            dot_radial_t = xp.sum(radial_n * t_xdot, axis=1)
+            vradial = dot_radial_r - dot_radial_t
+
+        foa = vradial/lightspd * freq
+
+        return foa
+    
+except:
+    print("Skipping trajectoryRoutines cupy imports.")
 
 def createLinearTrajectory(totalSamples, pos1, pos2, speed, sampleTime, start_coeff=0):
     # Define connecting vector between two anchors
@@ -59,36 +98,7 @@ def createCircularTrajectory(totalSamples, r_a=100000.0, desiredSpeed=100.0, r_h
     return r_x, r_xdot, arcangle, dtheta_per_s
 
 
-def calcFOA(r_x, r_xdot, t_x, t_xdot, freq=30e6):
-    '''
-    Expects individual row vectors.
-    All numpy array shapes expected to match.
-    
-    Assumed that arrays are either all cupy arrays or all numpy arrays,
-    operates agnostically using cupy/numpy.
-    '''
-    xp = cp.get_array_module(r_x)
-    
-    lightspd = 299792458.0
-    
-    radial = t_x - r_x # convention pointing towards transmitter
-    radial_n = radial / xp.linalg.norm(radial,axis=1).reshape((-1,1)) # don't remove this reshape, nor the axis arg
-    
-    if radial_n.ndim == 1:
-        vradial = xp.dot(radial_n, r_xdot) - xp.dot(radial_n, t_xdot) # minus or plus?
-    else:
-        # vradial = np.zeros(len(radial_n))
-        # for i in range(len(radial_n)):
-        #     vradial[i] = np.dot(radial_n[i,:],r_xdot[i,:]) - np.dot(radial_n[i,:], t_xdot[i,:])
-        
-        # make distinct numpy calls instead of the loop
-        dot_radial_r = xp.sum(radial_n * r_xdot, axis=1)
-        dot_radial_t = xp.sum(radial_n * t_xdot, axis=1)
-        vradial = dot_radial_r - dot_radial_t
 
-    foa = vradial/lightspd * freq
-
-    return foa
 
 def createTriangularSpacedPoints(numPts: int, dist: float=1.0,  startPt: np.ndarray=np.array([0,0]), make3d=False):
     '''
@@ -168,4 +178,112 @@ def createTriangularSpacedPoints(numPts: int, dist: float=1.0,  startPt: np.ndar
 
     return ptList
             
+#%% Containers
+class Transceiver:
+    def __init__(self, x: np.ndarray, xdot: np.ndarray, t: np.ndarray,
+                 symbol: str='x', symbolBrush: str='b', symbolPen: str='b'):
+        self.x = x
+        self.xdot = xdot
+        self.t = t  
         
+        self.symbol = symbol
+        self.symbolBrush = symbolBrush
+        self.symbolPen = symbolPen
+        
+    @classmethod
+    def asStationary(cls, x: np.ndarray, t: np.ndarray):
+        return cls(x, np.zeros(x.shape), t)
+    
+    @staticmethod
+    def plotFlat2d(transceivers: list, idx: np.ndarray):
+        win = pg.GraphicsLayoutWidget()
+        ax = win.addPlot()
+        for i, transceiver in enumerate(transceivers):
+            if i > 0:
+                assert(np.all(transceiver.t == transceivers[0].t))
+            # Plot the point
+            ax.plot(transceiver.x[idx,0], transceiver.x[idx,1],
+                    pen=None, symbol=transceiver.symbol,
+                    symbolBrush=transceiver.symbolBrush,
+                    symbolPen=transceiver.symbolPen)
+            
+        win.show()
+        return win, ax
+    
+##########################
+class Receiver(Transceiver):
+    def __init__(self, x: np.ndarray, xdot: np.ndarray, t: np.ndarray,
+                 symbol: str='x', symbolBrush: str='r', symbolPen: str='r'):
+        super().__init__(x, xdot, t, symbol, symbolBrush, symbolPen)
+
+##########################    
+class Transmitter(Transceiver):
+    def __init__(self, x: np.ndarray, xdot: np.ndarray, t: np.ndarray,
+                 symbol: str='o', symbolBrush: str='b', symbolPen: str='b'):
+        super().__init__(x, xdot, t, symbol, symbolBrush, symbolPen)
+    
+    def theoreticalRangeDiff(self, rx1: Receiver, rx2: Receiver):
+        assert(np.all(self.t == rx1.t))
+        assert(np.all(self.t == rx2.t))
+        range1 = np.linalg.norm(rx1.x - self.x, axis=1)
+        range2 = np.linalg.norm(rx2.x - self.x, axis=1)
+        return range2 - range1
+    
+    def plotHyperbolaFlat(self, rx1: Receiver, rx2: Receiver, rangediff: float=None, z: float=0, ax: pg.PlotItem=None):
+        if rangediff is None:
+            rangediff = self.theoreticalRangeDiff(rx1, rx2)
+            
+        timer = Timer()
+        timer.start()
+        hyperbola = generateHyperbolaXY(200, rangediff, rx1.x[0], rx2.x[0], orthostep=0.1)
+        timer.end()
+        
+        if ax is None:
+            fig = pg.GraphicsLayoutWidget()
+            ax = fig.addPlot()
+            
+        hypItem = ax.plot(hyperbola[:,0], hyperbola[:,1], pen='k')
+        hypItem.setSymbol
+        
+        return hyperbola, hypItem
+        
+    
+#%%
+if __name__ == "__main__":
+    from timingRoutines import Timer
+    timer = Timer()
+    from plotRoutines import *
+    closeAllFigs()
+    rxHeight = 1
+    rxA = Receiver.asStationary(np.array([[0,-1,rxHeight]]), np.array([0]))
+    rxB = Receiver.asStationary(np.array([[0,+1,rxHeight]]), np.array([0]))
+    tx = Transmitter.asStationary(np.array([[0, 0.51, 0]]), np.array([0]))
+    
+    rd = tx.theoreticalRangeDiff(rxA, rxB)
+    print(rd)
+    
+    win, ax = tx.plotFlat2d([rxA, rxB, tx], np.array([0]))
+    
+    from localizationRoutines import *
+    lightspd = 299792458.0
+    xr = np.arange(-10,10,0.1)
+    yr = np.arange(-12,12,0.1)
+    costgrid = gridSearchTDOA(rxA.x, rxB.x, rd / lightspd, np.array([1e-9]),
+                            xr, yr, 0)
+    
+    pgPlotHeatmap(np.exp(-costgrid.reshape((yr.size,xr.size)).T), xr[0], yr[0], xr[-1]-xr[0], yr[-1]-yr[0], window=ax, autoBorder=True)
+    
+    # Test hyperbola plots
+    # timer.start()
+    hyperbola, hypItem = tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
+    # tx.plotHyperbolaFlat(rxA, rxB, ax=ax)
+    # timer.end()
+    # hypItem.setSymbol('x')
+    
+    # Checking
+    plt.plot(np.linalg.norm(hyperbola - rxB.x[0], axis=1) - np.linalg.norm(hyperbola - rxA.x[0], axis=1))
+    plt.hlines([rd], 0, hyperbola.shape[0], colors='r', linestyles='dashed')
+    
+    
+    
+    

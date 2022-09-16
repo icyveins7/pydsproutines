@@ -33,6 +33,7 @@ class Hyperboloid:
         self.c = c
         # convention here is for c to be the same sign as rangediff
         # Note, this means that negative c -> use the upper sheet, positive c -> use the lower sheet
+        # However in practice, we can just use the sign of c as the indicator -> always use the (-c) coefficient as the correct sheet
         self.rangediff = c / 2 
         self.focusZ = np.sqrt(a**2 + c**2)
         
@@ -60,6 +61,12 @@ class Hyperboloid:
     def zminus(self, v):
         return -self.c * np.cosh(v)
     
+    def z(self, v, sign):
+        if sign > 0:
+            return self.zplus(v)
+        else:
+            return self.zminus(v)
+    
     # Rotations and translations
     def transform(self, X, Y, Z):
         xshape = X.shape
@@ -84,7 +91,7 @@ class Hyperboloid:
         return X1, Y1, Z1
     
     # Other methods    
-    def visualize(self, v=np.arange(0, 2, 0.1), ax=None, bothSheets=False):
+    def visualize(self, v=np.arange(0, 2, 0.1), ax=None, bothSheets=False, useSurf=False):
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(projection='3d')
@@ -117,8 +124,14 @@ class Hyperboloid:
         
         
         # Plot both sheets
-        ax.plot_wireframe(Xp, Yp, Zp, linestyle='--') # In order to see the foci, use wireframe rather than surface
-        ax.plot_wireframe(Xm, Ym, Zm, linestyle='--')
+        if useSurf:
+            if bothSheets:
+                ax.plot_surface(Xp, Yp, Zp, cmap='viridis')
+            ax.plot_surface(Xm, Ym, Zm, cmap='viridis')
+        else:
+            if bothSheets:
+                ax.plot_wireframe(Xp, Yp, Zp, color='k', linestyle='--') # In order to see the foci, use wireframe rather than surface
+            ax.plot_wireframe(Xm, Ym, Zm, color='k', linestyle='-')
         
         # Plot foci
         ax.scatter3D(self.foci[0,:], self.foci[1,:], self.foci[2,:], c='r')
@@ -129,71 +142,55 @@ class Hyperboloid:
         return ax, fig # , Xp, Yp, Zp, Xm, Ym, Zm
     
     # Intersection Methods
-    def intersectXY(self, v=np.arange(0, 2, 0.01)):
+    def _intersectXYsheet(self, v, sign):
         sinhv = np.sinh(v)
         coshv = np.cosh(v)
         A_0 = self.Rot[2,0] * self.a * sinhv
         A_1 = self.Rot[2,1] * self.a * sinhv
-        A_2p = self.Rot[2,2] * self.c * coshv + self.mu[2]
-        A_2m = self.Rot[2,2] * -self.c * coshv + self.mu[2]
+        A_2 = self.Rot[2,2] * sign * self.c * coshv + self.mu[2]
         
         with np.errstate(divide='ignore', invalid='ignore'):
             alpha = np.arctan(A_0 / A_1)
         
-            # breakpoint()
+            b = -A_2 / np.sqrt(A_0**2 + A_1**2)
         
-            b_p = -A_2p / np.sqrt(A_0**2 + A_1**2)
-            b_m = -A_2m / np.sqrt(A_0**2 + A_1**2)
+            theta1 = np.arcsin(b) # If there are NaNs here, it means that the particular v does not have a solution!
+            theta2 = np.sign(b) * np.pi - theta1
+  
+        theta = np.hstack((theta2[::-1], theta1)) - np.hstack((alpha[::-1], alpha))
+        v_ext = np.hstack((v[::-1], v))
         
-            theta_p1 = np.arcsin(b_p) # If there are NaNs here, it means that the particular v does not have a solution!
-            theta_m1 = np.arcsin(b_m)
-            theta_p2 = np.sign(b_p) * np.pi + np.sign(b_p)*theta_p1
-            theta_m2 = np.sign(b_m) * np.pi + np.sign(b_m)*theta_m1
-        # breakpoint()
-        
-        theta_p = np.hstack((theta_p2[::-1], theta_p1)) - np.hstack((alpha[::-1], alpha))
-        theta_m = np.hstack((theta_m2[::-1], theta_m1)) - np.hstack((alpha[::-1], alpha))
-        sinhv = np.hstack((sinhv[::-1], sinhv))
-        coshv = np.hstack((coshv[::-1], coshv))
-        
-        x_p = self.a * sinhv * np.cos(theta_p)
-        x_m = self.a * sinhv * np.cos(theta_m)
-        
-        y_p = self.a * sinhv * np.sin(theta_p)
-        y_m = self.a * sinhv * np.sin(theta_m)
-        
-        z_p = self.c * coshv
-        z_m = -self.c * coshv
+        x = self.x(v_ext, theta)
+        y = self.y(v_ext, theta)
+        z = self.z(v_ext, sign)
         
         # Remove nans?
-        idxp = np.logical_and(np.logical_and(~np.isnan(x_p), ~np.isnan(y_p)), ~np.isnan(z_p))
-        x_p = x_p[idxp]
-        y_p = y_p[idxp]
-        z_p = z_p[idxp]
-        idxm = np.logical_and(np.logical_and(~np.isnan(x_m), ~np.isnan(y_m)), ~np.isnan(z_m))
-        x_m = x_m[idxm]
-        y_m = y_m[idxm]
-        z_m = z_m[idxm]
+        idx = np.logical_and(np.logical_and(~np.isnan(x), ~np.isnan(y)), ~np.isnan(z))
+        x = x[idx]
+        y = y[idx]
+        z = z[idx]
         
-        vec_p = np.vstack((
-            x_p,
-            y_p,
-            z_p
+        vec = np.vstack((
+            x,
+            y,
+            z
         ))
-        vec_m = np.vstack((
-            x_m,
-            y_m,
-            z_m
-        ))
-        
         
         # Perform the transformation
-        vp = np.zeros_like(vec_p)
-        vm = np.zeros_like(vec_m)
-        vp[0,:], vp[1,:], vp[2,:] = self.transform(vec_p[0,:], vec_p[1,:], vec_p[2,:])
-        vm[0,:], vm[1,:], vm[2,:] = self.transform(vec_m[0,:], vec_m[1,:], vec_m[2,:])
+        vect = np.zeros_like(vec)   
+        vect[0,:], vect[1,:], vect[2,:] = self.transform(vec[0,:], vec[1,:], vec[2,:])
         
-        return vp, vm
+        return vect
+
+        
+    
+    def intersectXY(self, v=np.arange(0, 2, 0.01), onlyReturnOneSheet=False):
+        msheet = self._intersectXYsheet(v, -1) # This is the main sheet which corresponds correctly to range diff
+        if onlyReturnOneSheet:
+            return msheet
+        else:
+            psheet = self._intersectXYsheet(v, 1)
+            return msheet, psheet
          
         
     # Factory functions
@@ -246,7 +243,9 @@ class Hyperboloid:
         
 #%% Testing
 if __name__ == "__main__":
+    from timingRoutines import Timer
     closeAllFigs()
+    timer = Timer()
     
     # Basic zero-centred default
     h = Hyperboloid(1, 0.1)
@@ -259,8 +258,8 @@ if __name__ == "__main__":
         -1.0)
     ax, fig = hp.visualize()
     # Perform intersection
-    vecs_p, vecs_m = hp.intersectXY()
-    ax.plot3D(vecs_p[0,:], vecs_p[1,:], vecs_p[2,:], 'k-')
+    vecs_m, vecs_p = hp.intersectXY()
+    ax.plot3D(vecs_p[0,:], vecs_p[1,:], vecs_p[2,:], 'b-')
     ax.plot3D(vecs_m[0,:], vecs_m[1,:], vecs_m[2,:], 'g-')
     plt.figure()
     plt.plot(vecs_p[0], vecs_p[1], 'x-')
@@ -275,8 +274,8 @@ if __name__ == "__main__":
     )
     ax, fig = ha.visualize()
     # Perform intersection
-    vecs_p, vecs_m = ha.intersectXY()
-    ax.plot3D(vecs_p[0,:], vecs_p[1,:], vecs_p[2,:], 'k-')
+    vecs_m, vecs_p = ha.intersectXY()
+    ax.plot3D(vecs_p[0,:], vecs_p[1,:], vecs_p[2,:], 'b-')
     ax.plot3D(vecs_m[0,:], vecs_m[1,:], vecs_m[2,:], 'g-')
     plt.figure()
     plt.plot(vecs_p[0], vecs_p[1], 'x-')
@@ -290,41 +289,68 @@ if __name__ == "__main__":
     )
     ax, fig = hat.visualize(v=np.arange(0,3.5,0.1))
     # Perform intersection
-    vecs_p, vecs_m = hat.intersectXY(v=np.arange(0,3,0.001))
-    ax.plot3D(vecs_p[0,:], vecs_p[1,:], vecs_p[2,:], 'k-')
+    timer.start()
+    vecs_m, vecs_p = hat.intersectXY(v=np.arange(0,3.5,0.001))
+    timer.end()
+    ax.plot3D(vecs_p[0,:], vecs_p[1,:], vecs_p[2,:], 'b-')
     ax.plot3D(vecs_m[0,:], vecs_m[1,:], vecs_m[2,:], 'g-')
     plt.figure()
     plt.plot(vecs_p[0], vecs_p[1], 'x-')
     plt.plot(vecs_m[0], vecs_m[1], 'x-')
     
-    # # Generate reversed
-    # hatr = Hyperboloid.fromFoci(
-    #     10 + np.array([1, 1, 1]),
-    #     10 + np.array([-1, -1, -1]),
-    #     -1.0
-    # )
-    # ax, fig = hatr.visualize() 
-    
     #%% Unit tests
     import unittest
     class TestHyperboloids(unittest.TestCase):
         def test_zero_plane(self):
+            # Test the foci locations
             np.testing.assert_allclose(
                 hp.foci[:,0], [-1,0,0], atol=1e-7)
             np.testing.assert_allclose(
                 hp.foci[:,1], [1,0,0], atol=1e-7)
+            # Test the sheet correctness
+            vm = hp.intersectXY(onlyReturnOneSheet=True)
+            np.testing.assert_allclose(
+                np.linalg.norm(vm - hp.foci[:,1].reshape((-1,1)), axis=0) - np.linalg.norm(vm - hp.foci[:,0].reshape((-1,1)), axis=0),
+                np.zeros(vm.shape[1]) - 1.0
+            )
+            
             
         def test_zero_orient(self):
+            # Test the foci locations
             np.testing.assert_allclose(
                 ha.foci[:,0], [-1,-1,-1], atol=1e-7)
             np.testing.assert_allclose(
                 ha.foci[:,1], [1,1,1], atol=1e-7)
+            # Test the sheet correctness
+            vm = ha.intersectXY(onlyReturnOneSheet=True)
+            np.testing.assert_allclose(
+                np.linalg.norm(vm - ha.foci[:,1].reshape((-1,1)), axis=0) - np.linalg.norm(vm - ha.foci[:,0].reshape((-1,1)), axis=0),
+                np.zeros(vm.shape[1]) + 1.0
+            )
             
         def test_trans_orient(self):
+            # Test the foci locations
             np.testing.assert_allclose(
                 hat.foci[:,0], [9,9,9], atol=1e-7)
             np.testing.assert_allclose(
                 hat.foci[:,1], [11,11,11], atol=1e-7)
+            # Test the sheet correctness
+            vm = hat.intersectXY(onlyReturnOneSheet=True)
+            np.testing.assert_allclose(
+                np.linalg.norm(vm - hat.foci[:,1].reshape((-1,1)), axis=0) - np.linalg.norm(vm - hat.foci[:,0].reshape((-1,1)), axis=0),
+                np.zeros(vm.shape[1]) + 1.0
+            )
+            
+        def test_random_hyperboloid(self):
+            s = np.random.rand(3,2)
+            rangediff = np.linalg.norm(s[:,1] - s[:,0]) * (np.random.rand() * 2 - 1) # Randomly choose either one
+            hr = Hyperboloid.fromFoci(s[:,0], s[:,1], rangediff)
+            # Generate the correct sheet
+            vm = hr.intersectXY(onlyReturnOneSheet=True)
+            np.testing.assert_allclose(
+                np.linalg.norm(vm - hr.foci[:,1].reshape((-1,1)), axis=0) - np.linalg.norm(vm - hr.foci[:,0].reshape((-1,1)), axis=0),
+                np.zeros(vm.shape[1]) + rangediff
+            )
             
             
     unittest.main()

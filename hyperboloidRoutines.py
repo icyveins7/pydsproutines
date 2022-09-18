@@ -259,13 +259,40 @@ class Hyperboloid:
         tc[0,:] = tc[0,:] - omega**2 * lmbda**2
         
         # Root finder
+        points = []
         for i in np.arange(tc.shape[1]):
             poly = np.polynomial.Polynomial(tc[:,i])
             roots = poly.roots()
             
-            theta = np.arctan(roots) * 2
+            theta = np.arctan(roots)
+            # theta = np.pi * np.sign(np.real(theta)) + theta # Either roots are wrong, or need some correction like this?
+            theta = theta * 2
             
-            print(theta)
+            realidx = np.argwhere(np.imag(theta) == 0)
+            if realidx.size > 2:
+                print("WARNING: SHOULD NOT HAVE MORE THAN TWO ROOTS!")
+            if realidx.size > 0:
+                thetareal = np.real(theta)[realidx.reshape(-1)]
+                print(thetareal)
+                breakpoint()
+                for thetar in thetareal:
+                    if thetar > 0: # Arrange so that no need to sort later?
+                        points.append(np.vstack((
+                            self.x(v[i], thetar),
+                            self.y(v[i], thetar),
+                            self.z(v[i], -1)
+                       )))
+                    else:
+                        points.insert(0, np.vstack((
+                            self.x(v[i], thetar),
+                            self.y(v[i], thetar),
+                            self.z(v[i], -1)
+                        )))
+        # breakpoint()
+        points = np.hstack(points)
+        tpoints = np.zeros_like(points)
+        tpoints[0,:], tpoints[1,:], tpoints[2,:] = self.transform(points[0,:],points[1,:],points[2,:])
+        return tpoints
         
         
         
@@ -395,6 +422,9 @@ if __name__ == "__main__":
     z = 4.0 * np.cos(theta)
     ax.plot_wireframe(x,y,z)
     ax.set_box_aspect(None)
+    # Attempt to find intersection points
+    tpts = hsp.intersectOblateSpheroid(np.arange(0,3,0.1),5.0,4.0)
+    ax.plot3D(tpts[0,:],tpts[1,:],tpts[2,:],'r')
     
     
     #%% Unit tests

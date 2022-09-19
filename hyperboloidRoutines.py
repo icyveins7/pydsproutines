@@ -7,6 +7,9 @@ Created on Tue Sep 13 17:52:48 2022
 
 import numpy as np
 from plotRoutines import *
+from numba import njit
+
+from timingRoutines import Timer
 
 #%% 
 class Hyperboloid:
@@ -192,6 +195,40 @@ class Hyperboloid:
             psheet = self._intersectXYsheet(v, 1)
             return msheet, psheet
         
+    @staticmethod  
+    @njit('Tuple((float64[:], float64[:]))(float64[:,:], float64[:])', nogil=True)
+    def _intersectOblateSpheroidLoop(tc, v):
+        thetas = np.zeros((tc.shape[1], 4), dtype=np.complex128)
+        thetareals = np.zeros((2, tc.shape[1]), dtype=np.float64)
+        ve = np.zeros_like(thetareals)
+        
+        mctr = 0
+        pctr = 0
+        for i in np.arange(tc.shape[1]):
+            roots = np.roots(tc[::-1,i].astype(np.complex128))
+        
+            thetas[i,:] = np.arctan(roots) * 2
+        
+        
+            for theta in thetas[i,:]:
+                if np.imag(theta) == 0:
+                    thetareal = np.real(theta)
+                    if thetareal > 0:
+                        thetareals[1,pctr] = thetareal
+                        ve[1,pctr] = v[i]
+                        pctr += 1
+                    else:
+                        thetareals[0,-1-mctr] = thetareal
+                        ve[0,-1-mctr] = v[i]
+                        mctr += 1
+                    
+        # Cut it
+        thetareals = thetareals.flatten()[tc.shape[1]-mctr : tc.shape[1]+pctr]
+        ve = ve.flatten()[tc.shape[1]-mctr : tc.shape[1]+pctr]
+        
+                    
+        return thetareals, ve
+        
         
     def intersectOblateSpheroid(
             self,
@@ -256,42 +293,59 @@ class Hyperboloid:
         
         # Coefficients for polynomial
         tc = (alpha + beta) * lmbda**2 + gamma * omega**2
-        tc[0,:] = tc[0,:] - omega**2 * lmbda**2
+        # Corrections
+        osqlsq = omega**2 * lmbda**2
+        tc[0,:] = tc[0,:] - osqlsq
+        tc[2,:] = tc[2,:] - 2 * osqlsq
+        tc[4,:] = tc[4,:] - osqlsq
         
-        # Root finder
-        points = []
-        for i in np.arange(tc.shape[1]):
-            poly = np.polynomial.Polynomial(tc[:,i])
-            roots = poly.roots()
+
+        
+        # Numba-compiled method for speed over the loops
+        nthetareals, nve = self._intersectOblateSpheroidLoop(tc, v)
+        ptx = self.x(nve, nthetareals)
+        pty = self.y(nve, nthetareals)
+        ptz = self.z(nve, -1)
+        tpoints = np.zeros((3,nthetareals.size))
+        tpoints[0,:], tpoints[1,:], tpoints[2,:] = self.transform(ptx,pty,ptz)
+
+        # # Root finder
+        # points = []
+        # # breakpoint()
+        # for i in np.arange(tc.shape[1]):
+        #     # poly = np.polynomial.Polynomial(tc[:,i])
+        #     # roots = poly.roots()
+        #     roots = np.roots(tc[::-1,i]) # you need to use this for numba optimization, as the class isn't supported
             
-            theta = np.arctan(roots)
-            # theta = np.pi * np.sign(np.real(theta)) + theta # Either roots are wrong, or need some correction like this?
-            theta = theta * 2
+        #     theta = np.arctan(roots) * 2
             
-            realidx = np.argwhere(np.imag(theta) == 0)
-            if realidx.size > 2:
-                print("WARNING: SHOULD NOT HAVE MORE THAN TWO ROOTS!")
-            if realidx.size > 0:
-                thetareal = np.real(theta)[realidx.reshape(-1)]
-                print(thetareal)
-                breakpoint()
-                for thetar in thetareal:
-                    if thetar > 0: # Arrange so that no need to sort later?
-                        points.append(np.vstack((
-                            self.x(v[i], thetar),
-                            self.y(v[i], thetar),
-                            self.z(v[i], -1)
-                       )))
-                    else:
-                        points.insert(0, np.vstack((
-                            self.x(v[i], thetar),
-                            self.y(v[i], thetar),
-                            self.z(v[i], -1)
-                        )))
-        # breakpoint()
-        points = np.hstack(points)
-        tpoints = np.zeros_like(points)
-        tpoints[0,:], tpoints[1,:], tpoints[2,:] = self.transform(points[0,:],points[1,:],points[2,:])
+        #     realidx = np.argwhere(np.imag(theta) == 0)
+        #     if realidx.size > 2:
+        #         print("WARNING: SHOULD NOT HAVE MORE THAN TWO ROOTS!") # Degeneracy issue if foci are both perpendicular to surface?
+        #     if realidx.size > 0:
+        #         thetareal = np.real(theta)[realidx.reshape(-1)]
+
+        #         for thetar in thetareal:
+        #             if thetar > 0: # Arrange so that no need to sort later?
+        #                 points.append(np.vstack((
+        #                     self.x(v[i], thetar),
+        #                     self.y(v[i], thetar),
+        #                     self.z(v[i], -1)
+        #                )))
+        #             else:
+        #                 points.insert(0, np.vstack((
+        #                     self.x(v[i], thetar),
+        #                     self.y(v[i], thetar),
+        #                     self.z(v[i], -1)
+        #                 )))
+                        
+
+        
+        # # breakpoint()
+        # points = np.hstack(points)
+        # tpoints = np.zeros_like(points)
+        # tpoints[0,:], tpoints[1,:], tpoints[2,:] = self.transform(points[0,:],points[1,:],points[2,:])
+
         return tpoints
         
         
@@ -412,19 +466,26 @@ if __name__ == "__main__":
         np.array([-10, -1, 0]),
         0.5
     )
-    ax, fig = hsp.visualize(np.arange(0,3,0.1))
+    vs = np.arange(1.5,3,0.001)
+    ax, fig = hsp.visualize(vs)
     # Create spheroid
     theta = np.arange(0, np.pi, 0.1)
     phi = np.arange(0, 2*np.pi, 0.1)
     theta, phi = np.meshgrid(theta, phi)
-    x = 5.0 * np.sin(theta) * np.cos(phi)
-    y = 5.0 * np.sin(theta) * np.sin(phi)
-    z = 4.0 * np.cos(theta)
-    ax.plot_wireframe(x,y,z)
+    omega = 5.0 # Controls xy
+    lmbda = 4.0 # Controls z
+    x = omega * np.sin(theta) * np.cos(phi)
+    y = omega * np.sin(theta) * np.sin(phi)
+    z = lmbda * np.cos(theta)
+    ax.plot_wireframe(x,y,z,linestyle='--')
     ax.set_box_aspect(None)
     # Attempt to find intersection points
-    tpts = hsp.intersectOblateSpheroid(np.arange(0,3,0.1),5.0,4.0)
+    timer.start()
+    tpts = hsp.intersectOblateSpheroid(vs,omega,lmbda)
+    timer.end("intersectOblateSpheroid, %d pts" % (vs.size))
     ax.plot3D(tpts[0,:],tpts[1,:],tpts[2,:],'r')
+    # Check if points truly lie on surface
+    check = tpts[0,:]**2/omega**2 + tpts[1,:]**2/omega**2 + tpts[2,:]**2/lmbda**2
     
     
     #%% Unit tests

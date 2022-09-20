@@ -9,11 +9,57 @@ import numpy as np
 from plotRoutines import *
 
 #%%
-class Sphere:
+class Ellipsoid:
+    def __init__(self, a: float, b: float, c: float, 
+                 mu: np.ndarray=np.zeros(3),
+                 Rx: np.ndarray=np.eye(3),
+                 Rz: np.ndarray=np.eye(3)):
+        '''
+        Container for a general ellipsoid, given by
+        
+        .. math::
+            \frac{x^2}{a^2} + \frac{y^2}{b^2} + \frac{z^2}{c^2} = 1
+
+        Parameters
+        ----------
+        a : float
+            Constant for x.
+        b : float
+            Constant for y.
+        c : float
+            Constant for z.
+        mu : 1-D array
+            Translation vector i.e. position vector of centre.
+        Rx : 2-D array
+            X-axis rotation matrix.
+        Rz : 2-D array
+            Z-axis rotation matrix.
+
+        '''
+        
+        self.a = a
+        self.b = b
+        self.c = c
+        self.mu = mu
+        self.Rx = Rx
+        self.Rz = Rz
+        
+class OblateSpheroid(Ellipsoid):
+    def __init__(self, omega: float, lmbda: float,
+                 mu: np.ndarray=np.zeros(3),
+                 Rx: np.ndarray=np.eye(3),
+                 Rz: np.ndarray=np.eye(3)):
+        
+        self.omega = omega
+        self.lmbda = lmbda
+        assert(lmbda > omega)
+        super().__init__(omega, omega, lmbda, mu, Rx, Rz)
+
+
+class Sphere(Ellipsoid):
     def __init__(self, r: float, mu: np.ndarray=np.zeros(3)):
         self.r = r
-        self.mu = mu
-        
+        super().__init__(r, r, r, mu)
     
     def pointsFromAngles(self, theta, phi):
         points = np.array([

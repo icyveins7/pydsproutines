@@ -30,6 +30,12 @@ class Hyperboloid:
             Constant for x, y.
         c : float
             Constant for z. This is determined by foci at +/- c.
+        mu : 1-D array
+            Translation vector i.e. position vector of centre of foci.
+        Rx : 2-D array
+            X-axis rotation matrix.
+        Rz : 2-D array
+            Z-axis rotation matrix.
 
         '''
         self.a = a
@@ -119,10 +125,13 @@ class Hyperboloid:
         Xm, Ym, Zm = self.transform(X0, Y0, Zm0)
         
         # Ensure equal ratios
+        self.visxlim = np.ptp(np.hstack((Xp.reshape(-1), Xm.reshape(-1)))) # We keep these around for future reference
+        self.visylim = np.ptp(np.hstack((Yp.reshape(-1), Ym.reshape(-1)))) # in order to plot other objects around to scale together
+        self.viszlim = np.ptp(np.hstack((Zp.reshape(-1), Zm.reshape(-1))))
         ax.set_box_aspect((
-            np.ptp(np.hstack((Xp.reshape(-1), Xm.reshape(-1)))),
-            np.ptp(np.hstack((Yp.reshape(-1), Ym.reshape(-1)))),
-            np.ptp(np.hstack((Zp.reshape(-1), Zm.reshape(-1))))
+            self.visxlim,
+            self.visylim,
+            self.viszlim
         )) 
         
         
@@ -541,6 +550,22 @@ if __name__ == "__main__":
                 np.linalg.norm(vm - hr.foci[:,1].reshape((-1,1)), axis=0) - np.linalg.norm(vm - hr.foci[:,0].reshape((-1,1)), axis=0),
                 np.zeros(vm.shape[1]) + rangediff
             )
+            
+        def test_random_hyperboloid_spheroid(self):
+            s = np.random.rand(3,2) + 1.0 # Move it outside
+            rangediff = np.linalg.norm(s[:,1] - s[:,0]) * (np.random.rand() * 2 - 1) # Randomly choose either one
+            hr = Hyperboloid.fromFoci(s[:,0], s[:,1], rangediff)
+            # Generate the correct sheet
+            omega = 1.0
+            lmbda = 0.9
+            v = np.arange(1.5, 3, 0.01)
+            tpts = hr.intersectOblateSpheroid(v, omega, lmbda)
+            np.testing.assert_allclose(
+                (tpts[0]**2 + tpts[1]**2) / (omega**2) + tpts[2]**2 / (lmbda**2),
+                np.ones(tpts.shape[1])
+            )
+            
+            
             
             
     unittest.main()

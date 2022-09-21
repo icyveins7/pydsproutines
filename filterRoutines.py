@@ -12,6 +12,7 @@ import scipy.signal as sps
 import cupy as cp
 import cupyx.scipy.signal as cpsps
 import cpuWola as cpw
+from plotRoutines import *
 
 def cp_lfilter(ftap: cp.ndarray, x: cp.ndarray, chunksize: int=None):
     '''
@@ -325,6 +326,7 @@ class BurstDetector:
         self.d_absx = None
         self.d_ampSq = None
         self.d_medfiltered = None
+        self.threshold = None
         
     def medfilt(self, x):
         d_x = cp.asarray(x) # Push to gpu if not currently in it
@@ -333,11 +335,26 @@ class BurstDetector:
         self.d_medfiltered = cpsps.medfilt(self.d_ampSq, self.medfiltlen)
         
     def detectViaThreshold(self, threshold: float):
+        self.threshold = threshold # Kept for plotting
         signalIndices = cp.argwhere(self.d_medfiltered > threshold).flatten()
         splitIndices = cp.argwhere(cp.diff(signalIndices)>1).flatten() + 1 # the + 1 is necessary
         signalIndices = cp.split(signalIndices, splitIndices.get()) # For cupy, need to pull the split indices to host
         
         return signalIndices
+    
+    def pgplot(self, ax=None, fs=1):
+        if d_ampSq is None:
+            raise ValueError("Run medfilt() first.")
+        
+        
+        rwin, rax = pgPlotAmpTime([self.d_ampSq, self.d_medfiltered],
+                                  [fs, fs],
+                                  labels=["Power", "Medfilt"],
+                                  colors=["r", "b"],
+                                  ax=ax)
+        if self.threshold is not None:
+            rax.InfiniteLine(self.threshold, angle=0, movable=False, label='Threshold')
+        return rwin, rax
 
 def energyDetection(ampSq, medfiltlen, snrReqLinear=4.0, noiseIndices=None, splitSignalIndices=True):
     '''

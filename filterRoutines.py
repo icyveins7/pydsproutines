@@ -200,6 +200,39 @@ void upfirdn_sm(
 
 def cupyUpfirdn_sm(x: cp.ndarray, taps: cp.ndarray, up: int, down: int,
                    out: cp.ndarray=None, outabs: cp.ndarray=None):
+    '''
+    Runs a custom, shared-memory optimised kernel to perform the upfirdn
+    onboard the GPU. Note that if outputs are incorrect, it is likely that the
+    arrays' dtypes are incorrect.
+
+    Parameters
+    ----------
+    x : cp.ndarray
+        Input, complex64.
+    taps : cp.ndarray
+        Filter taps, float32.
+    up : int
+        Upsampling factor.
+    down : int
+        Downsampling factor.
+    out : cp.ndarray, optional
+        Output array, if already allocated, complex64. The default is None.
+    outabs : cp.ndarray, optional
+        Abs(output array), if already allocated, float32. The default is None.
+
+    Raises
+    ------
+    MemoryError
+        Raised when the length of taps is too large.
+
+    Returns
+    -------
+    out : cp.ndarray
+        Output array.
+    outabs : cp.ndarray
+        Abs(output array).
+
+    '''
     # Allocate output
     if out is None:
         out = cp.zeros(x.size * up // down, dtype=cp.complex64)

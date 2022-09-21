@@ -39,6 +39,38 @@ def cp_lfilter(ftap: cp.ndarray, x: cp.ndarray, chunksize: int=None):
 
         return c
     
+class CupyFilter:
+    def __init__(self, taps: cp.ndarray, force32f: bool=True):
+        self.force32f = force32f
+        if not force32f and taps.dtype != np.float32:
+            raise TypeError("Taps dtype is incorrect, must be float32.")
+        
+        # Move to device if not yet
+        self.taps = cp.asarray(taps).astype(cp.float32) # If already on device, does nothing
+        
+        # Interrim products
+        self.delay = cp.zeros(taps.size, dtype=cp.complex64)
+        
+    def lfilter(self, x: cp.ndarray):
+        if not self.force32f and x.dtype != cp.complex64:
+            raise TypeError("x dtype is incorrect, must be complex64.")
+        x = cp.asarray(x).astype(cp.complex64)
+        
+        # Pad the front
+        xp = cp.hstack((self.delay, x))
+        
+        # Filter with the delay
+        c = cpsps.convolve(self.taps, xp)
+        
+        # Set the new delay
+        self.delay[:] = c[self.taps.size + x.size : ]
+        
+        # Return the filtered values
+        cf = c[self.taps.size : self.taps.size + x.size]
+        
+        return cf
+        
+    
     
 # Raw kernel for tone creation
 upFirdnKernel = cp.RawKernel(r'''

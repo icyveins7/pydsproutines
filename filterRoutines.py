@@ -408,17 +408,17 @@ class BurstDetector:
         return signalIndices
     
     def pgplot(self, ax=None, fs=1):
-        if d_ampSq is None:
+        if self.d_ampSq is None:
             raise ValueError("Run medfilt() first.")
         
         
-        rwin, rax = pgPlotAmpTime([self.d_ampSq, self.d_medfiltered],
+        rwin, rax = pgPlotAmpTime([self.d_ampSq.get(), self.d_medfiltered.get()],
                                   [fs, fs],
                                   labels=["Power", "Medfilt"],
                                   colors=["r", "b"],
                                   ax=ax)
         if self.threshold is not None:
-            rax.InfiniteLine(self.threshold, angle=0, movable=False, label='Threshold')
+            rax.addItem(pg.InfiniteLine(self.threshold, angle=0, movable=False, label='Threshold'))
         return rwin, rax
 
 def energyDetection(ampSq, medfiltlen, snrReqLinear=4.0, noiseIndices=None, splitSignalIndices=True):

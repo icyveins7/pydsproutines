@@ -468,4 +468,35 @@ def energyDetection(ampSq, medfiltlen, snrReqLinear=4.0, noiseIndices=None, spli
         signalIndices = np.split(signalIndices, splitIndices)
     
     return noiseIndices, meanNoise, reqPower, medfiltered, signalIndices
+
+#%%
+def resampleFactorWizard(fs: int, rsfs: int):
+    '''
+    Convenience function to get up and down integer factors from a starting
+    sample rate to a target sample rate.
+
+    Parameters
+    ----------
+    fs : int
+        Initial sample rate.
+    rsfs : int
+        Target (resampled) sample rate.
+
+    Returns
+    -------
+    up : int
+        Upsampling factor.
+    down : int
+        Downsampling factor.
+
+    '''
+    # Enforce types
+    fs = int(fs)
+    rsfs = int(rsfs)
+    # Interrim sampling rate
+    l = np.lcm(fs, rsfs)
+    up = l // fs
+    down = l // rsfs
+    return int(up), int(down) # Enforce again in case
     
+

@@ -987,7 +987,7 @@ if __name__ == "__main__":
     # Test preamble detection
     preamble = bits[400:400+32]
     timer.start()
-    rotatedSyms, sample, rotation = demodulator.ambleRotate(preamble, np.arange(400,400+256))
+    rotatedSyms, sample, rotation = demodulator.ambleRotate(preamble, np.arange(400,400+256, dtype=np.int32))
     timer.end("Preamble search")
     plt.figure("Preamble matching")
     plt.plot(demodulator.matches)

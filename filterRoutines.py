@@ -13,6 +13,7 @@ import cupy as cp
 import cupyx.scipy.signal as cpsps
 import cpuWola as cpw
 from plotRoutines import *
+import scipy.cluster.vq as spc
 
 def cp_lfilter(ftap: cp.ndarray, x: cp.ndarray, chunksize: int=None):
     '''
@@ -392,6 +393,7 @@ class BurstDetector:
         self.d_ampSq = None
         self.d_medfiltered = None
         self.threshold = None
+        self.codebook = None
         
     def medfilt(self, x):
         d_x = cp.asarray(x) # Push to gpu if not currently in it
@@ -407,6 +409,25 @@ class BurstDetector:
         
         return signalIndices
     
+    def detectSingleEmitter(self, ratio: float):
+        # To seed the kmeans (which speeds it up ~30x), we find the max, and a 
+        # sample which is greater than the ratio difference
+        x = self.d_medfiltered.get()
+        bigClusterSeed = np.max(x)
+        smallClusterSeed = x[x < (bigClusterSeed/ratio)][0]
+        codebook, distortion = spc.kmeans(x,np.array([smallClusterSeed, bigClusterSeed]))
+        self.codebook = np.sort(codebook)
+        self.threshold = np.mean(codebook)
+        # Codify the samples
+        codes, dists = spc.vq(x, self.codebook)
+        # Match to the big cluster
+        signalIndices = np.argwhere(codes == 1).reshape(-1)
+        # Split as usual
+        splitIndices = np.argwhere(np.diff(signalIndices)>1).reshape(-1) + 1
+        signalIndices = np.split(signalIndices, splitIndices)
+        
+        return signalIndices
+    
     def pgplot(self, ax=None, fs=1):
         if self.d_ampSq is None:
             raise ValueError("Run medfilt() first.")
@@ -419,6 +440,9 @@ class BurstDetector:
                                   ax=ax)
         if self.threshold is not None:
             rax.addItem(pg.InfiniteLine(self.threshold, angle=0, movable=False, label='Threshold'))
+        if self.codebook is not None:
+            rax.addItem(pg.InfiniteLine(self.codebook[0], angle=0, movable=False, label='Noise Cluster'))
+            rax.addItem(pg.InfiniteLine(self.codebook[1], angle=0, movable=False, label='Signal Cluster'))
         return rwin, rax
 
 def energyDetection(ampSq, medfiltlen, snrReqLinear=4.0, noiseIndices=None, splitSignalIndices=True):

@@ -480,6 +480,32 @@ class SyncReaders:
         return outdata, outfps, outfts
     
 #%% Simple class to read the groups extracted from the readers
+
+# These classes are best suited for sparse recordings
+class GroupReader:
+    def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64, ensure_incremental=True):
+        self.folderpath = folderpath
+        self.cGrp = -1
+        self.groups = [i for i in os.listdir(folderpath) if os.path.isdir(os.path.join(folderpath, i))]
+        
+        # Storage for getter methods later
+        self.numSampsPerFile = numSampsPerFile
+        self.extension = extension
+        self.in_dtype = in_dtype
+        self.out_dtype = out_dtype
+        self.ensure_incremental = ensure_incremental
+        
+    def resetGroup(self):
+        self.cGrp = -1
+        
+    def nextGroup(self):
+        self.cGrp += 1
+        reader = SortedFolderReader(os.path.join(self.folderpath, self.groups[self.cGrp]),
+                                    self.numSampsPerFile, self.extension,
+                                    self.in_dtype, self.out_dtype, self.ensure_incremental)
+        data, filepaths, filetimes = reader.get(len(reader.filenames))
+        return data, filepaths, filetimes
+
 class GroupReaders:
     def __init__(self, folderpaths, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64, ensure_incremental=True):
         self.folderpaths = folderpaths

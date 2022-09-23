@@ -165,6 +165,8 @@ def musicXcorr(cutout, rx, f_search, ftap, fs, dsr, plist, musicrows=130, shifts
 
 
 def cztXcorr(cutout, rx, f_searchMin, f_searchMax, fs, cztStep=0.1, outputCAF=False, shifts=None):
+    cztobj = CZTCached(cutout.size, f_searchMin, f_searchMax, cztStep, fs)
+    
     # Create the freq array
     f_search = np.arange(f_searchMin, f_searchMax, cztStep)
     if shifts is None:
@@ -182,13 +184,29 @@ def cztXcorr(cutout, rx, f_searchMin, f_searchMax, fs, cztStep=0.1, outputCAF=Fa
             rxslice = rx[s:s+len(cutout)]
             rxNormPartSq = np.linalg.norm(rxslice)**2
             pdt = rxslice * cutoutconj
-            pdtczt = czt(pdt, f_search[0],f_search[-1]+cztStep/2, cztStep, fs)
+            # pdtczt = czt(pdt, f_search[0],f_search[-1]+cztStep/2, cztStep, fs)
+            pdtczt = cztobj.run(pdt)
             result[i,:] = np.abs(pdtczt)**2.0 / rxNormPartSq / cutoutNormSq
             
         return result, f_search
         
     else:
-        raise NotImplementedError("To do..")
+        result = np.zeros(shifts.size, dtype=rx.dtype)
+        freqs = np.zeros_like(result)
+        cutoutconj = cutout.conj()
+        for i in np.arange(len(shifts)):
+            s = shifts[i]
+            rxslice = rx[s:s+len(cutout)]
+            rxNorm = np.linalg.norm(rxslice)
+            pdt = rxslice * cutoutconj
+            # pdtczt = czt(pdt, f_search[0], f_search[-1]+cztStep/2, cztStep, fs)
+            pdtczt = cztobj.run(pdt)
+            abspdtczt = np.abs(pdtczt)
+            mi = np.argmax(abspdtczt)
+            result[i] = pdtczt[mi] / rxNorm / cutoutNorm
+            freqs[i] = f_search[mi]
+            
+        return result, freqs
     
 
 def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absResult=True):

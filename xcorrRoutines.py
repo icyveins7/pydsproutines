@@ -168,7 +168,7 @@ def cztXcorr(cutout, rx, f_searchMin, f_searchMax, fs, cztStep=0.1, outputCAF=Fa
     cztobj = CZTCached(cutout.size, f_searchMin, f_searchMax, cztStep, fs)
     
     # Create the freq array
-    f_search = np.arange(f_searchMin, f_searchMax, cztStep)
+    f_search = cztobj.getFreq() # np.arange(f_searchMin, f_searchMax, cztStep)
     if shifts is None:
         shifts = np.arange(len(rx)-len(cutout)+1)
     
@@ -192,7 +192,7 @@ def cztXcorr(cutout, rx, f_searchMin, f_searchMax, fs, cztStep=0.1, outputCAF=Fa
         
     else:
         result = np.zeros(shifts.size, dtype=rx.dtype)
-        freqs = np.zeros_like(result)
+        freqs = np.zeros(shifts.size, dtype=np.float64)
         cutoutconj = cutout.conj()
         for i in np.arange(len(shifts)):
             s = shifts[i]

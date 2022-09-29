@@ -331,6 +331,63 @@ class SimpleDemodulatorPSK:
             Packed bits storage of the input.
         '''
         return np.packbits(unpacked.reshape(-1))
+    
+    def findPlainText(self, syms: np.ndarray=None, phaseSymShift: int=0):
+        '''
+        For fixed symbols input and phaseSymShift mapping,
+        attempts to find an appropriate number of symbols to skip to maximise
+        the number of readable characters in UTF-8 encoding.
+        
+        UTF-8 characters lie within 0x21 to 0x7E. For blind demodulation,
+        it may not be clear where the start of a byte is.
+        
+        E.g. QPSK has 2 bits per symbol.
+        Hence there are 4 possible 'alignments' to read the start of a byte.
+        
+        This method will attempt to search the possible alignments and return the best one.
+
+        Parameters
+        ----------
+        syms : np.ndarray
+            Input array, usually from demod() output. Defaults to None,
+            which uses the internally saved output from the last demod().
+        phaseSymShift : int
+            Bitmap rotation, similar to symsToBits(). Defaults to 0.
+
+        Returns
+        -------
+        iSkip : int
+            The maximised alignment. The text can be read by then using
+            syms[iSkip:].
+        utf8chars : np.ndarray
+            Number of readable characters for the particular alignment.
+
+        '''
+        if syms is None:
+            syms = self.syms
+            
+        # BPSK: 8 symbols
+        # QPSK: 4 symbols
+        # 8PSK: 24 symbols (due to 3x8)
+        symbolSkips = np.arange(np.lcm(self.m, 8), dtype=np.uint32)
+        
+        # Search for the best one 
+        utf8chars = np.zeros(symbolSkips.size, dtype=np.uint32)
+        for i, symbolSkip in enumerate(symbolSkips):
+            mapped = self.symsToBits(syms[symbolSkip:], phaseSymShift)
+            packedbytes = self.packBinaryBytesToBits(
+                self.unpackToBinaryBytes(mapped)    
+            )
+            # Characters in UTF-8 start at 0x21, end at 0x7E
+            utf8chars[i] = np.intersect1d(
+                np.argwhere(packedbytes >= 0x21).reshape(-1),
+                np.argwhere(packedbytes <= 0x7E).reshape(-1)
+            ).size
+            
+        # Maximise the skip with most readable characters
+        iSkip = np.argmax(utf8chars)
+        
+        return iSkip, utf8chars
         
     
 ###############

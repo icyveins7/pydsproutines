@@ -188,6 +188,21 @@ class GroupDatabase:
         self.con = sq.connect(dbfilepath)
         self.cur = self.con.cursor()
         
+        # Add the meta table
+        self.addMetatable()
+        
+    def addMetatable(self):
+        self.cur.execute("create table if not exists meta(lastfiletime INTEGER)")
+        self.con.commit()
+        
+    def updateMetatable(self, lastfiletime: int):
+        self.cur.execute("insert or replace into meta values(?)", (int(lastfiletime),))
+        self.con.commit()
+        
+    def getLastProcessedTime(self):
+        self.cur.execute("select lastfiletime from meta")
+        return self.cur.fetchone()
+        
     def addTable(self, tablename: str):
         stmt = "create table if not exists %s(gidx INTEGER UNIQUE, starttime INTEGER, endtime INTEGER)" % tablename
         self.cur.execute(stmt)
@@ -214,7 +229,7 @@ class GroupDatabase:
             End time, inclusive i.e. group is from starttime <= time <= endtime. 
 
         '''
-        stmt = "insert into %s values(?,?,?)" % tablename
+        stmt = "insert or replace into %s values(?,?,?)" % tablename
         self.cur.execute(stmt, (gidx, starttime, endtime))
         self.con.commit()
         
@@ -249,6 +264,9 @@ class SortedFolderReader(FolderReader):
         # Error check that the values are incremental (no gaps)
         if ensure_incremental:
             assert(np.all(np.diff(self.filetimes)==1))
+            
+    def getFinalTime(self):
+        return self.filetimes[-1]
             
     def skipToTime(self, start):
         self.fidx = np.argwhere(self.filetimes == start)[0,0]
@@ -336,6 +354,9 @@ class SortedFolderReader(FolderReader):
         selectTimes = list(set(selectTimes))
         selectTimes.sort()
         
+        if len(selectTimes) == 0:
+            raise IndexError("No groups were found. Perhaps try lowering the minAmp threshold?")
+        
         if onlyExtractTimes:
             return selectTimes # return here directly
         
@@ -343,11 +364,7 @@ class SortedFolderReader(FolderReader):
         groupSplitIdx = np.hstack((0,(np.argwhere(np.diff(selectTimes) > 1) + 1).flatten(), len(selectTimes)))
         # print(groupSplitIdx)
         
-        # Create the main dir
-        if not os.path.isdir(targetfolderpath):
-            os.makedirs(targetfolderpath)
-            print("Created %s" % targetfolderpath)
-            
+        
         # Create the database
         if useDatabase:
             if dbfilepath is None:
@@ -358,6 +375,13 @@ class SortedFolderReader(FolderReader):
             tablename = "groups"
             print("Using tablename: %s" % tablename)
             gd.addTable(tablename)
+            
+        # Create the main dir
+        elif not os.path.isdir(targetfolderpath):
+            os.makedirs(targetfolderpath)
+            print("Created %s" % targetfolderpath)
+            
+        
  
         # Loop over groups
         for i in range(len(groupSplitIdx)-1):
@@ -385,6 +409,10 @@ class SortedFolderReader(FolderReader):
                 print("Inserted: gidx=%d, start=%d, end=%d\n" % (gidx, starttime, endtime))
                 
             print("-----")
+            
+        # If using database, append to the metadata so that we can track progress
+        if useDatabase:
+            gd.updateMetatable(self.getFinalTime()) # Update to the latest available time
             
     
         
@@ -554,6 +582,9 @@ class GroupReaders:
 #%% Readers that work with the database
 class GroupReadersDB:
     def __init__(self, grpdb, folderpaths, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64):
+        if not isinstance(folderpaths, list):
+            raise TypeError("folderpaths must be a list, even if only one folder is being used!")
+            # TODO: probably refactor to just one, not clear how to use more than one at a time?
         self.folderpaths = folderpaths
         # Storage for getter methods later
         self.numSampsPerFile = numSampsPerFile
@@ -587,7 +618,7 @@ class GroupReadersDB:
             data = multiBinReadThreaded(filelist, self.numSampsPerFile, in_dtype=self.in_dtype, out_dtype=self.out_dtype)
             alldata.append(data)
         
-        return alldata
+        return alldata, self.cStart, self.cEnd
             
         
     def resetGroup(self):

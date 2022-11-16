@@ -25,6 +25,8 @@ GroupXcorrFFT::GroupXcorrFFT(
 	{
 		ippsCopy_32fc(ygroups, m_ygroups.data(), (int)m_ygroups.size());
 	}
+	// Calculate the norm sq here
+	ippsNorm_L2_32fc64f(m_ygroups.data(), (int)m_ygroups.size(), &m_ygroupsNormSq);
 
 	// Copy the offsets
 	m_offsets.resize(numGroups);
@@ -60,7 +62,7 @@ void GroupXcorrFFT::calculateGroupPhases()
 	{
 		phase = 0;
 		rFreq = (Ipp64f)m_offsets.at(i) / (Ipp64f)m_fftlen;
-		ippsTone_64fc(temp_64fc.data(), 1.0, rFreq, &phase, ippAlgHintAccurate); // generate at 64fc for higher precision
+		ippsTone_64fc(temp_64fc.data(), m_fftlen, 1.0, rFreq, &phase, ippAlgHintAccurate); // generate at 64fc for higher precision
 		// Convert from 64f to 32f
 		ippsConvert_64f32f((Ipp64f*)temp_64fc.data(), (Ipp32f*)&m_groupPhases.at(i * m_fftlen), 2 * m_fftlen); // *2 length because complex
 	}
@@ -77,7 +79,8 @@ void GroupXcorrFFT::xcorr(const Ipp32fc *rx, const int rxlen, const int* shifts,
 			this,
 			t, NUM_THREADS,
 			rx, rxlen,
-			shifts, shiftslen
+			shifts, shiftslen,
+			out
 		);
 	}
 
@@ -113,10 +116,10 @@ void GroupXcorrFFT::xcorr_thread(int thrdIdx, int NUM_THREADS, const Ipp32fc* rx
 		shift = shifts[i];
 
 		// Perform the dot and fft over the groups
-		dot_and_fft(rx, shift, pdt, pdtfft, rxgroupNormSqCollect, pdtfftcombined, &rxgroupNormSq);
+		dot_and_fft(rx, shift, pdt, pdtfft, rxgroupNormSqCollect, pdtfftcombined, &rxgroupNormSq, pDFTSpec, pDFTBuffer);
 
 		// Calculate abs squared of the final output
-		ippsPowerSpectr_32fc(pdtfftcombined.data(), qf2.data(), pdtfftcombined.size());
+		ippsPowerSpectr_32fc(pdtfftcombined.data(), qf2.data(), (int)pdtfftcombined.size());
 
 		// Scale by the energies of both inputs
 		ippsDivC_32f(qf2.data(), static_cast<Ipp32f>(rxgroupNormSq * m_ygroupsNormSq), &out[i * m_fftlen], (int)m_fftlen);
@@ -152,18 +155,18 @@ void GroupXcorrFFT::dot_and_fft(
 	for (int g = 0; g < m_numGroups; g++)
 	{
 		// Calculate the norm
-		ippsNorm_32fc64f(&rx[shift], m_groupLength, &rxgroupNormSqCollect.at(g));
+		ippsNorm_L2_32fc64f(&rx[shift], m_groupLength, &rxgroupNormSqCollect.at(g));
 		// Remember to square it
 		rxgroupNormSqCollect.at(g) = rxgroupNormSqCollect.at(g) * rxgroupNormSqCollect.at(g);
 
 		// Multiply ygroup with rxgroup
-		ippsMul_32fc(&rx[shift], &m_ygroups.at(g * groupLength), pdt.data(), (int)m_groupLength);
+		ippsMul_32fc(&rx[shift], &m_ygroups.at(g * m_groupLength), pdt.data(), (int)m_groupLength);
 
 		// FFT the product (produce pdtfft)
-		ippsDFTFwd_CToC_64fc(pdt.data(), pdtfft.data(), pDFTSpec, pDFTBuffer);
+		ippsDFTFwd_CToC_32fc(pdt.data(), pdtfft.data(), pDFTSpec, pDFTBuffer);
 
 		// Accumulate into final vector with the phase correction
-		ippsAddProduct_32fc(m_groupPhases.at(g * m_fftlen), pdtfft.data(), pdtfftcombined.data(), m_fftlen);
+		ippsAddProduct_32fc(&m_groupPhases.at(g * m_fftlen), pdtfft.data(), pdtfftcombined.data(), m_fftlen);
 	}
 
 	// Remember to sum up all the rxgroupNormSqs
@@ -172,7 +175,7 @@ void GroupXcorrFFT::dot_and_fft(
 
 
 
-GroupXcorrFFT:~GroupXcorrFFT()
+GroupXcorrFFT::~GroupXcorrFFT()
 {
 
 }

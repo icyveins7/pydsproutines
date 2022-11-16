@@ -26,8 +26,14 @@ private:
 	void xcorr_thread(int thrdIdx, int NUM_THREADS, const Ipp32fc* rx, const int rxlen, const int* shifts, const int shiftslen, Ipp32f* out);
 	void dot_and_fft(
 		const Ipp32fc* rx,
+		int shift,
 		ippe::vector<Ipp32fc>& pdt,
-		ippe::vector<Ipp64f>& rxgroupNormSqCollect);
+		ippe::vector<Ipp32fc>& pdtfft,
+		ippe::vector<Ipp64f>& rxgroupNormSqCollect,
+		ippe::vector<Ipp32fc>& pdtfftcombined,
+		Ipp64f* rxgroupNormSq,
+		IppsDFTSpec_C_32fc* pDFTSpec,
+		Ipp8u* pDFTBuffer);
 
 	// Member variables
 	ippe::vector<Ipp32fc> m_ygroups;

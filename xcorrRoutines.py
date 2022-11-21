@@ -1416,7 +1416,18 @@ try:
 
 except:
     print("Ignoring cupy-related classes.")
-              
+
+
+#%% Cythonised classes
+import os
+os.add_dll_directory(os.path.join(os.environ['IPPROOT'], 'redist', 'intel64')) # Configure IPP dll reliance
+
+try: 
+    from cython_ext.CyGroupXcorrFFT import CyGroupXcorrFFT
+    
+except:
+    print("Unable to load cythonised xcorrRoutines")
+
 #%% Database for storing CAFs
 class CafDb:
     # Class-wide constants, ordered lists are important here for reference

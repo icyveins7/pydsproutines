@@ -70,6 +70,9 @@ class CupyFilter:
         cf = c[self.taps.size : self.taps.size + x.size]
         
         return cf
+    
+    def reset(self):
+        self.delay[:] = 0
         
     
     

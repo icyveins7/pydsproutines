@@ -19,3 +19,5 @@ cdef extern from "GroupXcorrFFT.h":
         GroupXcorrFFT(Ipp32fc*, int, int, int*, int, int, bool) except +
         
         void xcorr(Ipp32fc*, int, int*, int, Ipp32f*, int)
+        
+        int getFftlen()

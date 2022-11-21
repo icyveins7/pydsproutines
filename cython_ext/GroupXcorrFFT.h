@@ -19,6 +19,10 @@ public:
 
 	void xcorr(const Ipp32fc* rx, const int rxlen, const int* shifts, const int shiftslen, Ipp32f* out, int NUM_THREADS = 1);
 
+	// getters
+	int getFftlen() { return m_fftlen; }
+	ippe::vector<Ipp32fc>& getGroupPhases() { return m_groupPhases; }
+
 private:
 	// Computation methods
 	void makeFreq(ippe::vector<Ipp64f>& fftfreq);

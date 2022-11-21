@@ -1,7 +1,7 @@
 # distutils: language = c++
 import numpy as np
 cimport numpy as np
-from GroupXcorrFFT cimport GroupXcorrFFT, Ipp32fc, Ipp64f, bool
+from GroupXcorrFFT cimport GroupXcorrFFT, Ipp32fc, Ipp32f, Ipp64f, bool
 
 cdef class CyGroupXcorrFFT:
     cdef GroupXcorrFFT* gxcfft
@@ -21,3 +21,28 @@ cdef class CyGroupXcorrFFT:
         
     def __dealloc__(self):
         del self.gxcfft
+        
+    # Main computation method
+    def xcorr(self,
+              np.ndarray[np.complex64_t, ndim=1] rx,
+              np.ndarray[np.int32_t, ndim=1] shifts,
+              int NUM_THREADS=1):
+        
+        # Compute lengths to pass in
+        cdef int rxlen = <int>rx.size
+        cdef int shiftslen = <int>shifts.size
+        
+        # Allocate output
+        cdef np.ndarray out = np.zeros((shifts.size, self.gxcfft.getFftlen()), dtype=np.float32)
+        
+        # Call the internal method
+        self.gxcfft.xcorr(
+            <Ipp32fc*>rx.data,
+            rxlen,
+            <int*>shifts.data,
+            shiftslen,
+            <Ipp32f*>out.data,
+            NUM_THREADS
+        )
+        
+        return out

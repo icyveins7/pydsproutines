@@ -19,9 +19,11 @@ public:
 
 	void xcorr(const Ipp32fc* rx, const int rxlen, const int* shifts, const int shiftslen, Ipp32f* out, int NUM_THREADS = 1);
 
-	// getters
+	// getters (mainly for checking)
+	Ipp64f getYgroupsNormSq() { return m_ygroupsNormSq; }
 	int getFftlen() { return m_fftlen; }
 	ippe::vector<Ipp32fc>& getGroupPhases() { return m_groupPhases; }
+	std::vector<int>& getOffsets() { return m_offsets; }
 
 private:
 	// Computation methods

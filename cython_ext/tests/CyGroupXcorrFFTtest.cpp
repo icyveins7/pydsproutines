@@ -1,4 +1,4 @@
-// cl CyGroupXcorrFFTtest.cpp /EHsc /I.. ippcore.lib ipps.lib
+// cl CyGroupXcorrFFTtest.cpp ../GroupXcorrFFT.cpp /EHsc /I.. ippcore.lib ipps.lib
 // g++ CyGroupXcorrFFTtest.cpp ../GroupXcorrFFT.cpp -I../ -lippcore -lipps -lpthread -o CyGroupXcorrFFTtest
 
 #include <iostream>
@@ -76,6 +76,21 @@ int main(int argc, char *argv[])
 		offsets.data(),
 		fs
 	); // fftlen assumed to be same as grouplength
+	printf("Instantiation successful.\n");
+	printf("YgroupsNormSq = %f \n", gxcfft.getYgroupsNormSq());
+	// check group phases
+	//for (int i = 0; i < gxcfft.getGroupPhases().size(); i++)
+	//{
+	//	printf("%d: %f %f\n", i, gxcfft.getGroupPhases().at(i).re, gxcfft.getGroupPhases().at(i).im);
+	//}
+	printf("groupPhases %d: %f %f\n", 0, gxcfft.getGroupPhases().at(0).re, gxcfft.getGroupPhases().at(0).im);
+	int tmp;
+	std::cin >> tmp;
+	for (auto o : gxcfft.getOffsets())
+	{
+		printf("Offset at %d\n", o);
+	}
+
 
 	// run
 	ippe::vector<Ipp32f> cyout(out.size());
@@ -88,8 +103,12 @@ int main(int argc, char *argv[])
 	// compare?
 
 	// dump?
+	fp = fopen("cyout.bin", "wb");
+	cnt = fwrite(cyout.data(), sizeof(Ipp32f), cyout.size(), fp);
+	fclose(fp);
+	printf("Dumped %zd elements to cyout.bin\n", cnt);
 
-
+	printf("Test complete.\n");
 
 	return 0;
 }

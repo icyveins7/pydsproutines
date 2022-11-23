@@ -65,6 +65,59 @@ def czt_scipy(x, f1, f2, binWidth, fs):
     
     return cc
 
+#%% Simple class to compute integer multiple length FFTs for increased resolution
+class IntegerMultipleFFT:
+    def __init__(self, dtype=np.complex128, multiple: int=None, unpadLength: int=None):
+        self.dtype = dtype
+        self._M = None
+        self._tones = None # Placeholders
+        
+        self.setMultiple(multiple)
+        self.setUnpadLength(unpadLength)
+        
+    
+    ### Main calling functions
+    def computeInternals(self):
+        self._M = self._multiple * self._N
+        # Calculate the tones
+        self._tones = np.array([
+            np.exp(-1j*2*np.pi * i/self._multiple * np.arange(self._N) / self._N)
+            for i in np.arange(self._multiple)
+        ])
+    
+    def fft(self, x: np.ndarray, reorder: bool=False):
+        if x.ndim != 1:
+            raise Exception("Requires 1-dim array.")
+        if x.size != self._N:
+            raise Exception("Input length does not correspond to internal value. Please call setUnpadLength().")
+            
+        # Copy the arrays with the multiple
+        xtile = np.tile(x, (self._multiple, 1))
+        # Apply the tones
+        # np.multiply(xtile, self._tones, out=xtile) # In-place is very slightly less accurate it seems
+        xtileshift = xtile * self._tones
+        # Call FFT as a batch on each row
+        out = np.fft.fft(xtileshift, n=self._N, axis=1)
+        
+        if reorder:
+            out = out.T.reshape(-1)
+            
+        return out
+
+    ### Setters
+    def setMultiple(self, multiple: int):
+        self._multiple = multiple
+        
+    def setUnpadLength(self, unpadLength: int):
+        self._N = unpadLength
+        
+    ### Getters
+    def getPaddedLength(self):
+        return self._M
+    
+    def getTones(self):
+        return self._tones
+
 #%% Simple class to keep the FFT of the chirp filter to alleviate computations
 
 # Note, with the new scipy 1.8.0 update, this class has equivalent speed to the signal.CZT class

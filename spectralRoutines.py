@@ -68,12 +68,39 @@ def czt_scipy(x, f1, f2, binWidth, fs):
 #%% Simple class to compute integer multiple length FFTs for increased resolution
 class IntegerMultipleFFT:
     def __init__(self, dtype=np.complex128, multiple: int=None, unpadLength: int=None):
+        '''
+        This class offers a slight increase in computational speed over
+        np.fft.fft(x, n=some_longer_length), if the increased (i.e. padded) length
+        of the fft is an integer multiple of the original length.
+        
+        It does this by pre-calculating a bunch of tones to shift the signal by fractions
+        of a frequency bin, and then performing the FFT on the result.
+        
+        This allows for shorter FFTs, with an extra (linear) cost of complex multiplies.
+        With an increasing multiple, the cost savings are greater.
+
+        Parameters
+        ----------
+        dtype : TYPE, optional
+            Governs the dtype of the tones. The default is np.complex128.
+        multiple : int, optional
+            Integer multiple of the padded length i.e. targetLength/unpadLength.
+            This can be set later.
+            The default is None.
+        unpadLength : int, optional
+            The input length. This can be set later.
+            The default is None.
+
+        '''
         self.dtype = dtype
         self._M = None
         self._tones = None # Placeholders
         
         self.setMultiple(multiple)
         self.setUnpadLength(unpadLength)
+        
+        if self._multiple is not None and self._N is not None:
+            self.computeInternals()
         
     
     ### Main calling functions
@@ -86,16 +113,36 @@ class IntegerMultipleFFT:
         ])
     
     def fft(self, x: np.ndarray, reorder: bool=False):
+        '''
+        Runs a padded FFT of length x.size * multiple. If not instantiated with
+        the internal variables, you may need to call computeInternals() first.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Input array.
+        reorder : bool, optional
+            Flag to reshape and reorder it to the equivalent of
+            np.fft.fft(x, n=paddedLength). Otherwise, it will return the matrix
+            of FFTs where each row is an FFT after a tone shift.
+            The default is False.
+
+        Returns
+        -------
+        out : np.ndarray
+            Output, either a matrix of row-wise FFTs or a 1-dim array, equivalent
+            to the numpy fft padded call (see reorder flag).
+
+        '''
+        
         if x.ndim != 1:
             raise Exception("Requires 1-dim array.")
         if x.size != self._N:
             raise Exception("Input length does not correspond to internal value. Please call setUnpadLength().")
             
-        # Copy the arrays with the multiple
-        xtile = np.tile(x, (self._multiple, 1))
-        # Apply the tones
-        # np.multiply(xtile, self._tones, out=xtile) # In-place is very slightly less accurate it seems
-        xtileshift = xtile * self._tones
+        # We can broadcast the multiply immediately with the tones
+        xtileshift = np.multiply(x, self._tones)
+
         # Call FFT as a batch on each row
         out = np.fft.fft(xtileshift, n=self._N, axis=1)
         
@@ -421,64 +468,79 @@ except:
 
 
 if __name__=='__main__':
-    # Unit testing for GPU code
-    fs = 192000
+    from verifyRoutines import compareValues
     
-    fineFreqRange = 5.0
-    fineFreqStep = 0.001
-    freqs = np.arange(-fineFreqRange,fineFreqRange+fineFreqStep/2, fineFreqStep)
-    N = 145152
+    signal = np.random.randn(10000) + 1j * np.random.randn(10000)
     
-    phiSearch = np.arange(0,2*np.pi, 0.001)[:5000]
+    multiple=100
+    imfft = IntegerMultipleFFT(multiple=multiple, unpadLength=signal.size)
+    imfft.computeInternals()
+    sigfftlong = np.fft.fft(signal, n=signal.size*multiple)
+    compareValues(sigfftlong, imfft.fft(signal, True))
     
-    f0 = 0.312
     
-    t1 = time.time()
-    
-    for i in range(len(phiSearch)):
-        ts = toneSpectrum(f0, freqs, fs, N, phi=phiSearch[i])
+    try:
+        import cupy as cp
+        # Unit testing for GPU code
+        fs = 192000
         
-    t2 = time.time()
-    print("CPU: %f s." % (t2-t1))
-    
-    
-    
-    d_freqs = cp.array(freqs)
-    t1 = time.time()
-    
-    for i in range(len(phiSearch)):
-        tsg = toneSpectrum_gpu(f0, d_freqs, fs, N, phi=phiSearch[i])
+        fineFreqRange = 5.0
+        fineFreqStep = 0.001
+        freqs = np.arange(-fineFreqRange,fineFreqRange+fineFreqStep/2, fineFreqStep)
+        N = 145152
         
-    t2 = time.time()
-    print("Naive GPU Kernel: %f s." % (t2-t1))
-    print("Check:")
-    mi = np.argmax(np.abs(cp.asnumpy(tsg)-ts))
-    print(tsg[mi])
-    print(ts[mi])
-    
-    
-    #%%
-    d_f0List = cp.zeros(50) + f0
-    d_AList = cp.zeros(50) + 1
-    d_phiSearch = cp.array(phiSearch)
-    
-    t1 = time.time()
-    
-    
-    for i in range(int(len(phiSearch)/50)):
-        d_phiList = d_phiSearch[i*50:(i+1)*50]
-        tsgm = toneSpectrumMulti_gpu(d_f0List, d_freqs, fs, N, d_phiList, d_AList)
+        phiSearch = np.arange(0,2*np.pi, 0.001)[:5000]
         
+        f0 = 0.312
+        
+        t1 = time.time()
+        
+        for i in range(len(phiSearch)):
+            ts = toneSpectrum(f0, freqs, fs, N, phi=phiSearch[i])
+            
+        t2 = time.time()
+        print("CPU: %f s." % (t2-t1))
+        
+        
+        
+        d_freqs = cp.array(freqs)
+        t1 = time.time()
+        
+        for i in range(len(phiSearch)):
+            tsg = toneSpectrum_gpu(f0, d_freqs, fs, N, phi=phiSearch[i])
+            
+        t2 = time.time()
+        print("Naive GPU Kernel: %f s." % (t2-t1))
+        print("Check:")
+        mi = np.argmax(np.abs(cp.asnumpy(tsg)-ts))
+        print(tsg[mi])
+        print(ts[mi])
+        
+        
+        #%%
+        d_f0List = cp.zeros(50) + f0
+        d_AList = cp.zeros(50) + 1
+        d_phiSearch = cp.array(phiSearch)
+        
+        t1 = time.time()
+        
+        
+        for i in range(int(len(phiSearch)/50)):
+            d_phiList = d_phiSearch[i*50:(i+1)*50]
+            tsgm = toneSpectrumMulti_gpu(d_f0List, d_freqs, fs, N, d_phiList, d_AList)
+            
+        
+        t2 = time.time()
+        print("Batch-wise GPU Kernel: %f s." % (t2-t1))
+        
+        tsgcheck = cp.zeros((50,d_freqs.size), cp.complex128)
+        for k in range(50):
+            tsgcheck[k] = toneSpectrum_gpu(float(d_f0List[k]), d_freqs, fs, N, float(d_phiList[k]), float(d_AList[k]))
+        
+        print("Check:")
+        mi = cp.argmax(cp.abs(tsgcheck.flatten()-tsgm.flatten()))
+        print(tsgcheck.flatten()[mi])
+        print(tsgm.flatten()[mi])
     
-    t2 = time.time()
-    print("Batch-wise GPU Kernel: %f s." % (t2-t1))
-    
-    tsgcheck = cp.zeros((50,d_freqs.size), cp.complex128)
-    for k in range(50):
-        tsgcheck[k] = toneSpectrum_gpu(float(d_f0List[k]), d_freqs, fs, N, float(d_phiList[k]), float(d_AList[k]))
-    
-    print("Check:")
-    mi = cp.argmax(cp.abs(tsgcheck.flatten()-tsgm.flatten()))
-    print(tsgcheck.flatten()[mi])
-    print(tsgm.flatten()[mi])
-
+    except:
+        print("Skipping cupy unit tests.")

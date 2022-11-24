@@ -5,7 +5,7 @@ Created on Mon May 18 14:58:31 2020
 @author: Seo
 """
 
-
+import os
 import numpy as np
 import scipy as sp
 import scipy.signal as sps
@@ -15,6 +15,11 @@ import cpuWola as cpw
 from plotRoutines import *
 import scipy.cluster.vq as spc
 
+#%% 
+# Note that this function, which uses the cupy convolve, which in turn performs ffts,
+# tends to be inaccurate at the start of the array (during the rampup i.e. when taps
+# are being convolved with 0s)
+# Try to use the new classes that use kernels below
 def cp_lfilter(ftap: cp.ndarray, x: cp.ndarray, chunksize: int=None):
     '''
     Note: convert inputs into GPU arrays before passing them in.
@@ -74,9 +79,95 @@ class CupyFilter:
     def reset(self):
         self.delay[:] = 0
         
+#%% Raw kernel with shared mem for filtering
+class CupyKernelFilter:
+    def __init__(self):
+        with open(os.path.join(os.path.dirname(__file__), "custom_kernels/filter.cu"), "r") as fid:
+            sourcecode = fid.read()
+        self.module = cp.RawModule(code=sourcecode)
+        self.filter_smtaps_kernel = self.module.get_function("filter_smtaps")
+        self.filter_smtaps_sminput_kernel = self.module.get_function("filter_smtaps_sminput")
+        
+    def filter_smtaps(self, d_x: cp.ndarray, d_taps: cp.ndarray, THREADS_PER_BLOCK: int=128, OUTPUT_PER_BLK: int=128):
+        # Type checking
+        assert(d_taps.dtype == cp.float32)
+        assert(d_x.dtype == cp.complex64)
+        # Dimension checking
+        assert(d_x.ndim == 1 and d_taps.ndim == 1)
+        # Maximum length checking
+        assert(d_taps.nbytes <= 48000)
+        
+        # Allocate output
+        d_out = cp.zeros(d_x.size, dtype=cp.complex64)
+        
+        # Calculate shared memory requirement
+        smReq = d_taps.nbytes
+        
+        # Calculate number of blocks required and the output size per block
+        NUM_BLOCKS = d_x.size // OUTPUT_PER_BLK
+        NUM_BLOCKS = NUM_BLOCKS + 1 if d_x.size % OUTPUT_PER_BLK != 0 else NUM_BLOCKS # +1 if remnants
+        
+        # Run kernel
+        self.filter_smtaps_kernel(
+            (NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+            (d_x, d_x.size,
+             d_taps, d_taps.size,
+             OUTPUT_PER_BLK,
+             d_out, d_out.size),
+            shared_mem=smReq
+        )
+        
+        return d_out
     
+    def filter_smtaps_sminput(self, d_x: cp.ndarray, d_taps: cp.ndarray, THREADS_PER_BLOCK: int=128):
+        # Type checking
+        assert(d_taps.dtype == cp.float32)
+        assert(d_x.dtype == cp.complex64)
+        # Dimension checking
+        assert(d_x.ndim == 1 and d_taps.ndim == 1)
+        # Maximum length checking
+        assert(d_taps.size < 2400)
+        # Note that this length is fixed as we draw a line at a minimum of 2 * tapslength for the workspace.
+        # In theory, it can still work with anything more than 1 * tapslength, but this is the line we draw.
+        
+        # Allocate output
+        d_out = cp.zeros(d_x.size, dtype=cp.complex64)
+        
+        # Calculate the workspace available (we move in multiples of THREADS_PER_BLOCK)
+        workspaceFactor = ((48000 - d_taps.nbytes) - (d_taps.size-1) * 8) // 8 // THREADS_PER_BLOCK
+        # print(workspaceFactor)
+        workspaceSize = workspaceFactor * THREADS_PER_BLOCK + d_taps.size - 1
+        OUTPUT_PER_BLK = workspaceFactor * THREADS_PER_BLOCK
+        
+        # Calculate shared memory requirement
+        smReq = d_taps.nbytes + workspaceSize * 8
+        
+        # Calculate number of blocks required and the output size per block
+        NUM_BLOCKS = d_x.size // OUTPUT_PER_BLK
+        NUM_BLOCKS = NUM_BLOCKS + 1 if d_x.size % OUTPUT_PER_BLK != 0 else NUM_BLOCKS # +1 if remnants
+        
+        # Run kernel
+        self.filter_smtaps_sminput_kernel(
+            (NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+            (d_x, d_x.size,
+             d_taps, d_taps.size,
+             OUTPUT_PER_BLK,
+             workspaceSize,
+             d_out, d_out.size),
+            shared_mem=smReq
+        )
+        
+        return d_out
+        
+        
+        
+        
+        
     
-# Raw kernel for tone creation
+            
+        
+    
+#%% Raw kernel for upfirdn
 upFirdnKernel = cp.RawKernel(r'''
 #include <cupy/complex.cuh>
 extern "C" __global__

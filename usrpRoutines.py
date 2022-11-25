@@ -94,7 +94,6 @@ def getAvailableSubdirpaths(maindir):
     subdirpaths = [i for i in subdirpaths if os.path.isdir(i)]
     
     return subdirpaths
-        
     
 
 #%% Convenience classes
@@ -302,8 +301,8 @@ class SortedFolderReader(FolderReader):
         fts : list of ints.
             File times.
         '''
-        numFiles,start = self._getbounds(numFiles, start)
-        alldata, fps = super().get(numFiles, start)
+        # numFiles,start = self._getbounds(numFiles, start)
+        alldata, fps = super().get(numFiles, start) # This already calls getbounds?
         fts = self.filetimes[self.fidx-numFiles:self.fidx]
         return alldata, fps, fts
     

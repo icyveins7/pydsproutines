@@ -129,6 +129,19 @@ class FolderReader:
     def reset(self):
         self.fidx = 0
         
+    def getNextFile(self):
+        # Specifically only retrieve the next single file, provided as a convenience
+        numFiles, start = self._getbounds(1, None)
+        
+        end = start + numFiles
+        if end > len(self.filepaths):
+            raise ValueError("Insufficient files remaining.")
+        self.fidx = end
+        
+        fps = self.filepaths[start]
+        alldata = simpleBinRead(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
+        return alldata, fps
+        
     def get(self, numFiles=None, start=None):
         numFiles, start = self._getbounds(numFiles,start)
         

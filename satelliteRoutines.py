@@ -11,6 +11,7 @@ import re
 from sgp4.api import Satrec, SatrecArray, jday
  # Apparently, generating satellite positions with WGS72 is more accurate, as that is what the TLEs are generated from
 from sgp4.api import WGS72OLD, WGS72, WGS84
+from sgp4.api import SGP4_ERRORS
 
 #%% TLE Parser
 class TLEfile:
@@ -72,6 +73,47 @@ class Satellite:
 
         '''
         return cls(tle[name], name, const)
+    
+    def _parseErrors(self, e: int):
+        if np.any(e != 0):
+            # Get the first instance and return the error
+            idx = np.argmax(e != 0) # This returns on the first True
+            raise Exception(SGP4_ERRORS[e[idx]])
+    
+    ### Main propagation methods
+    def propagate(self, jd: np.ndarray, fr: np.ndarray):
+        '''
+        This is just a redirect to the sgp4 call. We assume array inputs.
+        '''
+        e, r, v = self.satrec.sgp4_array(jd, fr)
+        self._parseErrors(e)
+        return r, v
+    
+    def propagateFrom(self, jd0: float, fr0: float, start: float, stop: float, step: float):
+        fr = fr0 + np.arange(start, stop, step)
+        jd = jd0 + np.zeros(fr.size)
+        r, v = self.propagate(jd, fr)
+        return r, v
+    
+    def propagateFromEpoch(self, start: float, stop: float, step: float):
+        r, v = self.propagateFrom(
+            self.satrec.jdsatepoch,
+            self.satrec.jdsatepochF,
+            start,
+            stop,
+            step
+        )
+        return r, v
+    
+    def propagateSecondsFromEpoch(self, seconds: float):
+        '''
+        Not advisable to use this as it reverts to Pythonic scalars, hence slow.
+        '''
+        e, r, v = self.satrec.sgp4_tsince(seconds/60.0)
+        return e, r, v
+        
+    def propagateUtcTimestamps(self, timestamps: np.ndarray):
+        pass
 
 
 #%% Testing
@@ -98,4 +140,9 @@ if __name__ == "__main__":
     print(e)
     print(r)
     print(v)
+    
+    #%%
+    sat = Satellite([s,t])
+    r, v = sat.propagate(jd, fr)
+    r, v = sat.propagateFromEpoch(-1.0, 1.0, 0.001)
     

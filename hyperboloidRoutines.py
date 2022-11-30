@@ -82,7 +82,7 @@ class Hyperboloid:
         yshape = Y.shape
         zshape = Z.shape
         
-        # Create 3-d vectors
+        # Create 3-d vectors, each vector is now a column
         vecs = np.vstack((
                 X.reshape(-1),
                 Y.reshape(-1),
@@ -98,6 +98,13 @@ class Hyperboloid:
         Z1 = vecs[2,:].reshape(zshape)
         
         return X1, Y1, Z1
+    
+    def inverseTransform(self, points: np.ndarray):
+        assert(points.ndim == 2 and points.shape[0] == 3) # Enforce shape
+        # Broadcast the inverse translation
+        vecs = points - self.mu.reshape((-1,1))
+        vecs = np.linalg.inv(self.Rot) @ vecs
+        return vecs
     
     # Other methods    
     def visualize(self, v=np.arange(0, 2, 0.1), ax=None, bothSheets=False, useSurf=False):
@@ -237,6 +244,14 @@ class Hyperboloid:
         
                     
         return thetareals, ve
+    
+    def _estimateSpheroidV(self, omega, lmbda):
+        # First get the midpoint of the foci
+        fociMid = np.mean(self.foci, axis=1) # 1-d row vector
+        # Now estimate the v required to reach the centre, as a gauge
+        # TODO: complete by maybe converting to spheroid polar coords and estimating lengths
+        # Then converting to the v parameter
+        pass
         
         
     def intersectOblateSpheroid(

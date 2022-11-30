@@ -6,13 +6,72 @@ Created on Tue Nov 29 13:21:13 2022
 """
 
 import numpy as np
+import re
 
 from sgp4.api import Satrec, SatrecArray, jday
  # Apparently, generating satellite positions with WGS72 is more accurate, as that is what the TLEs are generated from
 from sgp4.api import WGS72OLD, WGS72, WGS84
 
-#%% Some convenient wrappers
+#%% TLE Parser
+class TLEfile:
+    def __init__(self, filepath: str):
+        self.filepath = filepath # To help remember which file this is
+        with open(filepath, "r") as fid:
+            self.lines = fid.readlines()
+            
+        self.tles = self._parse()
+            
+    # Internal parsing method
+    def _parse(self):
+        tles = dict()
+        currentSat = None
+        for line in self.lines:
+            if not re.match("\\d \\d+", line):
+                currentSat = line.strip()
+                tles[currentSat] = []
+            else:
+                tles[currentSat].append(line.strip())
+                assert(len(tles[currentSat]) <= 2)
+                
+        return tles
+    
+    # Convenient getter
+    def __getitem__(self, key):
+        return self.tles[key]
+        
 
+#%% Some convenient wrappers
+class Satellite:
+    # Redirector for constants
+    consts = {
+        'wgs84': WGS84,
+        'wgs72': WGS72,
+        'wgs72old': WGS72OLD
+    }
+    
+    def __init__(self, tle: list, name: str=None, const: str='wgs84'):
+        self.tle = tle
+        self.name = name
+        self.const = self.consts[const]
+        # Call the sgp4 stuff
+        self.satrec = Satrec.twoline2rv(*tle, self.const)
+        
+    @classmethod
+    def fromName(cls, tle: TLEfile, name: str, const: str='wgs84'):
+        '''
+        Automatically constructs from a TLEfile instance (see above) and a desired satellite name.
+
+        Parameters
+        ----------
+        tle : TLEfile
+            A prepared TLEfile class instance.
+        name : str
+            Desired name of satellite.
+        const : str, optional
+            Gravity constant. The default is 'wgs84'.
+
+        '''
+        return cls(tle[name], name, const)
 
 
 #%% Testing

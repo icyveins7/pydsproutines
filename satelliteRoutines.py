@@ -41,7 +41,7 @@ class TLEfile:
         return self.tles[key]
         
 
-#%% Some convenient wrappers
+#%% Some convenient wrappers for pure SGP4
 class Satellite:
     # Redirector for constants
     consts = {
@@ -114,6 +114,9 @@ class Satellite:
         
     def propagateUtcTimestamps(self, timestamps: np.ndarray):
         pass
+
+#%% However, skyfield offers very similar functionality
+from skyfield.api import EarthSatellite, load, wgs84
 
 
 #%% Testing

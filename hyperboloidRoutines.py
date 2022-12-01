@@ -536,7 +536,7 @@ if __name__ == "__main__":
     ax.set_box_aspect(None)
     # Attempt to find intersection points
     timer.start()
-    tpts = hsp.intersectOblateSpheroid(vs,omega,lmbda)
+    tpts, ve = hsp.intersectOblateSpheroid(vs,omega,lmbda)
     timer.end("intersectOblateSpheroid, %d pts" % (vs.size))
     ax.plot3D(tpts[0,:],tpts[1,:],tpts[2,:],'r')
     # Check if points truly lie on surface
@@ -605,7 +605,7 @@ if __name__ == "__main__":
             omega = 1.0
             lmbda = 0.9
             v = np.arange(1.5, 3, 0.01)
-            tpts = hr.intersectOblateSpheroid(v, omega, lmbda)
+            tpts, ve = hr.intersectOblateSpheroid(v, omega, lmbda)
             np.testing.assert_allclose(
                 (tpts[0]**2 + tpts[1]**2) / (omega**2) + tpts[2]**2 / (lmbda**2),
                 np.ones(tpts.shape[1])

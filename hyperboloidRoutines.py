@@ -223,20 +223,38 @@ class Hyperboloid:
         for i in np.arange(tc.shape[1]):
             roots = np.roots(tc[::-1,i].astype(np.complex128))
         
-            thetas[i,:] = np.arctan(roots) * 2
+            ## DEPRECATED
+            # thetas[i,:] = np.arctan(roots) * 2
         
-        
-            for theta in thetas[i,:]:
-                if np.imag(theta) == 0:
-                    thetareal = np.real(theta)
-                    if thetareal > 0:
-                        thetareals[1,pctr] = thetareal
-                        ve[1,pctr] = v[i]
-                        pctr += 1
-                    else:
-                        thetareals[0,-1-mctr] = thetareal
-                        ve[0,-1-mctr] = v[i]
-                        mctr += 1
+            # for theta in thetas[i,:]:
+            #     if np.imag(theta) == 0:
+            #         thetareal = np.real(theta)
+            #         if thetareal > 0:
+            #             thetareals[1,pctr] = thetareal
+            #             ve[1,pctr] = v[i]
+            #             pctr += 1
+            #         else:
+            #             thetareals[0,-1-mctr] = thetareal
+            #             ve[0,-1-mctr] = v[i]
+            #             mctr += 1
+                        
+                        
+            ## Instead of checking sign, sort them (this accounts for two negative or two positive roots, which is possible)
+            thetas = np.arctan(roots) * 2
+            thetas = np.real(thetas[np.imag(thetas) == 0]) # Extract only real roots
+            thetas = np.sort(thetas) # sort them
+            
+            # Make the assumption that there are only up to 2 roots (which there should only be)
+            if thetas.size >= 1:
+                # Simply append to the negatives
+                thetareals[0,-1-mctr] = thetas[0]
+                ve[0, -1-mctr] = v[i]
+                mctr += 1
+            if thetas.size == 2:
+                # If more than one, we push the second one to the positives, since it's sorted already
+                thetareals[1,pctr] = thetas[1]
+                ve[1,pctr] = v[i]
+                pctr += 1
                     
         # Cut it
         thetareals = thetareals.flatten()[tc.shape[1]-mctr : tc.shape[1]+pctr]
@@ -370,7 +388,7 @@ class Hyperboloid:
         # tpoints = np.zeros_like(points)
         # tpoints[0,:], tpoints[1,:], tpoints[2,:] = self.transform(points[0,:],points[1,:],points[2,:])
 
-        return tpoints
+        return tpoints, nve
         
         
         

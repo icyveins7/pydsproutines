@@ -12,7 +12,7 @@ import time
 from spectralRoutines import czt, CZTCached
 from signalCreationRoutines import makeFreq
 from musicRoutines import MUSIC
-from numba import jit
+# from numba import jit
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sqlite3 as sq
 import concurrent.futures

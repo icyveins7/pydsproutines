@@ -8,7 +8,7 @@ Created on Thu Apr  1 13:47:58 2021
 import numpy as np
 import scipy as sp
 from scipy.stats.distributions import chi2
-from numba import jit, njit
+# from numba import jit, njit
 import time
 
 #%% Coordinate transformations

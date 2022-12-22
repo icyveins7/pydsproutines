@@ -7,7 +7,7 @@ Created on Fri Jun 19 16:21:35 2020
 
 import numpy as np
 from timingRoutines import Timer
-from numba import njit, jit
+# from numba import njit, jit
 from xcorrRoutines import *
 import warnings
 
@@ -210,7 +210,7 @@ class SimpleDemodulatorPSK:
         return self.syms, sample, rotation
     
     @staticmethod
-    @njit('uint32[:,:](uint8[:], int32[:], intc, uint8[:], intc)', cache=True, nogil=True)
+    # @njit('uint32[:,:](uint8[:], int32[:], intc, uint8[:], intc)', cache=True, nogil=True)
     def _ambleSearch(m_amble, search, m, syms, length):
         matches = np.zeros((search.size, m), dtype=np.uint32)
         for i in np.arange(search.size): # Use np.arange instead of range
@@ -770,7 +770,7 @@ except Exception as e:
 
 
 #%%
-@jit(nopython=True)
+# @jit(nopython=True)
 def demodulateCP2FSK(syms, h, up):
     m = np.array([[-1],
                   [+1]]) # these map to [0, 1] bits

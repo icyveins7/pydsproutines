@@ -7,7 +7,7 @@ Created on Tue Sep 13 17:52:48 2022
 
 import numpy as np
 from plotRoutines import *
-from numba import njit
+# from numba import njit
 
 from timingRoutines import Timer
 
@@ -212,7 +212,7 @@ class Hyperboloid:
             return msheet, psheet
         
     @staticmethod  
-    @njit('Tuple((float64[:], float64[:]))(float64[:,:], float64[:])', nogil=True)
+    # @njit('Tuple((float64[:], float64[:]))(float64[:,:], float64[:])', nogil=True)
     def _intersectOblateSpheroidLoop(tc, v):
         thetas = np.zeros((tc.shape[1], 4), dtype=np.complex128)
         thetareals = np.zeros((2, tc.shape[1]), dtype=np.float64)

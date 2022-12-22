@@ -11,7 +11,7 @@ import scipy.signal as sps
 import time
 import sympy
 
-from numba import jit, njit
+# from numba import jit, njit
 # jit not used if not supported like in randint, or just slower..
 # usually requires loops to be present for some benefit to be seen
 
@@ -253,7 +253,7 @@ def padZeros_fftfactors(sig, minpad, fftprimeMax=7):
     return out, padlen, d
     
     
-@jit(nopython=True)
+# @jit(nopython=True)
 def makeFreq(length, fs):
     freq = np.zeros(length)
     for i in range(length):

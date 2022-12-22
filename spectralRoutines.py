@@ -7,7 +7,7 @@ Created on Wed Apr  7 16:26:26 2021
 
 import numpy as np
 import sympy
-from numba import jit
+# from numba import jit
 # import cupy as cp
 import time
 import scipy.signal as sps
@@ -294,7 +294,7 @@ def dft(x, freqs, fs):
     
     return output
 
-@jit(nopython=True)
+# @jit(nopython=True)
 def toneSpectrum(f0, freqs, fs, N, phi=0, A=1.0):
     '''
     Returns a spectrum corresponding to applying DFT to a tone with frequency f0 and phase phi,

@@ -15,13 +15,34 @@ import sympy
 # jit not used if not supported like in randint, or just slower..
 # usually requires loops to be present for some benefit to be seen
 
+#%%
 def randBits(length, m):
     return np.random.randint(0,m,length,dtype=np.uint8)
 
 def symsFromBits(bits, m, dtype=np.complex128):
     return np.exp(1j*2*np.pi*bits/m).astype(dtype)
     
-def randPSKsyms(length, m, dtype=np.complex128):
+def randPSKsyms(length: int, m: int, dtype=np.complex128):
+    '''
+    Generates array of random m-ary PSK symbols.
+
+    Parameters
+    ----------
+    length : int
+        Length of array.
+    m : int
+        Order of PSK.
+    dtype : numpy type, optional
+        The default is np.complex128.
+
+    Returns
+    -------
+    syms : np.ndarray
+        Array of symbols.
+    bits : np.ndarray
+        Associated array of bits.
+
+    '''
     bits = randBits(length, m)
     return symsFromBits(bits, m, dtype), bits
 
@@ -262,6 +283,7 @@ def makeFreq(length, fs):
             freq[i] = freq[i] - fs
     return freq
 
+#%%
 try:
     import cupy as cp
     

@@ -286,6 +286,7 @@ def makeFreq(length, fs):
 #%%
 try:
     import cupy as cp
+    import os
     
     # Raw kernel for tone creation
     addPhaseKernel = cp.RawKernel(r''' 
@@ -347,6 +348,71 @@ try:
                             freq,
                             tstart,
                             tstep))
+        
+    # Raw kernels for tone creation
+    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "genTones.cu"), "r") as fid:   
+        module = cp.RawModule(code=fid.read())
+        genTonesDirect_64fKernel = module.get_function("genTonesDirect_64f")
+        genTonesScaling_64fKernel = module.get_function("genTonesScaling_64f")
+        
+        
+    def cupyGenTonesDirect(f0: float, fstep: float, numFreqs: int, length: int):
+        THREADS_PER_BLOCK = 256
+        NUM_BLOCKS = length // THREADS_PER_BLOCK + 1
+        
+        out = cp.zeros((numFreqs, length), dtype=cp.complex128)
+        
+        genTonesDirect_64fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
+                                 (f0, fstep, numFreqs, length, out))
+        
+        return out
+    
+    def cupyGenTonesScaling(f0: float, fstep: float, numFreqs: int, length: int):
+        '''THIS APPEARS TO BE SLOWER!'''
+        THREADS_PER_BLOCK = 256
+        NUM_BLOCKS = length // THREADS_PER_BLOCK + 1
+        
+        out = cp.zeros((numFreqs, length), dtype=cp.complex128)
+        
+        genTonesScaling_64fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
+                                 (f0, fstep, numFreqs, length, out))
+        
+        return out
+        
     
 except ModuleNotFoundError as e:
     print("Cupy not found. Ignoring cupy imports.")
+    
+    
+#%%
+if __name__ == "__main__":
+    from verifyRoutines import *
+    from timingRoutines import *
+    timer = Timer()
+    
+    try:
+        import cupy as cp
+        
+        
+        # Test params
+        f0 = 0.0
+        numFreqs = 1000
+        fstep = 1/numFreqs
+        length = numFreqs
+        
+        # Actual test vs standard cupy calls
+        timer.start()
+        customtones = cupyGenTonesDirect(f0, fstep, numFreqs, length)
+        timer.evt("direct kernel")
+        customtones_scaling = cupyGenTonesScaling(f0, fstep, numFreqs, length)
+        timer.evt("scaling kernel")
+        tones = cp.exp(1j*2*cp.pi*cp.arange(f0, 1.0, fstep).reshape((-1,1)) * cp.arange(length))
+        timer.end("cupy")
+        
+        print("Comparing naive tones kernel with cupy")
+        compareValues(customtones.get().flatten(), tones.get().flatten())
+        print("Comparing scaling tones kernel with cupy")
+        compareValues(customtones_scaling.get().flatten(), tones.get().flatten())
+        
+    except ModuleNotFoundError as e:
+        print("Skipping cupy-related tests.")

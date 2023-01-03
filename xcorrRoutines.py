@@ -1420,7 +1420,8 @@ except:
 
 #%% Cythonised classes
 import os
-os.add_dll_directory(os.path.join(os.environ['IPPROOT'], 'redist', 'intel64')) # Configure IPP dll reliance
+if os.name == 'nt': # Load the directory on windows
+    os.add_dll_directory(os.path.join(os.environ['IPPROOT'], 'redist', 'intel64')) # Configure IPP dll reliance
 
 try: 
     from cython_ext.CyGroupXcorrFFT import CyGroupXcorrFFT

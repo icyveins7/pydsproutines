@@ -8,12 +8,15 @@ Created on Sun Jan  1 22:50:36 2023
 
 from configparser import ConfigParser, RawConfigParser
 
-#%% A wrapper for the most common use-case, a single config file, without having to call the read() again
+#%% 
 class DirectSingleConfig(ConfigParser):
+    '''A wrapper for the most common use-case, a single config file, without having to call the read() again.'''
     def __init__(self, filename: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.read(filename)
         self.currentSection = None
+        # Gonna take the liberty to set this since I always use it
+        self.optionxform = lambda option: option # preserves upper-case
         
     @classmethod
     def new(cls, filename: str, *args, **kwargs):
@@ -23,9 +26,14 @@ class DirectSingleConfig(ConfigParser):
     def loadSection(self, section: str):
         '''We use this to overload our own methods, without having to rewrite a SectionProxy class.'''
         self.currentSection = self.__getitem__(section)
-        
-#%%
-class SingleSignalConfig(DirectSingleConfig):
+
+#%% 
+class SingleSourceConfigMixin:
+    '''This mixin contains the parameters needed to read the samples.'''
+    @property
+    def srcdir(self):
+        return self.currentSection.get('srcdir')
+    
     @property
     def fs(self):
         return self.currentSection.getfloat('fs')
@@ -35,12 +43,53 @@ class SingleSignalConfig(DirectSingleConfig):
         return self.currentSection.getfloat('fc')
     
     @property
+    def conjSamples(self):
+        return self.currentSection.getbool('conjSamples')
+    
+    @property
+    def headerBytes(self):
+        return self.currentSection.getint('headerBytes')
+    
+#%% 
+class SingleTargetConfigMixin:
+    '''This mixin contains parameters related to a single target signal in the samples, and how to process it (for demodulation etc.).'''
+    @property
+    def target_fc(self):
+        return self.currentSection.getfloat('target_fc')
+    
+    @property
     def freqshift(self):
         return self.currentSection.getfloat('freqshift')
     
     @property
     def baud(self):
         return self.currentSection.getfloat('baud')
+    
+    @property
+    def numTaps(self):
+        return self.currentSection.getfloat('numTaps')
+    
+    @property
+    def target_osr(self):
+        return self.currentSection.getint('target_osr')
+    
+#%%
+class SinglePeriodicTargetConfigMixin(SingleTargetConfigMixin):
+    @property
+    def bitsPerBurst(self):
+        return self.currentSection.getint('bitsPerBurst')
+    
+    @property
+    def periodBits(self):
+        return self.currentSection.getint('periodBits')    
+   
+#%% Some common combinations
+class Src1Target1Config(SingleSourceConfigMixin, SingleTargetConfigMixin, DirectSingleConfig):
+    pass
+
+class Src1PeriodicTarget1Config(SingleSourceConfigMixin, SinglePeriodicTargetConfigMixin, DirectSingleConfig):
+    pass
+
         
 #%%
 if __name__ == "__main__":
@@ -55,7 +104,7 @@ if __name__ == "__main__":
     os.remove('test.ini')
     
     #%% Testing SingleSignalConfig
-    conf = SingleSignalConfig("test.ini")
+    conf = Src1Target1Config("test.ini") # SingleSignalConfig("test.ini")
     # Set in memory for now
     fs = 100.0
     fc = 1000.0
@@ -73,3 +122,25 @@ if __name__ == "__main__":
     assert(fc == conf.fc)
     assert(freqshift == conf.freqshift)
     assert(baud == conf.baud)
+    
+    #%% Testing periodic config
+    conf = Src1PeriodicTarget1Config("test.ini")
+    
+    bitsPerBurst = 50
+    periodBits = 100
+    
+    conf['s'] = {
+        'fs': fs,
+        'fc': fc,
+        'freqshift': freqshift,
+        'baud': baud,
+        'bitsPerBurst': bitsPerBurst,
+        'periodBits': periodBits
+    }
+    conf.loadSection('s')
+    assert(fs == conf.fs)
+    assert(fc == conf.fc)
+    assert(freqshift == conf.freqshift)
+    assert(baud == conf.baud)
+    assert(bitsPerBurst == conf.bitsPerBurst)
+    assert(periodBits == conf.periodBits)

@@ -48,6 +48,9 @@ def simpleBinRead(filename, numSamps=-1, in_dtype=np.int16, out_dtype=np.complex
     '''
     Simple, single-file complex data reader. numSamps refers to the number of complex samples.
     '''
+    if in_dtype == np.complex64 or in_dtype == np.complex128:
+        raise TypeError("in_dtype must be a real type. You likely want float32 or float64 instead.")
+    
     data = np.fromfile(filename, dtype=in_dtype, count=numSamps*2, offset=offset).astype(np.float32).view(out_dtype)
     
     return data
@@ -116,7 +119,9 @@ class FolderReader:
         self.maxsizeof = int(8e9) # in bytes, maximum usage
         
     def refreshFilelists(self):
-        reqMinFilesize = np.zeros(1, dtype=self.in_dtype).itemsize * 2 * self.numSampsPerFile
+        baseObj = np.zeros(1, dtype=self.in_dtype)
+        reqMinFilesize = baseObj.itemsize * 2 * self.numSampsPerFile if np.isrealobj(baseObj) else baseObj.itemsize * self.numSampsPerFile
+        # reqMinFilesize = np.zeros(1, dtype=self.in_dtype).itemsize * 2 * self.numSampsPerFile
 
         dircontents = os.listdir(self.folderpath)
         if self.ignoreInsufficientData:
@@ -261,7 +266,7 @@ class GroupDatabase:
             r = self.cur.fetchall()
             return r
         
-    
+#%%
 class SortedFolderReader(FolderReader):
     def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64, ensure_incremental=True):
         super().__init__(folderpath, numSampsPerFile, extension, in_dtype, out_dtype)

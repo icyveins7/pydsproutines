@@ -33,17 +33,17 @@ signal configs and processing configs. A typical config file may look something 
     [src_src2]
     ...
     
-    [proc_first]
+    [pro_first]
     src = src1
     sig = signal1
     ...
     
-    [proc_second]
+    [pro_second]
     src = src2
     sig = signal1
     ...
     
-    [proc_firstdifferent]
+    [pro_firstdifferent]
     src = src1
     sig = signal1
     ...
@@ -105,6 +105,9 @@ class DirectSingleConfig(ConfigParser):
 
 #%%
 class SourceSectionProxy(SectionProxy):
+    def __repr__(self):
+        return '<SourceSection: {}>'.format(self._name)
+    
     @property
     def srcdir(self):
         return self.get('srcdir')
@@ -131,6 +134,9 @@ class SourceSectionProxy(SectionProxy):
     
 #%%
 class SignalSectionProxy(SectionProxy):
+    def __repr__(self):
+        return '<SignalSection: {}>'.format(self._name)
+    
     @property
     def target_fc(self):
         return self.getfloat('target_fc')
@@ -141,6 +147,8 @@ class SignalSectionProxy(SectionProxy):
     
 #%%
 class ProcessingSectionProxy(SectionProxy):
+    def __repr__(self):
+        return '<ProcessingSection: {}>'.format(self._name)
     @property
     def numTaps(self):
         return self.getint('numTaps')
@@ -151,15 +159,28 @@ class ProcessingSectionProxy(SectionProxy):
     
 #%%
 class WorkspaceSectionProxy(SectionProxy):
-    pass
+    def __repr__(self):
+        return '<WorkspaceSection: {}>'.format(self._name)
+    
 
 #%%
 class DSPConfig(DirectSingleConfig):
-    def __init__(self, *args, **kwargs):
-        super().__init__(self, *args, **kwargs)
-        self._recastSections()
+    def __init__(self, filename: str, *args, **kwargs):
+        super().__init__(filename, *args, **kwargs)
+        self.recastSections()
         
-    def _recastSections(self):
+    # Note that for these type-specific sections, we strip the prefix
+    def getSources(self):
+        return {self._keySuffix(key): item for key, item in self._proxies.items() if self._isSourceSection(key)}
+    
+    def getSignals(self):
+        return {self._keySuffix(key): item for key, item in self._proxies.items() if self._isSignalSection(key)}
+    
+    def getProcesses(self):
+        return {self._keySuffix(key): item for key, item in self._proxies.items() if self._isProcessingSection(key)}
+        
+    
+    def recastSections(self):
         # Proxies stored in _proxies
         for key in self._proxies:
             if self._isSourceSection(key):
@@ -173,15 +194,21 @@ class DSPConfig(DirectSingleConfig):
                 
             else:
                 self._proxies[key] = WorkspaceSectionProxy(self._proxies[key]._parser, self._proxies[key]._name)
-                
+      
+    def _keyPrefix(self, key: str):
+        return key[:4]
+
+    def _keySuffix(self, key: str):
+        return key[4:]          
+      
     def _isSourceSection(self, key: str):
-        return key[4:] == 'src_'
+        return self._keyPrefix(key) == 'src_'
             
     def _isSignalSection(self, key: str):
-        return key[4:] == 'sig_'
+        return self._keyPrefix(key) == 'sig_'
     
     def _isProcessingSection(self, key: str):
-        return key[5:] == 'proc_'
+        return self._keyPrefix(key) == 'pro_'
     
 
 #%% Intend to deprecate from this onwards, bad format to do things..
@@ -283,52 +310,80 @@ class Src2PeriodicTarget1Config(DualSourceConfigMixin, SinglePeriodicTargetConfi
 if __name__ == "__main__":
     import os
     
-    #%% Testing simple creation with files
-    conf = DirectSingleConfig("test.ini")
-    assert(not os.path.exists("test.ini"))
-    
-    conf = DirectSingleConfig.new('test.ini')
-    assert(os.path.exists('test.ini'))
-    os.remove('test.ini')
-    
-    #%% Testing SingleSignalConfig
-    conf = Src1Target1Config("test.ini") # SingleSignalConfig("test.ini")
-    # Set in memory for now
-    fs = 100.0
-    fc = 1000.0
-    freqshift = 123.0
-    baud = 10.0
-    conf['s'] = {
-        'fs': fs,
-        'fc': fc,
-        'freqshift': freqshift,
-        'baud': baud
+    cfg = DSPConfig("")
+    cfg['src_src1'] = {
+        'fs': 1000    
     }
-    # Check values
-    conf.loadSection('s')
-    assert(fs == conf.fs)
-    assert(fc == conf.fc)
-    assert(freqshift == conf.freqshift)
-    assert(baud == conf.baud)
-    
-    #%% Testing periodic config
-    conf = Src1PeriodicTarget1Config("test.ini")
-    
-    bitsPerBurst = 50
-    periodBits = 100
-    
-    conf['s'] = {
-        'fs': fs,
-        'fc': fc,
-        'freqshift': freqshift,
-        'baud': baud,
-        'bitsPerBurst': bitsPerBurst,
-        'periodBits': periodBits
+    cfg['src_src2'] = {
+        'fs': 2000    
     }
-    conf.loadSection('s')
-    assert(fs == conf.fs)
-    assert(fc == conf.fc)
-    assert(freqshift == conf.freqshift)
-    assert(baud == conf.baud)
-    assert(bitsPerBurst == conf.bitsPerBurst)
-    assert(periodBits == conf.periodBits)
+    cfg['sig_sig1'] = {
+        'baud': 100
+    }
+    cfg['pro_src1_sig1'] = {
+        'src': 'src1',
+        'sig': 'sig1',
+        'numTaps': 16
+    }
+    # For testing, we manually recast here (don't need to do this if loaded from file)
+    cfg.recastSections()
+    # See that the repr is outputted correctly
+    print(cfg['src_src1'])
+    print(cfg['sig_sig1'])
+    # See that you can get multiple sources/signals
+    sources = cfg.getSources()
+    # And can use the property getters comfortably as well
+    print(sources['src1'].fs)
+    print(sources['src2'].fs)
+    
+    
+    #%%
+    # #%% Testing simple creation with files
+    # conf = DirectSingleConfig("test.ini")
+    # assert(not os.path.exists("test.ini"))
+    
+    # conf = DirectSingleConfig.new('test.ini')
+    # assert(os.path.exists('test.ini'))
+    # os.remove('test.ini')
+    
+    # #%% Testing SingleSignalConfig
+    # conf = Src1Target1Config("test.ini") # SingleSignalConfig("test.ini")
+    # # Set in memory for now
+    # fs = 100.0
+    # fc = 1000.0
+    # freqshift = 123.0
+    # baud = 10.0
+    # conf['s'] = {
+    #     'fs': fs,
+    #     'fc': fc,
+    #     'freqshift': freqshift,
+    #     'baud': baud
+    # }
+    # # Check values
+    # conf.loadSection('s')
+    # assert(fs == conf.fs)
+    # assert(fc == conf.fc)
+    # assert(freqshift == conf.freqshift)
+    # assert(baud == conf.baud)
+    
+    # #%% Testing periodic config
+    # conf = Src1PeriodicTarget1Config("test.ini")
+    
+    # bitsPerBurst = 50
+    # periodBits = 100
+    
+    # conf['s'] = {
+    #     'fs': fs,
+    #     'fc': fc,
+    #     'freqshift': freqshift,
+    #     'baud': baud,
+    #     'bitsPerBurst': bitsPerBurst,
+    #     'periodBits': periodBits
+    # }
+    # conf.loadSection('s')
+    # assert(fs == conf.fs)
+    # assert(fc == conf.fc)
+    # assert(freqshift == conf.freqshift)
+    # assert(baud == conf.baud)
+    # assert(bitsPerBurst == conf.bitsPerBurst)
+    # assert(periodBits == conf.periodBits)

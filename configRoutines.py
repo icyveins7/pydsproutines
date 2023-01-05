@@ -59,6 +59,32 @@ class SingleSourceConfigMixin:
     def headerBytes(self):
         return self.currentSection.getint('headerBytes')
     
+#%%
+class DualSourceConfigMixin(SingleSourceConfigMixin):
+    '''
+    This mixin contains all the single (primary) source parameters,
+    plus an extra set prefixed with 'sec_' to entail a secondary source.
+    '''
+    @property
+    def sec_srcdir(self):
+        return self.currentSection.get('sec_srcdir')
+    
+    @property
+    def sec_fs(self):
+        return self.currentSection.getfloat('sec_fs')
+    
+    @property
+    def sec_fc(self):
+        return self.currentSection.getfloat('sec_fc')
+    
+    @property
+    def sec_conjSamples(self):
+        return self.currentSection.getbool('sec_conjSamples')
+    
+    @property
+    def sec_headerBytes(self):
+        return self.currentSection.getint('sec_headerBytes')
+    
 #%% 
 class SingleTargetConfigMixin:
     '''This mixin contains parameters related to a single target signal in the samples, and how to process it (for demodulation etc.).'''
@@ -99,6 +125,11 @@ class Src1Target1Config(SingleSourceConfigMixin, SingleTargetConfigMixin, Direct
 class Src1PeriodicTarget1Config(SingleSourceConfigMixin, SinglePeriodicTargetConfigMixin, DirectSingleConfig):
     pass
 
+class Src2Target1Config(DualSourceConfigMixin, SingleTargetConfigMixin, DirectSingleConfig):
+    pass
+
+class Src2PeriodicTarget1Config(DualSourceConfigMixin, SinglePeriodicTargetConfigMixin, DirectSingleConfig):
+    pass
         
 #%%
 if __name__ == "__main__":

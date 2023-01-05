@@ -320,7 +320,7 @@ class SortedFolderReader(FolderReader):
         return alldata, fps, fts
     
     def splitHighAmpSubfolders(self, targetfolderpath: str, selectTimes: list=None,
-                               minAmp: float=1e3, bufFront: int=1, bufBack: int=1, onlyExtractTimes: bool=False,
+                               minAmp: float=1e3, bufFront: int=1, bufBack: int=1, onlyExtractTimes: bool=False, onlyExtractGroups: bool=False,
                                fmt: str="%06d", useDatabase: bool=False, dbfilepath: str=None):
         '''
         Detects files with high amplitudes, and selects a group of files around them based on bufFront/bufBack.
@@ -374,7 +374,8 @@ class SortedFolderReader(FolderReader):
         
         # Now pull groups out where the difference is more than 1
         groupSplitIdx = np.hstack((0,(np.argwhere(np.diff(selectTimes) > 1) + 1).flatten(), len(selectTimes)))
-        # print(groupSplitIdx)
+        if onlyExtractGroups: # This will just return as a list of lists
+            return [selectTimes[groupSplitIdx[i]:groupSplitIdx[i+1]] for i in np.arange(groupSplitIdx.size-1)]
         
         
         # Create the database

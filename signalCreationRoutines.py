@@ -357,6 +357,10 @@ try:
         
         
     def cupyGenTonesDirect(f0: float, fstep: float, numFreqs: int, length: int):
+        # Simple checks
+        if abs(f0) > 1.0 or f0 + (numFreqs-1) * fstep >= 1.0:
+            raise ValueError("Frequencies should be normalised.")
+    
         THREADS_PER_BLOCK = 256
         NUM_BLOCKS = length // THREADS_PER_BLOCK + 1
         

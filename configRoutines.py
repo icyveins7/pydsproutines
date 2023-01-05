@@ -13,10 +13,11 @@ class DirectSingleConfig(ConfigParser):
     '''A wrapper for the most common use-case, a single config file, without having to call the read() again.'''
     def __init__(self, filename: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Gonna take the liberty to set this since I always use it
+        self.optionxform = str # lambda option: option # preserves upper-case
+        # Note that you must set the optionxform before reading
         self.read(filename)
         self.currentSection = None
-        # Gonna take the liberty to set this since I always use it
-        self.optionxform = lambda option: option # preserves upper-case
         
     @classmethod
     def new(cls, filename: str, *args, **kwargs):
@@ -26,6 +27,14 @@ class DirectSingleConfig(ConfigParser):
     def loadSection(self, section: str):
         '''We use this to overload our own methods, without having to rewrite a SectionProxy class.'''
         self.currentSection = self.__getitem__(section)
+        
+    def loadMenu(self):
+        sections = self.sections()
+        sections.insert(0, 'DEFAULT')
+        for i, section in enumerate(sections):
+            print("%d: %s" % (i, section))
+        idx = int(input("Select section: "))
+        self.loadSection(sections[idx])         
 
 #%% 
 class SingleSourceConfigMixin:
@@ -67,7 +76,7 @@ class SingleTargetConfigMixin:
     
     @property
     def numTaps(self):
-        return self.currentSection.getfloat('numTaps')
+        return self.currentSection.getint('numTaps')
     
     @property
     def target_osr(self):

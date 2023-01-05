@@ -33,24 +33,56 @@ signal configs and processing configs. A typical config file may look something 
     [src_src2]
     ...
     
-    [proc_src1_signal1]
+    [proc_first]
+    src = src1
+    sig = signal1
     ...
     
-    [proc_src2_signal1]
+    [proc_second]
+    src = src2
+    sig = signal1
     ...
+    
+    [proc_firstdifferent]
+    src = src1
+    sig = signal1
+    ...
+    
+    [myfirstworkspace]
+    proc_first
+    proc_firstdifferent
+    
+In general, it is useful to align the different signals and sources at the top, as these are
+IMMUTABLE, and usually never change; if a signal is present in a particular source and needs processing,
+you generally know its characteristics and they will probably be identical throughout the course of your 'work'.
+
+However, in the course of your work, you may experiment with different ways of processing the same signal,
+even if its coming from the same source (maybe you want to use less filter taps for speed comparisons?).
+As such, naming your processing sections with 'proc_someDescriptiveName' will help you remember what it is
+you are trying with a particular processing section.
+
+Finally, when you want to load an entire workspace configuration, you can then simply identify the
+processing sections which you would like to use.
 
 """
 
-from configparser import ConfigParser, RawConfigParser
+from configparser import ConfigParser, RawConfigParser, SectionProxy
+import os
+import __main__
 
 #%% 
 class DirectSingleConfig(ConfigParser):
-    '''A wrapper for the most common use-case, a single config file, without having to call the read() again.'''
-    def __init__(self, filename: str, *args, **kwargs):
+    '''
+    A wrapper for the most common use-case, a single config file, without having to call the read() again.
+    The filename will default to the current script's name, with extension .ini, and this resides in the same folder.
+    '''
+    def __init__(self, filename: str=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Gonna take the liberty to set this since I always use it
         self.optionxform = str # lambda option: option # preserves upper-case
         # Note that you must set the optionxform before reading
+        if filename is None:
+            filename = os.path.splitext(__main__.__file__)[0] + ".ini"
         self.read(filename)
         self.currentSection = None
         
@@ -72,62 +104,85 @@ class DirectSingleConfig(ConfigParser):
         self.loadSection(sections[idx])
 
 #%%
-class SourceConfigMixin:
-    '''This mixin contains the parameters needed to read the samples.'''
-    def loadSrc(self, src: str):
-        '''This looks for a section prefixed with "src_" and loads it.'''
-        self.loadSection('src_' + src)
-    
+class SourceSectionProxy(SectionProxy):
     @property
     def srcdir(self):
-        return self.currentSection.get('srcdir')
+        return self.get('srcdir')
     
     @property
     def fs(self):
-        return self.currentSection.getfloat('fs')
+        return self.getfloat('fs')
     
     @property
     def fc(self):
-        return self.currentSection.getfloat('fc')
+        return self.getfloat('fc')
     
     @property
     def conjSamples(self):
-        return self.currentSection.getbool('conjSamples')
+        return self.getbool('conjSamples')
     
     @property
     def headerBytes(self):
-        return self.currentSection.getint('headerBytes')
+        return self.getint('headerBytes')
     
     @property
     def dtype(self):
-        return self.currentSection.get('dtype')
+        return self.get('dtype')
     
 #%%
-class SignalConfigMixin:
-    '''This mixin contains parameters related to a single target signal in the samples, and how to process it (for demodulation etc.).'''
-    def loadSig(self, sig: str):
-        '''This looks for a section prefixed with "sig_" and loads it.'''
-        self.loadSection('sig_' + sig)
-    
+class SignalSectionProxy(SectionProxy):
     @property
     def target_fc(self):
-        return self.currentSection.getfloat('target_fc')
-    
-    @property
-    def freqshift(self):
-        return self.currentSection.getfloat('freqshift')
+        return self.getfloat('target_fc')
     
     @property
     def baud(self):
-        return self.currentSection.getfloat('baud')
+        return self.getfloat('baud')
     
+#%%
+class ProcessingSectionProxy(SectionProxy):
     @property
     def numTaps(self):
-        return self.currentSection.getint('numTaps')
+        return self.getint('numTaps')
     
     @property
     def target_osr(self):
-        return self.currentSection.getint('target_osr')
+        return self.getint('target_osr')
+    
+#%%
+class WorkspaceSectionProxy(SectionProxy):
+    pass
+
+#%%
+class DSPConfig(DirectSingleConfig):
+    def __init__(self, *args, **kwargs):
+        super().__init__(self, *args, **kwargs)
+        self._recastSections()
+        
+    def _recastSections(self):
+        # Proxies stored in _proxies
+        for key in self._proxies:
+            if self._isSourceSection(key):
+                self._proxies[key] = SourceSectionProxy(self._proxies[key]._parser, self._proxies[key]._name)
+                
+            elif self._isSignalSection(key):
+                self._proxies[key] = SignalSectionProxy(self._proxies[key]._parser, self._proxies[key]._name)
+                
+            elif self._isProcessingSection(key):
+                self._proxies[key] = ProcessingSectionProxy(self._proxies[key]._parser, self._proxies[key]._name)
+                
+            else:
+                self._proxies[key] = WorkspaceSectionProxy(self._proxies[key]._parser, self._proxies[key]._name)
+                
+    def _isSourceSection(self, key: str):
+        return key[4:] == 'src_'
+            
+    def _isSignalSection(self, key: str):
+        return key[4:] == 'sig_'
+    
+    def _isProcessingSection(self, key: str):
+        return key[5:] == 'proc_'
+    
 
 #%% Intend to deprecate from this onwards, bad format to do things..
 class SingleSourceConfigMixin:

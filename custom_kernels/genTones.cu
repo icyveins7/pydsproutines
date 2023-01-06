@@ -64,7 +64,7 @@ void genTonesScaling_64f(
 	{
 		f = f0 + fidx * fstep; // the frequency we are working on
 		offset = fidx * len; // offset to the row to write to
-		outstack = outstack * alpha;
+		outstack = outstack * alpha; // the reason this is slower is maybe due to how cupy complex is performed i.e. via 4 real multiplies, 1 add and 1 sub
 		if (i < len){
 			out[offset + i] = outstack;
 		}

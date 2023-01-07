@@ -805,6 +805,10 @@ class BurstyDemodulator:
     differential modulation modes (DQPSK, CPFSK etc.).
     '''
     def __init__(self, burstLen: int, guardLen: int, up: int=1):
+        '''
+        Note that burstLen and guardLen are the number of bits.
+        Do not include the OSR (this will be accounted for by the 'up' parameter.
+        '''
         self.burstLen = burstLen
         self.guardLen = guardLen
         self.period = self.burstLen + self.guardLen

@@ -22,7 +22,11 @@ def compareValues(x: np.ndarray, y: np.ndarray, plotAbs=False):
 
     Returns
     -------
-    None.
+    rawChg : float
+        Largest absolute change (corresponding to the first index printed).
+        
+    fracChg : float
+        Largest fractional change (corresponding to the second index printed).
 
     '''
     
@@ -30,6 +34,7 @@ def compareValues(x: np.ndarray, y: np.ndarray, plotAbs=False):
     print("Values with largest raw change (index %d):" % (ii))
     print(x[ii])
     print(y[ii])
+    rawChg = np.abs(x[ii]-y[ii])
     
     nonzeros = np.argwhere(x!=0)
     x_nonzero = x[nonzeros]
@@ -38,6 +43,9 @@ def compareValues(x: np.ndarray, y: np.ndarray, plotAbs=False):
     print("Values with largest %% change (index %d):" % (nonzeros[iip]))
     print(x_nonzero[iip])
     print(y_nonzero[iip])
+    fracChg = np.abs(x_nonzero[iip]-y_nonzero[iip]) / np.abs(x_nonzero[iip])
+    
+    return rawChg, fracChg
     
     if plotAbs:
         plt.figure()

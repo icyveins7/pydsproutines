@@ -354,9 +354,10 @@ try:
         module = cp.RawModule(code=fid.read())
         genTonesDirect_64fKernel = module.get_function("genTonesDirect_64f")
         genTonesScaling_64fKernel = module.get_function("genTonesScaling_64f")
+        genTonesDirect_32fKernel = module.get_function("genTonesDirect_32f")
         
         
-    def cupyGenTonesDirect(f0: float, fstep: float, numFreqs: int, length: int):
+    def cupyGenTonesDirect(f0: float, fstep: float, numFreqs: int, length: int, dtype: type=np.complex128):
         # Simple checks
         if abs(f0) > 1.0 or f0 + (numFreqs-1) * fstep >= 1.0:
             raise ValueError("Frequencies should be normalised.")
@@ -364,10 +365,19 @@ try:
         THREADS_PER_BLOCK = 256
         NUM_BLOCKS = length // THREADS_PER_BLOCK + 1
         
-        out = cp.zeros((numFreqs, length), dtype=cp.complex128)
+        out = cp.zeros((numFreqs, length), dtype=dtype)
         
-        genTonesDirect_64fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
-                                 (f0, fstep, numFreqs, length, out))
+        if dtype == np.complex128:
+            genTonesDirect_64fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
+                                     (f0, fstep, numFreqs, length, out))
+            
+        elif dtype == np.complex64:
+            genTonesDirect_32fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
+                                     (f0, fstep, numFreqs, length, out))
+            
+        else:
+            raise TypeError("dtype must be either complex128 or complex64")
+        
         
         return out
     
@@ -411,12 +421,21 @@ if __name__ == "__main__":
         customtones_scaling = cupyGenTonesScaling(f0, fstep, numFreqs, length)
         timer.evt("scaling kernel")
         tones = cp.exp(1j*2*cp.pi*cp.arange(f0, 1.0, fstep).reshape((-1,1)) * cp.arange(length))
-        timer.end("cupy")
+        timer.evt("cupy")
         
+        
+        # Test 32f version
+        customtone32f = cupyGenTonesDirect(f0, fstep, numFreqs, length, np.complex64)
+        timer.evt("direct kernel 32f")
+        
+        
+        timer.end()
         print("Comparing naive tones kernel with cupy")
         compareValues(customtones.get().flatten(), tones.get().flatten())
         print("Comparing scaling tones kernel with cupy")
         compareValues(customtones_scaling.get().flatten(), tones.get().flatten())
+        print("Comparing 32f tones kernel with cupy")
+        compareValues(customtone32f.get().flatten(), tones.get().flatten())
         
     except ModuleNotFoundError as e:
         print("Skipping cupy-related tests.")

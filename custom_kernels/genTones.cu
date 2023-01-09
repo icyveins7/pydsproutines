@@ -70,3 +70,32 @@ void genTonesScaling_64f(
 		}
 	}
 }
+
+// we make a 32f version for the faster kernel alone
+// note that internally it's still computed with doubles, but we write to global mem as floats
+extern "C" __global__
+void genTonesDirect_32f(
+	const double f0,
+	const double fstep,
+	const int numFreqs,
+	const int len,
+	complex<float> *out)
+{
+	// spawn as many blocks as required to fulfill the length
+	// each block just writes to its own section of the output, iterates over every frequency
+	int startidx = blockIdx.x * blockDim.x;
+	int i = threadIdx.x + startidx; // each thread will work on this sample, for every frequency
+	int offset;
+	
+	double f, phase, re, im;
+	
+	for (int fidx = 0; fidx < numFreqs; fidx++)
+	{
+		f = f0 + fidx * fstep; // the frequency we are working on
+		offset = fidx * len; // offset to the row to write to
+		sincospi(2 * f * (double)i, &im, &re); // write the components to stack
+		if (i < len){ // coalesced global writes
+			out[offset + i] = complex<float>(re, im);
+		}
+	}
+}

@@ -148,3 +148,80 @@ void genTonesScaling_32f(
 		}
 	}
 }
+
+/* 
+What about dot producting tones directly? 
+This would be like CZTs, except possibly without the overhead of multiple FFT calls and optimised shared mem usage?
+Benefit of this is to read the source only once from global memory.
+*/
+
+// 1. We use shared memory to store up to 64 * 64 complex64 values of src*tone. To keep things simple, we can fix this size, along with the kernel parameters, as 64x64 always.
+// 2. Then we sum up within shared memory and then output to an external array (this will then require a separate second kernel to sum results together)
+// 3. Return to step 1 with the rest of the frequencies, until all frequencies are complete.
+extern "C" __global__
+void dotTonesScaling_32f(
+	const double f0,
+	const double fstep,
+	const int numFreqs,
+	const int len,
+	const complex<float> *src,
+	complex<float> *out)
+{
+   // spawn as many blocks as required to fulfill the length
+	// each block just writes to its own section of the output, iterates over every frequency
+	int startidx = blockIdx.x * blockDim.x;
+	int i = threadIdx.x + startidx; // each thread will work on this sample, for every frequency
+
+   // initialise shared memory
+   extern __shared__ double s[];   
+   complex<float> *s_ws = (complex<float>*)s; // (64*64) complex floats
+   
+   // let's have a variable to mark the row in shared memory we are currently writing to
+   int s_row;
+
+   // the rest of the variable declarations as before
+	double f, phase, re, im;
+	complex<double> outstack;
+	
+	// calculate the value for the first frequency
+	sincospi(2 * f0 * (double)i, &im, &re);
+	outstack = complex<double>(re, im); // we keep a copy on stack
+	
+	// now calculate the complex number to scale by
+	sincospi(2 * fstep * (double)i, &im, &re);
+	complex<double> alpha = complex<double>(re, im);
+	
+	// no point doing anything if this thread is beyond the length
+	if (i < len)
+	{
+    	// loop over all the frequencies
+    	for (int fidx = 0; fidx < numFreqs; fidx++)
+    	{
+        	// define the row in shared memory we will be working on
+        	s_row = fidx % 64;
+        	
+        	// for everything other than the first loop, we must multiply by the tone
+        	if (fidx > 0)
+        	{
+        		outstack = outstack * alpha; 
+        	}
+        	else // for the first loop, we instead now multiply by the source (this is the only time we read the source)
+        	{
+            	outstack = outstack * src[i];
+        	}
+
+        	// after we have done the multiply of the tone, we save it in the appropriate spot in the workspace on shared mem
+         s_ws[64 * s_row + threadIdx.x] = complex<float>(outstack.real(), outstack.imag()); // cast to floats just like before
+         
+         // finally, if we have completed a batch of 64 (or we're on the last freq),
+         // it's time to sum up in sharedmem and output to global mem after
+         if (fidx % 64 == 0 & fidx != 0 || fidx == numFreqs-1)
+         {
+             // to be completed
+         }
+         
+          
+    	}
+	}
+}
+

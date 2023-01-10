@@ -10,6 +10,9 @@ if __name__ == "__main__":
     from signalCreationRoutines import *
     from verifyRoutines import *
     from timingRoutines import Timer
+    
+    import cupy as cp
+    
     timer = Timer()
     
     length = 1000000
@@ -24,7 +27,10 @@ if __name__ == "__main__":
     d_x = cp.asarray(x)
     
     timer.start()
+    e1 = cp.cuda.get_current_stream().record()
+    e1.record()
     d_out = d_cztobj.runMany(d_x)
+    e1.synchronize()
     timer.evt("czt gpu batch")
     
     #%%

@@ -30,6 +30,7 @@ if __name__ == "__main__":
     e1 = cp.cuda.get_current_stream().record()
     d_out = d_cztobj.runMany(d_x)
     e2 = cp.cuda.get_current_stream().record()
+    e2.synchronize()
     print("cuda events: %f " % (cp.cuda.get_elapsed_time(e1, e2)))
     timer.evt("czt gpu batch")
     

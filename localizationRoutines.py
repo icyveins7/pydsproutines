@@ -10,6 +10,7 @@ import scipy as sp
 from scipy.stats.distributions import chi2
 # from numba import jit, njit
 import time
+from skyfield.api import wgs84
 
 #%% Coordinate transformations
 def geodeticLLA2ecef(lat_rad, lon_rad, h):
@@ -527,6 +528,20 @@ def gridSearchTDFD_direct(s1x_list, s2x_list,
     
     return cost_grid
 
+#%% Grid generator for most localizers
+def latlongrid_to_ecef(centrelat, centrelon, latspan, lonspan, numLat, numLon):
+    lonlist = np.linspace(centrelon - lonspan/2, centrelon + lonspan/2, numLon)
+    latlist = np.linspace(centrelat - latspan/2 ,centrelat + latspan/2, numLat)
+    longrid, latgrid = np.meshgrid(lonlist, latlist)
+    
+    longridflat = longrid.flatten()
+    latgridflat = latgrid.flatten()
+    
+    # Convert to xyz
+    ecefgrid = wgs84.latlon(latgridflat, longridflat).itrs_xyz.m.transpose() # N x 3
+    
+    return ecefgrid, lonlist, latlist
+    
 #%% CRB Routines (conversions from commonMex)
 def calcCRB_TD(x, S, sig_r, pairs=None, cmat=None):
     ''' S is presented column-wise i.e. 3 X N array. '''

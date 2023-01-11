@@ -355,17 +355,18 @@ try:
         genTonesDirect_64fKernel = module.get_function("genTonesDirect_64f")
         genTonesScaling_64fKernel = module.get_function("genTonesScaling_64f")
         genTonesDirect_32fKernel = module.get_function("genTonesDirect_32f")
+        genTonesScaling_32fKernel = module.get_function("genTonesScaling_32f")
         
         
-    def cupyGenTonesDirect(f0: float, fstep: float, numFreqs: int, length: int, dtype: type=np.complex128):
+    def cupyGenTonesDirect(f0: float, fstep: float, numFreqs: int, length: int, dtype: type=np.complex128, THREADS_PER_BLOCK: int=128):
+        '''This kernel is almost 1 order slower than the scaling kernel according to nvprof.'''
         # Simple checks
         if abs(f0) > 1.0 or f0 + (numFreqs-1) * fstep >= 1.0:
             raise ValueError("Frequencies should be normalised.")
     
-        THREADS_PER_BLOCK = 256
         NUM_BLOCKS = length // THREADS_PER_BLOCK + 1
         
-        out = cp.zeros((numFreqs, length), dtype=dtype)
+        out = cp.empty((numFreqs, length), dtype=dtype)
         
         if dtype == np.complex128:
             genTonesDirect_64fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
@@ -381,15 +382,20 @@ try:
         
         return out
     
-    def cupyGenTonesScaling(f0: float, fstep: float, numFreqs: int, length: int):
-        '''THIS APPEARS TO BE SLOWER!'''
-        THREADS_PER_BLOCK = 256
+    def cupyGenTonesScaling(f0: float, fstep: float, numFreqs: int, length: int, dtype: type=np.complex128, THREADS_PER_BLOCK: int=128):
+        '''This may appear to be slower when timing within python, but the kernel is significantly faster (~10x via nvprof).'''
         NUM_BLOCKS = length // THREADS_PER_BLOCK + 1
         
-        out = cp.zeros((numFreqs, length), dtype=cp.complex128)
+        out = cp.empty((numFreqs, length), dtype=dtype)
         
-        genTonesScaling_64fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
-                                 (f0, fstep, numFreqs, length, out))
+        if dtype == np.complex128:
+            genTonesScaling_64fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
+                                     (f0, fstep, numFreqs, length, out))
+        elif dtype == np.complex64:
+            genTonesScaling_32fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
+                                     (f0, fstep, numFreqs, length, out))
+        else:
+            raise TypeError("dtype must be either complex128 or complex64")
         
         return out
         
@@ -427,6 +433,8 @@ if __name__ == "__main__":
         # Test 32f version
         customtone32f = cupyGenTonesDirect(f0, fstep, numFreqs, length, np.complex64)
         timer.evt("direct kernel 32f")
+        customtone32f_scaling = cupyGenTonesScaling(f0, fstep, numFreqs, length, np.complex64)
+        timer.evt("scaling kernel 32f")
         
         
         timer.end()
@@ -436,6 +444,8 @@ if __name__ == "__main__":
         compareValues(customtones_scaling.get().flatten(), tones.get().flatten())
         print("Comparing 32f tones kernel with cupy")
         compareValues(customtone32f.get().flatten(), tones.get().flatten())
+        print("Comparing 32f tones scaling kernel with cupy")
+        compareValues(customtone32f_scaling.get().flatten(), tones.get().flatten())
         
     except ModuleNotFoundError as e:
         print("Skipping cupy-related tests.")

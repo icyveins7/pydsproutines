@@ -14,3 +14,5 @@ cython_ext/*.pyd
 __pycache__/
 *.egg-info/
 *.bak
+*.nvvp
+

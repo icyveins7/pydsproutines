@@ -201,6 +201,21 @@ class CZTCached:
         
         return g
         
+    def runMany(self, xmany: np.ndarray, out: np.ndarray=None):
+        y = xmany * self.aa
+        # FFTs/IFFTs done on each row
+        fy = np.fft.fft(y, self.nfft, axis=-1) # actually it already does this by default
+        np.multiply(fy,self.fv,out=fy)
+        g = np.fft.ifft(fy, axis=-1)
+        
+        if out is None:
+            g = g[:,self.m-1:self.m+self.k-1] * self.ww[self.m-1:self.m+self.k-1]
+            
+            return g
+        else: # Write direct to output
+            np.multiply(g[:,self.m-1:self.m+self.k-1],self.ww[self.m-1:self.m+self.k-1],
+                        out=out)
+        
     def getFreq(self):
         return np.arange(self.k) * self.binWidth + self.f1
         

@@ -219,7 +219,33 @@ def gridSearchBlindLinearRTT(
         toa_sigma_list: np.ndarray,
         grid_list: np.ndarray,
         verb: bool=True):
-    # Docstring here..
+    
+    '''
+    Parameters
+    ----------
+    tx_list : np.ndarray
+        Transmitter position(s). If 1-d array, assumed as a static position,
+        otherwise each row represents a position for the associated measurement.
+    rx_list : np.ndarray
+        Receiver position (may be the same as the transmitter). 
+        If 1-d array, assumed as a static position,
+        otherwise each row represents a position for the associated measurement.
+    time_list : np.ndarray
+        Time value to perform linear scaling on. Often you can use the transmit time or receive time.
+    toa_list : np.ndarray
+        RTT time-of-arrival measurements. These should be strictly positive.
+    toa_sigma_list : np.ndarray
+        RTT measurement errors.
+    grid_list : np.ndarray
+        2-d array of grid points to evaluate costs at. Each row represents a point.
+    verb : bool, optional
+        Verbose printing (for timing). The default is True.
+
+    Returns
+    -------
+    cost_grid : np.ndarray
+        A cost array of length equal to the number of grid points.
+    '''
     
     # Instantiate output
     numGridPts = grid_list.shape[0]

@@ -190,6 +190,9 @@ void dotTonesScaling_32f(
 	// now calculate the complex number to scale by
 	sincospi(2 * fstep * (double)i, &im, &re);
 	complex<double> alpha = complex<double>(re, im);
+    
+    // make a double version of the global mem source
+    complex<double> src64f;
 	
 	// no point doing anything if this thread is beyond the length
 	if (i < len)
@@ -207,19 +210,20 @@ void dotTonesScaling_32f(
         	}
         	else // for the first loop, we instead now multiply by the source (this is the only time we read the source)
         	{
-            	outstack = outstack * src[i];
+                src64f = complex<double>(src[i].real(), src[i].imag());
+            	outstack = outstack * src64f;
         	}
 
         	// after we have done the multiply of the tone, we save it in the appropriate spot in the workspace on shared mem
-         s_ws[64 * s_row + threadIdx.x] = complex<float>(outstack.real(), outstack.imag()); // cast to floats just like before
-         
-         // finally, if we have completed a batch of 64 (or we're on the last freq),
-         // it's time to sum up in sharedmem and output to global mem after
-         if (fidx % 64 == 0 & fidx != 0 || fidx == numFreqs-1)
-         {
-             // to be completed
-         }
-         
+            s_ws[64 * s_row + threadIdx.x] = complex<float>(outstack.real(), outstack.imag()); // cast to floats just like before
+            
+            // finally, if we have completed a batch of 64 (or we're on the last freq),
+            // it's time to sum up in sharedmem and output to global mem after
+            if (fidx % 64 == 0 & fidx != 0 || fidx == numFreqs-1)
+            {
+                // to be completed
+            }
+            
           
     	}
 	}

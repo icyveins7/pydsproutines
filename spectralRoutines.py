@@ -6,6 +6,7 @@ Created on Wed Apr  7 16:26:26 2021
 """
 
 import numpy as np
+import scipy as sp
 import sympy
 # from numba import jit
 
@@ -170,7 +171,7 @@ class IntegerMultipleFFT:
 
 # Note, with the new scipy 1.8.0 update, this class has equivalent speed to the signal.CZT class
 class CZTCached:
-    def __init__(self, xlength, f1, f2, binWidth, fs):
+    def __init__(self, xlength, f1, f2, binWidth, fs, convertTo32fc=False):
         self.binWidth = binWidth # Need these 2 for getFreq
         self.f1 = f1
     
@@ -191,12 +192,18 @@ class CZTCached:
         
         nn = np.arange(self.m)
         self.aa = np.exp(1j * 2 * np.pi * f1/fs * -nn) * self.ww[self.m+nn-1]
+
+        if convertTo32fc:
+            self.ww = self.ww.astype(np.complex64)
+            self.fv = self.fv.astype(np.complex64)
+            self.aa = self.aa.astype(np.complex64)
         
     def run(self, x):
         y = x * self.aa
-        fy = np.fft.fft(y, self.nfft)
+        fy = sp.fft.fft(y, self.nfft)
         fy = fy * self.fv
-        g = np.fft.ifft(fy)
+        g = sp.fft.ifft(fy)
+        # Note that we use scipy fft to maintain dtypes
         
         g = g[self.m-1:self.m+self.k-1] * self.ww[self.m-1:self.m+self.k-1]
         
@@ -205,9 +212,10 @@ class CZTCached:
     def runMany(self, xmany: np.ndarray, out: np.ndarray=None):
         y = xmany * self.aa
         # FFTs/IFFTs done on each row
-        fy = np.fft.fft(y, self.nfft, axis=-1) # actually it already does this by default
+        fy = sp.fft.fft(y, self.nfft, axis=-1) # actually it already does this by default
         np.multiply(fy,self.fv,out=fy)
-        g = np.fft.ifft(fy, axis=-1)
+        g = sp.fft.ifft(fy, axis=-1)
+        # Note that we use scipy fft to maintain dtypes, and so it can be almost 2x faster for complex64
         
         if out is None:
             g = g[:,self.m-1:self.m+self.k-1] * self.ww[self.m-1:self.m+self.k-1]

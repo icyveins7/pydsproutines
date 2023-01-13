@@ -15,4 +15,5 @@ __pycache__/
 *.egg-info/
 *.bak
 *.nvvp
+*.vscode/
 

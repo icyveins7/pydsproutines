@@ -20,13 +20,13 @@ import concurrent.futures
 try:
     import cupy as cp
     
-    GPU_RAM_LIM_BYTES = 6e9 # use to roughly judge if it will fit
-    
-    
     def cp_fastXcorr(cutout, rx, freqsearch=True, outputCAF=False, shifts=None, absResult=True, BATCH=1024):
         """
         Equivalent to fastXcorr, designed to run on gpu.
         """
+        # Query the ram of the device, but we need extra space for the ffts to work, so use 1/4 to estimate
+        if cutout.nbytes * BATCH > cp.cuda.device.Device().mem_info[1] / 4: 
+            raise MemoryError("Not enough memory with this batch. Try lowering the batch value.")
         
         # need both to be same type, maintain the type throughout
         if cutout.dtype is not rx.dtype:

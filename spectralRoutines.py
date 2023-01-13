@@ -449,7 +449,34 @@ try:
         dotTonesScaling_32fKernel = module.get_function("dotTonesScaling_32f")
         
     def cupyDotTonesScaling(f0: float, fstep: float, numFreqs: int, src: cp.ndarray):
+        '''
+        Performs the dot product tone * src for multiple tones.
+        This is done in blocks of 64 for efficiency reasons; you most likely want to accumulate them with
+        cp.sum(axis=0) afterwards, in order to simulate ffts/czts.
         
+        Example:
+            # Remember, you need to put minus sign to compare with CZTs
+            d_outkernel_interrim = cupyDotTonesScaling(-f1/fs, -fstep/fs, d_cztobj.getFreq().size, d_src)
+            d_outkernel = cp.sum(d_outkernel_interrim, axis=0)
+
+        Parameters
+        ----------
+        f0 : float
+            Normalised starting frequency, like f1 in czts.
+        fstep : float
+            Normalised step frequency.
+        numFreqs : int
+            Total number of frequencies.
+        src : cp.ndarray
+            Source array.
+
+        Returns
+        -------
+        out_interrim : cp.ndarray
+            NUM_BLOCKS x numFreqs array on the GPU.
+            Each row contains the dot products of the tones and the associated 64 samples for its block.
+
+        '''
         length = src.size
         dtype = cp.complex64 # This is a fixed constant for this kernel
         THREADS_PER_BLOCK = 64 # This is also a fixed constant for this kernel

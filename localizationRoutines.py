@@ -11,6 +11,7 @@ from scipy.stats.distributions import chi2
 # from numba import jit, njit
 import time
 from skyfield.api import wgs84
+from plotRoutines import *
 
 #%% Coordinate transformations
 def geodeticLLA2ecef(lat_rad, lon_rad, h):
@@ -696,8 +697,247 @@ def projectCRBtoEllipse(crb, pos, percent, dof=2, theta=None):
     ellipse = x * u[:,0].reshape((-1,1)) + y * u[:,1].reshape((-1,1)) + pos
     
     return ellipse
+
+
+#%% Helper classes
+class GridLocalizer:
+    lightspd = 299792458.0
     
+    def __init__(self, gridmat: np.ndarray, xrange: np.ndarray, yrange: np.ndarray):
+        '''
+        Initialises a localizer which will search a grid of points.
+
+        Parameters
+        ----------
+        gridmat : np.ndarray
+            N x 3 matrix of N Cartesian coordinate points i.e. each point is 1 row.
+            Does not technically need to be evenly spaced.
+            See classmethods for common ways to instantiate.
+        xrange : np.ndarray
+            Length L array of x values used to generate the gridmat.
+        yrange : np.ndarray
+            Length M array of y values used to generate the gridmat. 
+        '''
+        self.gridmat = gridmat
+        self.xrange = xrange
+        self.yrange = yrange
+       
+    # Factory methods
+    @classmethod
+    def fromXYMeshgrid(cls, xrange: np.ndarray, yrange: np.ndarray):
+        xm, ym = np.meshgrid(xrange, yrange)
+        gridmat = np.hstack((xm.reshape((-1,1)), ym.reshape((-1,1))))
+        return cls(gridmat, xrange, yrange)
+        
+    # Interface methods (see mixins below)
+    def run(self):
+        raise NotImplementedError("This method is only defined in subclasses.")
+        
+    def localize(self, cost_grid: np.ndarray):
+        gridminidx = np.argmin(cost_grid)
+        gridmin = self.gridmat[gridminidx]
+        return gridmin
+        
+    def crb(self):
+        raise NotImplementedError("This method is only defined in subclasses.")
+        
+    def plot(self, cost_grid: np.ndarray):
+        '''
+        Plots a heatmap of the cost_grid generated from run().
+        You should not need to reshape the output from run() yourself.
+
+        Parameters
+        ----------
+        cost_grid : np.ndarray
+            Length N array of least squares errors for each grid point, 
+            directly from the run() method. All reshaping is done automatically, do not reshape it yourself!
+
+        Returns
+        -------
+        ax : pyqtgraph axes
+            The Pyqtgraph axes. You can call ax.plot() again to plot on top of the heatmap.
+        img : pyqtgraph.ImageItem
+            The Pyqtgraph heatmap image.
+
+        '''
+        ax, img = pgPlotHeatmap(np.exp(-0.5*cost_grid.reshape((self.yrange.size, self.xrange.size))).T, # must transpose
+                                self.xrange[0],
+                                self.yrange[0],
+                                np.ptp(self.xrange),
+                                np.ptp(self.yrange),
+                                autoBorder=True)
+        return ax, img
     
+#%%
+class LatLonGridLocalizer(GridLocalizer):
+    def __init__(self, latlist: np.ndarray, lonlist: np.ndarray, gridmat: np.ndarray):
+        '''
+        Initialises a localizer based on a latitude-longitude grid rather than
+        Cartesian coordinates. Calculations will still be performed in Cartesian space.
+
+        Parameters
+        ----------
+        latlist : np.ndarray
+            The array of latitude values.
+        lonlist : np.ndarray
+            The array of longitude values.
+        gridmat : np.ndarray
+            The associated matrix of Cartesian points. See GridLocalizer's __init__ method.
+            See factory methods like 'fromLatLonLimits' for easy initializations.
+
+        '''
+        super().__init__(gridmat, lonlist, latlist)
+        # We repoint some variable names for clarity
+        self.lonlist = lonlist
+        self.latlist = latlist
+        
+    @classmethod
+    def fromLatLonLimits(cls, centrelat, centrelon, latspan, lonspan, numLat, numLon):
+        ecefgrid, lonlist, latlist = latlongrid_to_ecef(centrelat, centrelon, latspan, lonspan, numLat, numLon)
+        return cls(latlist, lonlist, ecefgrid)
+    
+    def localize(self, cost_grid: np.ndarray):
+        gridminidx = np.argmin(cost_grid)
+        latgridmin = gridminidx // self.latlist.size
+        longridmin = gridminidx % self.latlist.size
+        longridmin = self.lonlist[longridmin]
+        latgridmin = self.latlist[latgridmin]
+        gridmin = self.gridmat[gridminidx]
+        return longridmin, latgridmin, gridmin
+        
+        
+#%% Mixins for the localizers
+class TDMixin:
+    def run(self, s1x_list: np.ndarray, s2x_list: np.ndarray, tdoa_list: np.ndarray, td_sigma_list: np.ndarray):
+        '''
+        Performs TDOA weighted least squares error calculations on every point in the grid.
+        TDOAs are assumed to be measured as (time to sensor 2) - (time to sensor 1).
+
+        Parameters
+        ----------
+        s1x_list : np.ndarray
+            K x 3 matrix. The positions (in units of metres) of the first sensor in Cartesian coordinates for every TDOA measurement.
+        s2x_list : np.ndarray
+            K x 3 matrix. The positions (in units of metres) of the second sensor in Cartesian coordinates for every TDOA measurement.
+        tdoa_list : np.ndarray
+            Length K array of TDOA measurements (in seconds).
+        td_sigma_list : np.ndarray
+            Length K array of TDOA measurement uncertainties (in seconds).
+
+        Returns
+        -------
+        cost_grid : np.ndarray
+            Length N array. The least squares errors for every grid point.
+        '''
+        cost_grid = gridSearchTDOA_direct(s1x_list, s2x_list, tdoa_list, td_sigma_list, self.gridmat)
+        return cost_grid
+    
+#%%
+class TDFDMixin:
+    def run(self,
+            s1x_list, s2x_list, tdoa_list, td_sigma_list,
+            s1v_list, s2v_list, fdoa_list, fd_sigma_list, fc):
+        '''
+        Performs TDOA+FDOA weighted least squares error calculations on every point in the grid.
+        TDOAs are assumed to be measured as (time to sensor 2) - (time to sensor 1).
+        This convention holds for FDOA as well.
+
+        Parameters
+        ----------
+        s1x_list : np.ndarray
+            K x 3 matrix. The positions (in units of metres) of the first sensor in Cartesian coordinates for every measurement.
+        s2x_list : np.ndarray
+            K x 3 matrix. The positions (in units of metres) of the second sensor in Cartesian coordinates for every measurement.
+        tdoa_list : np.ndarray
+            Length K array of TDOA measurements (in seconds).
+        td_sigma_list : np.ndarray
+            Length K array of TDOA measurement uncertainties (in seconds).
+        s1v_list : np.ndarray
+            K x 3 matrix. The velocities (in units of m/s) of the first sensor in Cartesian coordinates for every measurement.
+        s2v_list : np.ndarray
+            K x 3 matrix. The velocities (in units of m/s) of the second sensor in Cartesian coordinates for every measurement.
+        fdoa_list : np.ndarray
+            Length K array of FDOA measurements (in Hz).
+        fd_sigma_list : np.ndarray
+            Length K array of FDOA measurement uncertainties (in Hz).
+        fc : float
+            Centre frequency. This is used to normalise the FDOA measurements.
+
+        Returns
+        -------
+        cost_grid : np.ndarray
+            Length N array. The least squares errors for every grid point.
+        '''
+        
+        cost_grid = gridSearchTDFD_direct(s1x_list, s2x_list,
+                                         tdoa_list, td_sigma_list,
+                                         s1v_list, s2v_list,
+                                         fdoa_list, fd_sigma_list, fc,
+                                         self.gridmat, verb=True)
+        return cost_grid
+    
+    def crb(self, gridmin: np.ndarray,
+            s1x_list: np.ndarray, s2x_list: np.ndarray,
+            s1v_list: np.ndarray, s2v_list: np.ndarray,
+            td_sigma_list: np.ndarray, fd_sigma_list: np.ndarray, 
+            fc: float):
+        '''
+        Calculates the raw CRB for TD+FD localization, assuming a certain position
+        (this is usually extracted from the localization output) and a stationary target i.e. 0 velocity.
+        Note, this also assumes a known altitude constraint (technically a known vector length constraint).
+
+        Parameters
+        ----------
+        gridmin : np.ndarray
+            The position to calculate the CRB around. In practical scenarios, we use the output from
+            the localizer i.e. run() then localize().
+        s1x_list : np.ndarray
+            K x 3 matrix. Identical to run().
+        s2x_list : np.ndarray
+            K x 3 matrix. Identical to run().
+        s1v_list : np.ndarray
+            K x 3 matrix. Identical to run().
+        s2v_list : np.ndarray
+            K x 3 matrix. Identical to run().
+        td_sigma_list : np.ndarray
+            Length K array. Identical to run().
+        fd_sigma_list : np.ndarray
+            Length K array. Identical to run().
+        fc : float
+            Centre frequency. Identical to run().
+
+        Returns
+        -------
+        crb : np.ndarray
+            6 x 6 matrix. CRB output (with assumed constraints).
+        '''
+        
+        S_combined = np.zeros((s1x_list.shape[0]*2,3))
+        S_combined[0::2] = s2x_list # note the ordering is flipped here
+        S_combined[1::2] = s1x_list
+        S_combined = S_combined.T
+        Sdot_combined = np.zeros((s1v_list.shape[0]*2,3))
+        Sdot_combined[0::2] = s2v_list
+        Sdot_combined[1::2] = s1v_list
+        Sdot_combined = Sdot_combined.T
+
+        cmat = np.vstack((
+            np.hstack((gridmin, np.zeros(3))), # altitude constraint
+            [0,0,0,1,0,0], # velocity component constraints
+            [0,0,0,0,1,0],
+            [0,0,0,0,0,1]
+        )).T
+        crb = calcCRB_TDFD(gridmin, S_combined, td_sigma_list*self.lightspd,
+                            np.array([0,0,0]), Sdot_combined, fd_sigma_list/fc*self.lightspd, cmat=cmat)
+        
+        return crb
+    
+#%% Common combinations (remember that MRO is left to right)
+class LatLonGridLocalizerTD(TDMixin, LatLonGridLocalizer):
+    pass
+
+class LatLonGridLocalizerTDFD(TDFDMixin, LatLonGridLocalizer):
+    pass
 
 #%%
 try:

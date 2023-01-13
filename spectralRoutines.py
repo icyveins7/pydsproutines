@@ -459,8 +459,9 @@ try:
         NUM_BLOCKS = NUM_BLOCKS + 1 if length % THREADS_PER_BLOCK > 0 else NUM_BLOCKS # increment if there's remainder
         
         out_interrim = cp.empty((NUM_BLOCKS, numFreqs), dtype=dtype)
-        smReq = 64 * 64 * 8 # A constant shared memory grid of 64 * 64 complex64s
-        
+        smReq = 65 * 64 * 8 # A constant shared memory grid of 64 * 64 complex64s
+        # We +1 to smReq to alleviate shared mem bank conflicts?
+
         dotTonesScaling_32fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
                                   (f0, fstep, numFreqs, length, src, out_interrim),
                                   shared_mem=smReq)

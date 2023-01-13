@@ -8,9 +8,10 @@ Created on Wed Apr  7 16:26:26 2021
 import numpy as np
 import sympy
 # from numba import jit
-# import cupy as cp
+
 import time
 import scipy.signal as sps
+import os
 
 #%%
 def czt(x, f1, f2, binWidth, fs):
@@ -219,7 +220,7 @@ class CZTCached:
     def getFreq(self):
         return np.arange(self.k) * self.binWidth + self.f1
         
-    
+#%%    
 try:
     import cupy as cp
     
@@ -280,51 +281,7 @@ try:
                 cp.multiply(g[:,self.m-1:self.m+self.k-1],self.d_ww[self.m-1:self.m+self.k-1],
                             out=out)
                 
-except:
-    print("Ignoring cupy imports..")
-        
-
-#%%
-def dft(x, freqs, fs):
-    '''
-
-    Parameters
-    ----------
-    x : array
-        Input data.
-    freqs : array
-        Array of bin frequency values to evaluate at.
-
-    Returns
-    -------
-    Array of DFT bin values for input frequencies.
-
-    '''
-    
-    output = np.zeros(len(freqs),dtype=np.complex128)
-    for i in np.arange(len(freqs)):
-        freq = freqs[i]
-        tone = np.exp(-1j*2*np.pi*freq*np.arange(len(x))/fs)
-        output[i] = np.dot(tone, x)
-    
-    return output
-
-# @jit(nopython=True)
-def toneSpectrum(f0, freqs, fs, N, phi=0, A=1.0):
-    '''
-    Returns a spectrum corresponding to applying DFT to a tone with frequency f0 and phase phi,
-    at values specified by the 'freqs' array.
-    
-    See the tone reproduction notebook for details.
-    '''
-    
-    vals = -1j * A * (1 - np.exp(-1j*2*np.pi*(freqs-f0)*N/fs))/(2*np.pi*(freqs-f0)/fs) * np.exp(1j*phi)
-    
-    return vals
-
-try:
-    import cupy as cp
-    
+    #%%
     toneSpecKernel = cp.RawKernel(r'''
     #include <cupy/complex.cuh>
     #include <math_constants.h>
@@ -477,6 +434,77 @@ try:
                             shared_mem=(THREADS_PER_BLOCK+3*d_f0List.size)*8)
                     
         return out
+                
+    #%% loading from the .cu file
+    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "genTones.cu"), "r") as fid:   
+        module = cp.RawModule(code=fid.read())
+        dotTonesScaling_32fKernel = module.get_function("dotTonesScaling_32f")
+        
+    def cupyDotTonesScaling(f0: float, fstep: float, numFreqs: int, src: cp.ndarray):
+        
+        length = src.size
+        dtype = cp.complex64 # This is a fixed constant for this kernel
+        THREADS_PER_BLOCK = 64 # This is also a fixed constant for this kernel
+        assert(src.dtype == dtype)
+        
+        NUM_BLOCKS = length // THREADS_PER_BLOCK
+        NUM_BLOCKS = NUM_BLOCKS + 1 if length % THREADS_PER_BLOCK > 0 else NUM_BLOCKS # increment if there's remainder
+        
+        out_interrim = cp.empty((NUM_BLOCKS, numFreqs), dtype=dtype)
+        smReq = 64 * 64 * 8 # A constant shared memory grid of 64 * 64 complex64s
+        
+        dotTonesScaling_32fKernel((NUM_BLOCKS,), (THREADS_PER_BLOCK,),
+                                  (f0, fstep, numFreqs, length, src, out_interrim),
+                                  shared_mem=smReq)
+        
+        return out_interrim
+        
+except:
+    print("Ignoring cupy imports..")
+        
+
+#%%
+def dft(x, freqs, fs):
+    '''
+
+    Parameters
+    ----------
+    x : array
+        Input data.
+    freqs : array
+        Array of bin frequency values to evaluate at.
+
+    Returns
+    -------
+    Array of DFT bin values for input frequencies.
+
+    '''
+    
+    output = np.zeros(len(freqs),dtype=np.complex128)
+    for i in np.arange(len(freqs)):
+        freq = freqs[i]
+        tone = np.exp(-1j*2*np.pi*freq*np.arange(len(x))/fs)
+        output[i] = np.dot(tone, x)
+    
+    return output
+
+# @jit(nopython=True)
+def toneSpectrum(f0, freqs, fs, N, phi=0, A=1.0):
+    '''
+    Returns a spectrum corresponding to applying DFT to a tone with frequency f0 and phase phi,
+    at values specified by the 'freqs' array.
+    
+    See the tone reproduction notebook for details.
+    '''
+    
+    vals = -1j * A * (1 - np.exp(-1j*2*np.pi*(freqs-f0)*N/fs))/(2*np.pi*(freqs-f0)/fs) * np.exp(1j*phi)
+    
+    return vals
+
+try:
+    import cupy as cp
+    
+    
     
 except:
     print("Ignoring cupy imports..")

@@ -193,6 +193,13 @@ void dotTonesScaling_32f(
     
     // make a double version of the global mem source
     complex<double> src64f;
+    
+    // track the batch we're on
+    int batch = 0;
+    // and an accumulator within batches
+    complex<float> accumulator;
+    // and also resolve the number of shared mem columns we actually use out of the 64
+    int kMax = len - startidx < 64 ? len - startidx : 64;
 	
 	// no point doing anything if this thread is beyond the length
 	if (i < len)
@@ -200,6 +207,28 @@ void dotTonesScaling_32f(
     	// loop over all the frequencies
     	for (int fidx = 0; fidx < numFreqs; fidx++)
     	{
+            // finally, if we have completed a batch of 64 (or we're on the last freq),
+            // it's time to sum up in sharedmem and output to global mem after
+            if (fidx % 64 == 0 & fidx != 0)
+            {
+                // we wait for everyone to be done writing to shared mem for this batch
+                __syncthreads();
+                
+                // then we iterate across the columns
+                accumulator = 0.0f; // pre-zero-ing
+                for (int k = 0; k < kMax; k++) // note that not all columns may be used (if we're the last block)
+                {
+                    // each thread works on one particular row
+                    accumulator += s_ws[threadIdx.x * 64 + k];
+                }
+                
+                // once complete, we flush to global memory
+                out[blockIdx.x * numFreqs + 64*batch + threadIdx.x] = accumulator;
+                
+                // increment the batch so we know where to write to next time
+                batch++;
+            }
+            
         	// define the row in shared memory we will be working on
         	s_row = fidx % 64;
         	
@@ -216,16 +245,25 @@ void dotTonesScaling_32f(
 
         	// after we have done the multiply of the tone, we save it in the appropriate spot in the workspace on shared mem
             s_ws[64 * s_row + threadIdx.x] = complex<float>(outstack.real(), outstack.imag()); // cast to floats just like before
-            
-            // finally, if we have completed a batch of 64 (or we're on the last freq),
-            // it's time to sum up in sharedmem and output to global mem after
-            if (fidx % 64 == 0 & fidx != 0 || fidx == numFreqs-1)
+    	}
+        
+        // we must also write the last batch in..
+        __syncthreads();
+        
+        // note that on the last batch, not all 64 rows (i.e. freqs) may have been used, so we only accumulate and write those that are remaining
+        if (threadIdx.x < numFreqs - batch * 64)
+        {
+            // then we iterate across the columns
+            accumulator = 0.0f;
+            for (int k = 0; k < kMax; k++)
             {
-                // to be completed
+                // each thread works on one particular row
+                accumulator += s_ws[threadIdx.x * 64 + k];
             }
             
-          
-    	}
+            // once complete, we flush to global memory
+            out[blockIdx.x * numFreqs + 64*batch + threadIdx.x] = accumulator;
+        }
 	}
 }
 

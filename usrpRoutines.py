@@ -142,6 +142,9 @@ class FolderReader:
         self.ignoreInsufficientData = ignoreInsufficientData
         self.refreshFilelists()
         
+        self.executor = ThreadPoolExecutor(1) # Generally good to have only 1 thread on concurrency for reading
+        self.futures = None
+        
         self.reset()
         
         # Calculate memory footprint
@@ -178,16 +181,42 @@ class FolderReader:
         alldata = simpleBinRead(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
         return alldata, fps
         
-    def get(self, numFiles=None, start=None):
-        numFiles, start = self._getbounds(numFiles,start)
+    def get(self, numFiles=None, start=None, prefetch=0):
+        # Let's check if we have any prefetched results
+        if self.future is not None:
+            # Wait for future to complete, if not yet complete
+            concurrent.futures.wait(self.futures)
+            
+            # Extract the data (and convert it, as the futures doesn't do that for you)
+            futuredata = [future.result().astype(np.float32).view(self.out_dtype) 
+                          for future in self.futures]
+            futuredata = np.hstack(futuredata).reshape(-1) # Flatten
+            
+            # Increment the internal index
+            self.fidx += len(self.futures) # We read this number of files
+            
+            # At the end, we must re-set future to None
+            self.futures = None
+            
+            # TODO: handle cases where future data is less or more than requested
+            raise NotImplementedError("TODO: extract data, read the rest of the requirements if prefetch was insufficient.")
+        else:
+            # Default behaviour
+            numFiles, start = self._getbounds(numFiles,start)
+            
+            end = start + numFiles
+            if end > len(self.filepaths):
+                raise ValueError("Insufficient files remaining.")
+            self.fidx = end
+            
+            fps = self.filepaths[start:end]
+            alldata = multiBinReadThreaded(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
         
-        end = start + numFiles
-        if end > len(self.filepaths):
-            raise ValueError("Insufficient files remaining.")
-        self.fidx = end
+        # If prefetch is requested, we submit it to futures
+        if prefetch > 0:
+            self.futures = [futureBinRead(self.executor, self.filepaths[i], self.numSampsPerFile, self.in_dtype)
+                            for i in range(self.fidx, self.fidx + prefetch)]
         
-        fps = self.filepaths[start:end]
-        alldata = multiBinReadThreaded(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
         return alldata, fps
     
     def _getbounds(self, numFiles, start):

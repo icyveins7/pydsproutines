@@ -49,8 +49,8 @@ signal configs and processing configs. A typical config file may look something 
     ...
     
     [myfirstworkspace]
-    proc_first
-    proc_firstdifferent
+    pro_first
+    pro_firstdifferent
     
 In general, it is useful to align the different signals and sources at the top, as these are
 IMMUTABLE, and usually never change; if a signal is present in a particular source and needs processing,
@@ -149,6 +149,16 @@ class SignalSectionProxy(SectionProxy):
 class ProcessingSectionProxy(SectionProxy):
     def __repr__(self):
         return '<ProcessingSection: {}>'.format(self._name)
+        
+    # Redirect to the associated src and sig section objects
+    @property
+    def src(self):
+        return self.parser.getSrc(self.get('src'))
+        
+    @property
+    def sig(self):
+        return self.parser.getSig(self.get('sig'))
+        
     @property
     def numTaps(self):
         return self.getint('numTaps')
@@ -168,17 +178,48 @@ class DSPConfig(DirectSingleConfig):
     def __init__(self, filename: str, *args, **kwargs):
         super().__init__(filename, *args, **kwargs)
         self.recastSections()
-        
+    
     # Note that for these type-specific sections, we strip the prefix
-    def getSources(self):
+    # Also note that these list everything in the config file.
+    @property
+    def allSources(self):
         return {self._keySuffix(key): item for key, item in self._proxies.items() if self._isSourceSection(key)}
     
-    def getSignals(self):
+    @property
+    def allSignals(self):
         return {self._keySuffix(key): item for key, item in self._proxies.items() if self._isSignalSection(key)}
     
-    def getProcesses(self):
+    @property
+    def allProcesses(self):
         return {self._keySuffix(key): item for key, item in self._proxies.items() if self._isProcessingSection(key)}
         
+    # But usually you want to activate a certain workspace
+    def loadMenu(self):
+        '''Overloaded the menu to only show workspaces.'''
+        workspaces = [section for section in self.sections() if self._isWorkspaceSection(section)]
+        
+        for i, workspace in enumerate(workspaces):
+            print("%d: %s" % (i, workspace))
+        idx = int(input("Select workspace: "))
+        self.loadSection(workspaces[idx])
+        
+    # And with a certain workspace, you only want the associated processes
+    @property
+    def processes(self):
+        return {self._keySuffix(key): self._proxies[key] for key in list(self.currentSection.keys())}
+        
+    # Auxiliary things..
+    def _makeSrcKey(self, src: str):
+        return 'src_' + src
+        
+    def getSrc(self, src: str):
+        return self._proxies[self._makeSrcKey(src)]
+        
+    def _makeSigKey(self, sig: str):
+        return 'sig_' + sig
+        
+    def getSig(self, sig: str):
+        return self._proxies[self._makeSigKey(sig)]
     
     def recastSections(self):
         # Proxies stored in _proxies
@@ -194,7 +235,7 @@ class DSPConfig(DirectSingleConfig):
                 
             else:
                 self._proxies[key] = WorkspaceSectionProxy(self._proxies[key]._parser, self._proxies[key]._name)
-      
+    
     def _keyPrefix(self, key: str):
         return key[:4]
 
@@ -210,6 +251,26 @@ class DSPConfig(DirectSingleConfig):
     def _isProcessingSection(self, key: str):
         return self._keyPrefix(key) == 'pro_'
     
+    def _isWorkspaceSection(self, key: str):
+        if not (self._isSourceSection(key) or self._isSignalSection(key) or self._isProcessingSection(key)):
+            return True
+        else:
+            return False
+    
+#%% Many cases involve processing only one signal at a time i.e. only 1 process for each workspace
+class SingleProcessDSPConfig(DSPConfig):
+    @property
+    def process(self):
+        return list(self.processes.items())[0][1]
+        
+    # We also short circuit the src and signal directly
+    @property
+    def src(self):
+        return self.process.src
+        
+    @property
+    def sig(self):
+        return self.process.sig
 
 #%% Intend to deprecate from this onwards, bad format to do things..
 class SingleSourceConfigMixin:

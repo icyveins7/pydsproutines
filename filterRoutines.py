@@ -478,9 +478,8 @@ class Channeliser:
 
 #%%
 class BurstDetector:
-    def __init__(self, medfiltlen: int, snrReqLinear: float):
+    def __init__(self, medfiltlen: int):
         self.medfiltlen = medfiltlen
-        self.snrReqLinear = snrReqLinear
         
         # Placeholders for later results
         self.d_absx = None
@@ -521,6 +520,53 @@ class BurstDetector:
         signalIndices = np.split(signalIndices, splitIndices)
         
         return signalIndices
+        
+    def detectRegularSections(self, sectionSizeRange: np.ndarray):
+        '''
+        Uses the samples' power to estimate the length of a period for bursty signals.
+        
+        Assume a signal consists of a burst duration followed by a guard duration, which together constitutes the period.
+        By sectioning into test periods and taking the mean power over the periods,
+        then performing a simple kmeans estimate to cluster, we should see that the correct period length will have
+        the widest spacing in the clusters. This is used to find the period length.
+        
+        Depending on the resolution required, it is likely that a rough estimate should be used to find the coarse period,
+        then a finer, second search can be applied.
+        
+        Example:
+            detectRegularSections(np.arange(..., ..., 1000) # Skip 1000 samples at a time
+            detectRegularSections(np.arange(coarse-1000, coarse+1000, 1) # Search around the coarse estimate at sample level
+        '''
+        metric = np.zeros((sectionSizeRange.size, 2))
+        codebooks = np.zeros((sectionSizeRange.size, 2))
+        for i, partitionSize in enumerate(sectionSizeRange):
+            partitioned = cp.abs(self.d_medfiltered)
+            if self.d_medfiltered.size % partitionSize > 0:    
+                partitioned = cp.abs(self.d_medfiltered)[:-(self.d_medfiltered.size % partitionSize)] # Slice off the ends if needed to be a multiple
+            partitioned = partitioned.reshape((-1, partitionSize))
+            # Take mean down the columns
+            partitionMeans = cp.mean(partitioned, axis=0)
+            
+            ratio = 1.5
+            x = partitionMeans.get()
+            bigClusterSeed = np.max(x)
+            try:
+                smallClusterSeed = x[x < (bigClusterSeed/ratio)][0]
+            except:
+                smallClusterSeed = np.min(x)
+            codebook, distortion = spc.kmeans(x,np.array([smallClusterSeed, bigClusterSeed]))
+            codebook = np.sort(codebook)
+            codebooks[i,:] = codebook
+
+            # Codify the samples
+            codes, dists = spc.vq(x, codebook)
+            
+            print("partitionSize = %d, codebook clustering = %f, distortion = %f" % (partitionSize, np.diff(codebook)[0], distortion))
+            print("num0s = %d, num1s = %d" % (np.argwhere(codes==0).size, np.argwhere(codes==1).size))
+            metric[i, 0] = np.diff(codebook)[0]
+            metric[i, 1] = distortion
+            
+        return metric, codebooks
     
     def pgplot(self, ax=None, fs=1):
         if self.d_ampSq is None:

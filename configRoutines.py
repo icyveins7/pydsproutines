@@ -144,6 +144,26 @@ class SignalSectionProxy(SectionProxy):
     @property
     def baud(self):
         return self.getfloat('baud')
+
+    @property
+    def numPeriodBits(self):
+        '''For periodic signals, this is the sum of the burst (on) and guard (off) duration in bits.'''
+        return self.getint('numPeriodBits')
+
+    @property
+    def numBurstBits(self):
+        '''For periodic signals, this is the single burst (on) duration in bits.'''
+        return self.getint('numBurstBits')
+
+    @property
+    def numGuardBits(self):
+        '''For periodic signals, this is the single guard (off) duration in bits.'''
+        return self.getint('numGuardBits')
+
+    @property
+    def numBursts(self):
+        '''For periodic signals, this is the total number of bursts.'''
+        return self.getint('numBursts')
     
 #%%
 class ProcessingSectionProxy(SectionProxy):
@@ -175,8 +195,8 @@ class WorkspaceSectionProxy(SectionProxy):
 
 #%%
 class DSPConfig(DirectSingleConfig):
-    def __init__(self, filename: str, *args, **kwargs):
-        super().__init__(filename, *args, **kwargs)
+    def __init__(self, filename: str, *args, allow_no_value=True, **kwargs):
+        super().__init__(filename, *args, allow_no_value=allow_no_value, **kwargs)
         self.recastSections()
     
     # Note that for these type-specific sections, we strip the prefix

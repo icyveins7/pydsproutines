@@ -10,6 +10,7 @@ from timingRoutines import Timer
 # from numba import njit, jit
 from xcorrRoutines import *
 import warnings
+import matplotlib.pyplot as plt
 
 try:
     import cupy as cp
@@ -829,6 +830,7 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
         
         # Outputs
         self.d_costs = None
+        self.searchIdx = None
         
     def demod(self, x: np.ndarray, numBursts: int=None, searchIdx: np.ndarray=None):
         # t1 = time.perf_counter()
@@ -860,7 +862,7 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
         if searchIdx is None:
             # extent = genIdx[-1] + self.up
             searchIdx = np.arange(xc_abs_max.size - genIdx[-1])
-            print("Auto-generated search indices from %d to %d" % (searchIdx[0], searchIdx[-1]))
+            # print("Auto-generated search indices from %d to %d" % (searchIdx[0], searchIdx[-1]))
         
         # Loop over the search range
         self.d_costs = np.zeros(searchIdx.size)
@@ -876,6 +878,9 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
         
         # t2 = time.perf_counter()
         # print("Took %f s." % (t2-t1))
+
+        # Save searchIdx for plotting
+        self.searchIdx = searchIdx
         
         return dbits, mi
 
@@ -897,6 +902,12 @@ class BurstyDemodulatorCP2FSK(BurstyDemodulator):
 
         '''
         self.burstIdxs = burstIdxs
+
+    def plotCosts(self):
+        fig, ax = plt.subplots(1,1,num="CP2FSK Demodulator Cost")
+        ax.plot(self.searchIdx, self.d_costs)
+        return fig, ax
+
 
 #%%
 def convertIntToBase4Combination(l, i):

@@ -473,6 +473,14 @@ class Channeliser:
         self.delay[:] = x[-self.delay.size:] # copy the ending samples into delay
         
         return channels[self.jump:,:] # only return the valid parts ie skip the delay/Dec samples
+
+    def channelFreqs(self, fs: float=1.0):
+        '''Returns the centre frequency for each channel.'''
+        return makeFreq(self.numChannels, fs)
+
+    def channelFs(self, fs: float=1.0):
+        '''Returns the new sampling rate for each channel.'''
+        return fs / self.Dec
         
     
 
@@ -493,6 +501,20 @@ class BurstDetector:
         self.d_absx = cp.abs(d_x)
         self.d_ampSq = self.d_absx * self.d_absx
         self.d_medfiltered = cpsps.medfilt(self.d_ampSq, self.medfiltlen)
+
+    @staticmethod
+    def imposeSignalLengthLimits(signalIndices: list, minLength: int=0, maxLength: int=None):
+        '''
+        Use this after signalIndices are returned from the detection methods
+        in order to weed out the nonsense ones.
+        '''
+        if maxLength is None:
+            maxLength = 4294967295 # arbitrarily gonna set uint324294967295 as the max
+        return [i for i in signalIndices if i.size >= minLength and i.size <= maxLength]
+
+    @staticmethod
+    def getStartAndEndIdx(signalIdx: np.ndarray):
+        return signalIdx[0], signalIdx[-1]
         
     def detectViaThreshold(self, threshold: float):
         self.threshold = threshold # Kept for plotting

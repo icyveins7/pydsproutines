@@ -80,6 +80,37 @@ def multiBinReadThreaded(filenames, numSamps, in_dtype=np.int16, out_dtype=np.co
             alldata[i*numSamps: (i+1)*numSamps] = future.result() # write to the mass array
             
     return alldata
+
+def futureBinRead(executor: ThreadPoolExecutor, filename: str, numSamps: int, in_dtype: type=np.int16, offset: int=0):
+    '''
+    Uses an existing ThreadPoolExecutor to submit a single bin read, akin to simpleBinRead.
+    The result array can be extracted via future.result(). This allows you to pre-load data from disk in another thread.
+
+    Parameters
+    ----------
+    executor : concurrent.futures.ThreadPoolExecutor
+        Pre-initialized ThreadPoolExecutor.
+    filename : str
+        Single filepath to load.
+    numSamps : int
+        Number of complex samples to load.
+    in_dtype : type, optional
+        Data type of each component of the samples (either I or Q). The default is np.int16.
+        Do not specify complex64 or complex128 types.
+    offset : int, optional
+        The offset in bytes from the start of the file. The default is 0.
+
+    Returns
+    -------
+    future : concurrent.futures.Future
+        Future object which contains the data array. Use future.result() to extract the array.
+
+    '''
+    if in_dtype == np.complex64 or in_dtype == np.complex128:
+        raise TypeError("in_dtype must be a real type. You likely want float32 or float64 instead.")
+    
+    future = executor.submit(np.fromfile, filename, dtype=in_dtype, count=numSamps*2, offset=offset)
+    return future
     
 def isInt16Clipping(data, threshold=32000):
     if data.dtype == np.complex64:

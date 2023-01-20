@@ -81,7 +81,7 @@ def multiBinReadThreaded(filenames, numSamps, in_dtype=np.int16, out_dtype=np.co
             
     return alldata
 
-def futureBinRead(executor: ThreadPoolExecutor, filename: str, numSamps: int, in_dtype: type=np.int16, offset: int=0):
+def futureBinRead(executor: concurrent.futures.ThreadPoolExecutor, filename: str, numSamps: int, in_dtype: type=np.int16, offset: int=0):
     '''
     Uses an existing ThreadPoolExecutor to submit a single bin read, akin to simpleBinRead.
     The result array can be extracted via future.result(). This allows you to pre-load data from disk in another thread.
@@ -142,8 +142,8 @@ class FolderReader:
         self.ignoreInsufficientData = ignoreInsufficientData
         self.refreshFilelists()
         
-        self.executor = ThreadPoolExecutor(1) # Generally good to have only 1 thread on concurrency for reading
-        self.futures = None
+        self.executor = concurrent.futures.ThreadPoolExecutor(1) # Generally good to have only 1 thread on concurrency for reading
+        self.futures = []
         
         self.reset()
         
@@ -166,7 +166,63 @@ class FolderReader:
         self.reset() # cannot ensure file indexing after list is reset
         
     def reset(self):
+        '''Brings the reader back to the first file.'''
         self.fidx = 0
+
+    def startAtIndex(self, i: int):
+        '''
+        Moves the reader to the i'th file.
+        Note: calling this explicitly will discard all prefetched data as we cannot be sure we are in order any more.
+        '''
+        self.fidx = i
+        self.futures.clear()
+
+    def get(self, numFiles: int, prefetch: int=0):
+        '''
+        Reads the next (numFiles) files,
+        and prefetches an optional number of them.
+        '''
+
+        startingFileIdx = self.fidx
+        remainderToRead = numFiles
+        data = np.zeros((numFiles, self.numSampsPerFile), dtype=self.out_dtype)
+        i = 0 # Counter for what we've read
+        # First iterate over the prefetched data, if any
+        while len(self.futures) > 0 and remainderToRead > 0:
+            future = self.futures.pop(0) # Pop the earliest one
+            data[i,:] = future.result().astype(np.float32).view(self.out_dtype) # Save it to our output
+            i += 1
+            remainderToRead -= 1 # Every file we read, we remove from the remainder
+            self.fidx += 1 # We also increment the internal counter
+
+        # If there is a remainder left then we have to explicitly read it ourselves now
+        if remainderToRead > 0:
+            print("Manually retrieving %d files.." % (remainderToRead))
+            data[i,:] = simpleBinRead(
+                self.filepaths[self.fidx],
+                self.numSampsPerFile,
+                self.in_dtype,
+                self.out_dtype
+            )
+            i += 1
+            self.fidx += 1
+
+        # And then we prefetch the additional amount required
+        additional = prefetch - len(self.futures)
+        for a in range(additional):
+            self.futures.append(
+                futureBinRead(
+                    self.executor, self.filepaths[self.fidx+a],
+                    self.numSampsPerFile, self.in_dtype
+                )
+            )
+
+        # Carve out the filepaths to return
+        fps = self.filepaths[startingFileIdx:self.fidx]
+        # Flatten
+        data = data.flatten()
+
+        return data, fps
         
     def getNextFile(self):
         # Specifically only retrieve the next single file, provided as a convenience
@@ -181,43 +237,69 @@ class FolderReader:
         alldata = simpleBinRead(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
         return alldata, fps
         
-    def get(self, numFiles=None, start=None, prefetch=0):
-        # Let's check if we have any prefetched results
-        if self.future is not None:
-            # Wait for future to complete, if not yet complete
-            concurrent.futures.wait(self.futures)
-            
-            # Extract the data (and convert it, as the futures doesn't do that for you)
-            futuredata = [future.result().astype(np.float32).view(self.out_dtype) 
-                          for future in self.futures]
-            futuredata = np.hstack(futuredata).reshape(-1) # Flatten
-            
-            # Increment the internal index
-            self.fidx += len(self.futures) # We read this number of files
-            
-            # At the end, we must re-set future to None
-            self.futures = None
-            
-            # TODO: handle cases where future data is less or more than requested
-            raise NotImplementedError("TODO: extract data, read the rest of the requirements if prefetch was insufficient.")
-        else:
-            # Default behaviour
-            numFiles, start = self._getbounds(numFiles,start)
-            
-            end = start + numFiles
-            if end > len(self.filepaths):
-                raise ValueError("Insufficient files remaining.")
-            self.fidx = end
-            
-            fps = self.filepaths[start:end]
-            alldata = multiBinReadThreaded(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
+    # def get(self, numFiles=None, start=None, prefetch=0):
         
-        # If prefetch is requested, we submit it to futures
-        if prefetch > 0:
-            self.futures = [futureBinRead(self.executor, self.filepaths[i], self.numSampsPerFile, self.in_dtype)
-                            for i in range(self.fidx, self.fidx + prefetch)]
+    #     remainderToRead = numFiles
+    #     # Attempt to read from prefetched results
+
+
+
+    #     # Let's check if we have any prefetched results
+    #     if len(self.futures) > 0:
+    #         # Wait for future to complete, if not yet complete
+    #         concurrent.futures.wait(self.futures)
+            
+    #         # TODO: handle None case?
+    #         # If requested amount is more than or equal to prefetched amount
+    #         if numFiles >= len(self.futures):
+    #             # Extract the data (and convert it, as the futures doesn't do that for you)
+    #             futuredata = [future.result().astype(np.float32).view(self.out_dtype) 
+    #                         for future in self.futures]
+    #             futuredata = np.hstack(futuredata).reshape(-1) # Flatten
+
+    #             # Increment the internal index
+    #             self.fidx += len(self.futures) # We read this number of files
+
+    #             # Count how many we have left to read
+    #             remainder = numFiles - len(self.futures)
+
+    #         # Otherwise just read what we need from the prefetched, and leave the rest
+    #         else:
+    #             futuredata = [self.futures[i].result().astype(np.float32).view(self.out_dtype)
+    #                 for i in range(numFiles)
+    #             ]
+    #             futuredata = np.hstack(futuredata).reshape(-1)
+
+    #             # Increment internal index up to current value
+    #             self.fidx += numFiles
+
+    #             # Remove the used futures
+    #             for i in range(numFiles):
+    #                 self.futures.pop()
+            
+    #         # At the end, we must re-set future to None
+    #         self.futures = None
+            
+    #         # TODO: handle cases where future data is less or more than requested
+    #         raise NotImplementedError("TODO: extract data, read the rest of the requirements if prefetch was insufficient.")
+    #     else:
+    #         # Default behaviour
+    #         numFiles, start = self._getbounds(numFiles,start)
+            
+    #         end = start + numFiles
+    #         if end > len(self.filepaths):
+    #             raise ValueError("Insufficient files remaining.")
+    #         self.fidx = end
+            
+    #         fps = self.filepaths[start:end]
+    #         alldata = multiBinReadThreaded(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
         
-        return alldata, fps
+    #     # If prefetch is requested, we submit it to futures
+    #     if prefetch > 0:
+    #         self.futures = [futureBinRead(self.executor, self.filepaths[i], self.numSampsPerFile, self.in_dtype)
+    #                         for i in range(self.fidx, self.fidx + prefetch)]
+        
+    #     return alldata, fps
     
     def _getbounds(self, numFiles, start):
         if start is None:
@@ -255,78 +337,8 @@ class FolderReader:
         if plotSpecgram:
             plt.figure()
             plt.specgram(alldata, NFFT=1024, Fs=fs)
-            
-#%%
-class GroupDatabase:
-    def __init__(self, dbfilepath: str = "groups.db"):
-        self.dbfilepath = dbfilepath
-        
-        # Make the db
-        self.con = sq.connect(dbfilepath)
-        self.cur = self.con.cursor()
-        
-        # Add the meta table
-        self.addMetatable()
-        
-    def addMetatable(self):
-        self.cur.execute("create table if not exists meta(lastfiletime INTEGER)")
-        self.con.commit()
-        
-    def updateMetatable(self, lastfiletime: int):
-        self.cur.execute("insert or replace into meta values(?)", (int(lastfiletime),))
-        self.con.commit()
-        
-    def getLastProcessedTime(self):
-        self.cur.execute("select lastfiletime from meta")
-        return self.cur.fetchone()
-        
-    def addTable(self, tablename: str):
-        stmt = "create table if not exists %s(gidx INTEGER UNIQUE, starttime INTEGER, endtime INTEGER)" % tablename
-        self.cur.execute(stmt)
-        self.con.commit()
-        
-    def getLatestGroupIdx(self, tablename: str):
-        stmt = "select max(gidx) from %s" % tablename
-        self.cur.execute(stmt)
-        r = self.cur.fetchone()
-        print(r)
-        return r
-        
-    def insertGroup(self, tablename: str, gidx: int, starttime: int, endtime: int):
-        '''
-        Parameters
-        ----------
-        tablename : str
-            Table to insert into.
-        gidx : int
-            Group index, unique value for each row.
-        starttime : int
-            Start time, inclusive.
-        endtime : int
-            End time, inclusive i.e. group is from starttime <= time <= endtime. 
 
-        '''
-        stmt = "insert or replace into %s values(?,?,?)" % tablename
-        self.cur.execute(stmt, (gidx, starttime, endtime))
-        self.con.commit()
-        
-    def getGroupByIdx(self, tablename: str, gidx: int):
-        stmt = "select * from %s where gidx=?" % tablename
-        self.cur.execute(stmt, (gidx,))
-        _, start, end = self.cur.fetchone()
-        return start, end
-        
-    def getAllGroups(self, tablename: str, returnDataframe: bool = False):
-        stmt = "select * from %s" % tablename
-        if returnDataframe:
-            df = pd.read_sql_query(stmt, self.con)
-            return df
-        else:
-            self.cur.execute(stmt)
-            r = self.cur.fetchall()
-            return r
-        
-#%%
+#%% 
 class SortedFolderReader(FolderReader):
     def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64, ensure_incremental=True):
         super().__init__(folderpath, numSampsPerFile, extension, in_dtype, out_dtype)
@@ -345,8 +357,13 @@ class SortedFolderReader(FolderReader):
     def getFinalTime(self):
         return self.filetimes[-1]
             
-    def skipToTime(self, start):
-        self.fidx = np.argwhere(self.filetimes == start)[0,0]
+    def startAtTime(self, startTime: int):
+        '''
+        Skips reader to the file at specified time.
+        Note that prefetched data will be cleared when you do this.
+        '''
+        targetFidx = np.argwhere(self.filetimes == startTime)[0,0]
+        self.startAtIndex(targetFidx)
             
     def getPathByTime(self, reqTime):
         return self.filepaths[np.argwhere(self.filetimes == reqTime).flatten()[0]]
@@ -360,29 +377,55 @@ class SortedFolderReader(FolderReader):
             paths = [self.getPathByTime(i) for i in reqTime]
             alldata = multiBinReadThreaded(paths, self.numSampsPerFile, self.in_dtype, self.out_dtype)
             return alldata, paths
-            
-    def get(self, numFiles=None, start=None):
+
+    def get(self, numFiles: int, prefetch: int=0):
         '''
+        Extracts the desired number of files and optionally prefetches extra files.
+
         Parameters
         ----------
         numFiles : int
-            Number of files to open & concatenate.
-        start : int, optional
-            File index (starting from 0 for the first file). The default is None (=0).
+            The number of files to output. If some are prefetched it will manually pull the remainder.
+        prefetch : int, optional
+            The additional number of files to prefetch, to speed up consequent calls. By default 0.
 
         Returns
         -------
-        alldata : array
-            Data.
-        fps : list of strings
-            Filepaths.
-        fts : list of ints.
-            File times.
+        data : np.ndarray
+            Output array. Has length numFiles * numSampsPerFile.
+        fps : list
+            List of file paths that were read, in order.
+        fts : np.ndarray
+            List of file times that were read, in order.
         '''
-        # numFiles,start = self._getbounds(numFiles, start)
-        alldata, fps = super().get(numFiles, start) # This already calls getbounds?
+
+        data, fps = super().get(numFiles, prefetch)
         fts = self.filetimes[self.fidx-numFiles:self.fidx]
-        return alldata, fps, fts
+        return data, fps, fts
+
+    
+    # def get(self, numFiles=None, start=None):
+    #     '''
+    #     Parameters
+    #     ----------
+    #     numFiles : int
+    #         Number of files to open & concatenate.
+    #     start : int, optional
+    #         File index (starting from 0 for the first file). The default is None (=0).
+
+    #     Returns
+    #     -------
+    #     alldata : array
+    #         Data.
+    #     fps : list of strings
+    #         Filepaths.
+    #     fts : list of ints.
+    #         File times.
+    #     '''
+    #     # numFiles,start = self._getbounds(numFiles, start)
+    #     alldata, fps = super().get(numFiles, start) # This already calls getbounds?
+    #     fts = self.filetimes[self.fidx-numFiles:self.fidx]
+    #     return alldata, fps, fts
     
     def splitHighAmpSubfolders(self, targetfolderpath: str, selectTimes: list=None,
                                minAmp: float=1e3, bufFront: int=1, bufBack: int=1, onlyExtractTimes: bool=False, onlyExtractGroups: bool=False,
@@ -495,6 +538,77 @@ class SortedFolderReader(FolderReader):
     
         
         return selectTimes
+            
+#%%
+class GroupDatabase:
+    def __init__(self, dbfilepath: str = "groups.db"):
+        self.dbfilepath = dbfilepath
+        
+        # Make the db
+        self.con = sq.connect(dbfilepath)
+        self.cur = self.con.cursor()
+        
+        # Add the meta table
+        self.addMetatable()
+        
+    def addMetatable(self):
+        self.cur.execute("create table if not exists meta(lastfiletime INTEGER)")
+        self.con.commit()
+        
+    def updateMetatable(self, lastfiletime: int):
+        self.cur.execute("insert or replace into meta values(?)", (int(lastfiletime),))
+        self.con.commit()
+        
+    def getLastProcessedTime(self):
+        self.cur.execute("select lastfiletime from meta")
+        return self.cur.fetchone()
+        
+    def addTable(self, tablename: str):
+        stmt = "create table if not exists %s(gidx INTEGER UNIQUE, starttime INTEGER, endtime INTEGER)" % tablename
+        self.cur.execute(stmt)
+        self.con.commit()
+        
+    def getLatestGroupIdx(self, tablename: str):
+        stmt = "select max(gidx) from %s" % tablename
+        self.cur.execute(stmt)
+        r = self.cur.fetchone()
+        print(r)
+        return r
+        
+    def insertGroup(self, tablename: str, gidx: int, starttime: int, endtime: int):
+        '''
+        Parameters
+        ----------
+        tablename : str
+            Table to insert into.
+        gidx : int
+            Group index, unique value for each row.
+        starttime : int
+            Start time, inclusive.
+        endtime : int
+            End time, inclusive i.e. group is from starttime <= time <= endtime. 
+
+        '''
+        stmt = "insert or replace into %s values(?,?,?)" % tablename
+        self.cur.execute(stmt, (gidx, starttime, endtime))
+        self.con.commit()
+        
+    def getGroupByIdx(self, tablename: str, gidx: int):
+        stmt = "select * from %s where gidx=?" % tablename
+        self.cur.execute(stmt, (gidx,))
+        _, start, end = self.cur.fetchone()
+        return start, end
+        
+    def getAllGroups(self, tablename: str, returnDataframe: bool = False):
+        stmt = "select * from %s" % tablename
+        if returnDataframe:
+            df = pd.read_sql_query(stmt, self.con)
+            return df
+        else:
+            self.cur.execute(stmt)
+            r = self.cur.fetchall()
+            return r
+        
         
 #%% This is meant to only read one second at a time
 class LiveReader(FolderReader):

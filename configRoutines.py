@@ -164,6 +164,22 @@ class SignalSectionProxy(SectionProxy):
     def numBursts(self):
         '''For periodic signals, this is the total number of bursts.'''
         return self.getint('numBursts')
+
+    @property
+    def hasChannels(self):
+        '''For signals that occupy multiple channels, this returns True.'''
+        return self.getbool('hasChannels')
+
+    @property
+    def numChannels(self):
+        '''For signals that occupy multiple channels, this returns the number of channels.'''
+        return self.getint('numChannels')
+
+    @property
+    def channelSpacingHz(self):
+        '''For signals that occupy multiple channels, this returns the spacing between each channel.'''
+        return self.getfloat('channelSpacingHz')
+ 
     
 #%%
 class ProcessingSectionProxy(SectionProxy):

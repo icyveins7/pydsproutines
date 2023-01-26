@@ -196,7 +196,7 @@ class FolderReader:
             self.fidx += 1 # We also increment the internal counter
 
         # If there is a remainder left then we have to explicitly read it ourselves now
-        if remainderToRead > 0:
+        while remainderToRead > 0:
             print("Manually retrieving %d files.." % (remainderToRead))
             data[i,:] = simpleBinRead(
                 self.filepaths[self.fidx],
@@ -206,6 +206,7 @@ class FolderReader:
             )
             i += 1
             self.fidx += 1
+            remainderToRead -= 1
 
         # And then we prefetch the additional amount required
         additional = prefetch - len(self.futures)

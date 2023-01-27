@@ -304,7 +304,32 @@ def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=
     
     return fig, ax
 
+#%%
+def pgPlotAmpTimeChannels(chnls, chnl_fs, windowTitle=None, equalYScale=False):
+    win = pg.GraphicsLayoutWidget(title=windowTitle)
+    ax = []
+    t = np.arange(chnls.shape[0]) / chnl_fs
 
+    for i in range(chnls.shape[1]):
+        p = win.addPlot(row=i, col=0)
+        p.addLegend()
+        p.plot(t, np.abs(chnls[:,-1-i]), name="Channel %d" % (chnls.shape[1]-1-i))
+        if i > 0:
+            p.setXLink(ax[0])
+
+        ax.append(p)
+
+    if equalYScale:
+        maxamp = np.max(np.abs(chnls.flatten()))
+        for p in ax:
+            p.setYRange(0, maxamp)
+
+    win.show()
+
+    return win, ax
+
+
+#%%
 def plotTrajectory2d(r_x, r_xdot=None, r_xfmt='b.', quiver_scale=None, ax=None):
     if ax is None:
         fig, ax = plt.subplots(1,1)

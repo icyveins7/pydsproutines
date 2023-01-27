@@ -45,12 +45,12 @@ try:
         elif not outputCAF:
             
             if absResult is True:
-                print('Frequency scanning, but no CAF output (flattened to time)..')
+                # print('Frequency scanning, but no CAF output (flattened to time)..')
                 # h_freqlist = np.zeros(len(shifts),dtype=np.uint32)
                 d_freqlist = cp.zeros(len(shifts),dtype=cp.uint32)
             
             
-                print('Returning normalized QF^2 real values..')
+                # print('Returning normalized QF^2 real values..')
                 # h_result = np.zeros(len(shifts),dtype=np.float64)
                 d_result = cp.zeros(len(shifts),dtype=cp.float64)
     
@@ -70,7 +70,7 @@ try:
                 
                 
                 # now iterate over the number of iterations required
-                print("Starting cupy loop")
+                # print("Starting cupy loop")
                 for i in range(numIter):
                     if i == numIter-1: # on the last iteration, may have to clip
                         # print("FINAL BATCH")

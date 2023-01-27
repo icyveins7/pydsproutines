@@ -343,6 +343,30 @@ def plotFreqz(taps, cutoff=None):
     
     return fig, ax
 
+def plotAngles(angles: np.ndarray, colour: str='b', showCircle: bool=False, showConnectors: bool=False, ax=None):
+    x = np.cos(angles)
+    y = np.sin(angles)
+    
+    if ax is None:
+        fig, ax = plt.subplots(1,1)
+    else:
+        fig = None
+    
+    ax.plot(x, y, colour+'x')
+    if showCircle:
+        cx = np.cos(np.arange(0,2*np.pi,0.001))
+        cy = np.sin(np.arange(0,2*np.pi,0.001))
+        ax.plot(cx, cy, 'k--')
+
+    if showConnectors:
+        for i in range(len(x)):
+            ax.plot([0, x[i]], [0, y[i]], colour+'-')
+    
+    ax.axis([-1.1,1.1,-1.1,1.1])
+    ax.set_aspect('equal')
+
+    return fig, ax
+
 def mplBtnToggle(p, fig):
     '''
     Binds 'a' to reset and show all plots.

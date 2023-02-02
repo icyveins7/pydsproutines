@@ -368,7 +368,7 @@ def plotFreqz(taps, cutoff=None):
     
     return fig, ax
 
-def plotAngles(angles: np.ndarray, colour: str='b', showCircle: bool=False, showConnectors: bool=False, ax=None):
+def plotAngles(angles: np.ndarray, colour: str='b', label: str=None, showCircle: bool=False, showConnectors: bool=False, ax=None):
     x = np.cos(angles)
     y = np.sin(angles)
     
@@ -377,7 +377,7 @@ def plotAngles(angles: np.ndarray, colour: str='b', showCircle: bool=False, show
     else:
         fig = None
     
-    ax.plot(x, y, colour+'x')
+    ax.plot(x, y, colour+'x', label=label)
     if showCircle:
         cx = np.cos(np.arange(0,2*np.pi,0.001))
         cy = np.sin(np.arange(0,2*np.pi,0.001))

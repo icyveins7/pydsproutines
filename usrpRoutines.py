@@ -237,70 +237,6 @@ class FolderReader:
         fps = self.filepaths[start]
         alldata = simpleBinRead(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
         return alldata, fps
-        
-    # def get(self, numFiles=None, start=None, prefetch=0):
-        
-    #     remainderToRead = numFiles
-    #     # Attempt to read from prefetched results
-
-
-
-    #     # Let's check if we have any prefetched results
-    #     if len(self.futures) > 0:
-    #         # Wait for future to complete, if not yet complete
-    #         concurrent.futures.wait(self.futures)
-            
-    #         # TODO: handle None case?
-    #         # If requested amount is more than or equal to prefetched amount
-    #         if numFiles >= len(self.futures):
-    #             # Extract the data (and convert it, as the futures doesn't do that for you)
-    #             futuredata = [future.result().astype(np.float32).view(self.out_dtype) 
-    #                         for future in self.futures]
-    #             futuredata = np.hstack(futuredata).reshape(-1) # Flatten
-
-    #             # Increment the internal index
-    #             self.fidx += len(self.futures) # We read this number of files
-
-    #             # Count how many we have left to read
-    #             remainder = numFiles - len(self.futures)
-
-    #         # Otherwise just read what we need from the prefetched, and leave the rest
-    #         else:
-    #             futuredata = [self.futures[i].result().astype(np.float32).view(self.out_dtype)
-    #                 for i in range(numFiles)
-    #             ]
-    #             futuredata = np.hstack(futuredata).reshape(-1)
-
-    #             # Increment internal index up to current value
-    #             self.fidx += numFiles
-
-    #             # Remove the used futures
-    #             for i in range(numFiles):
-    #                 self.futures.pop()
-            
-    #         # At the end, we must re-set future to None
-    #         self.futures = None
-            
-    #         # TODO: handle cases where future data is less or more than requested
-    #         raise NotImplementedError("TODO: extract data, read the rest of the requirements if prefetch was insufficient.")
-    #     else:
-    #         # Default behaviour
-    #         numFiles, start = self._getbounds(numFiles,start)
-            
-    #         end = start + numFiles
-    #         if end > len(self.filepaths):
-    #             raise ValueError("Insufficient files remaining.")
-    #         self.fidx = end
-            
-    #         fps = self.filepaths[start:end]
-    #         alldata = multiBinReadThreaded(fps, self.numSampsPerFile, self.in_dtype, self.out_dtype)
-        
-    #     # If prefetch is requested, we submit it to futures
-    #     if prefetch > 0:
-    #         self.futures = [futureBinRead(self.executor, self.filepaths[i], self.numSampsPerFile, self.in_dtype)
-    #                         for i in range(self.fidx, self.fidx + prefetch)]
-        
-    #     return alldata, fps
     
     def _getbounds(self, numFiles, start):
         if start is None:
@@ -403,30 +339,6 @@ class SortedFolderReader(FolderReader):
         data, fps = super().get(numFiles, prefetch)
         fts = self.filetimes[self.fidx-numFiles:self.fidx]
         return data, fps, fts
-
-    
-    # def get(self, numFiles=None, start=None):
-    #     '''
-    #     Parameters
-    #     ----------
-    #     numFiles : int
-    #         Number of files to open & concatenate.
-    #     start : int, optional
-    #         File index (starting from 0 for the first file). The default is None (=0).
-
-    #     Returns
-    #     -------
-    #     alldata : array
-    #         Data.
-    #     fps : list of strings
-    #         Filepaths.
-    #     fts : list of ints.
-    #         File times.
-    #     '''
-    #     # numFiles,start = self._getbounds(numFiles, start)
-    #     alldata, fps = super().get(numFiles, start) # This already calls getbounds?
-    #     fts = self.filetimes[self.fidx-numFiles:self.fidx]
-    #     return alldata, fps, fts
     
     def splitHighAmpSubfolders(self, targetfolderpath: str, selectTimes: list=None,
                                minAmp: float=1e3, bufFront: int=1, bufBack: int=1, onlyExtractTimes: bool=False, onlyExtractGroups: bool=False,
@@ -539,6 +451,71 @@ class SortedFolderReader(FolderReader):
     
         
         return selectTimes
+    
+#%%
+class GroupReader(SortedFolderReader):
+    '''
+    This reader is inherited from SortedFolderReader, but adds additional methods to return and track data in groups.
+    Here, a group is defined as a series of files that are saved one after another i.e. one second difference in file times.
+    If two consecutive files differ by more than one second, the group ends.
+    The data can then be extracted group-wise.
+    Folder structure should look something like this:
+        0.bin (group 0)
+        1.bin (group 0)
+        4.bin (group 1)
+        7.bin (group 2)
+        8.bin (group 2)
+    '''
+    def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64):
+        super().__init__(folderpath, numSampsPerFile, extension, in_dtype, out_dtype, ensure_incremental=False)
+        self.groups = self._parseGroups()
+        self.cGrp = -1
+        
+    def _parseGroups(self):
+        # Find where the times differ by more than 1s
+        d = np.diff(self.filetimes)
+        # Place breaks where these occur; note that +1 is required, and we pad with 0 (to include the first) and the total length (to include the last)
+        ii = np.hstack((0, np.argwhere(d > 1).flatten() + 1, self.filetimes.size))
+        # Define the groups
+        groups = [self.filetimes[ii[j]:ii[j+1]] for j in range(ii.size-1)]
+        return groups
+    
+    def reset(self):
+        super().reset()
+        self.cGrp = -1 # Reset the group index too
+        
+    def getGroup(self, prefetchNextGroup: bool=False):
+        '''
+        Extracts N files, where N is the number of files in the next group.
+
+        Parameters
+        ----------
+        prefetchNextGroup : bool, optional
+            Prefetches files in the following group. The default is False.
+
+        Returns
+        -------
+        data : np.ndarray
+            Output array. Has length numFiles * numSampsPerFile.
+        fps : list
+            List of file paths that were read, in order.
+        fts : np.ndarray
+            List of file times that were read, in order.
+            Should not have any files that are more than 1s apart.
+        '''
+        # First increment the group index
+        self.cGrp += 1
+        # Get the number of files in the group
+        numFiles = self.groups[self.cGrp].size
+        # Check how many to prefetch if desired
+        if prefetchNextGroup and self.cGrp+1 < len(self.groups):
+            prefetch = self.groups[self.cGrp+1].size
+        else:
+            prefetch = 0
+        # Call the standard getter
+        data, fps, fts = self.get(numFiles, prefetch)
+        return data, fps, fts
+
             
 #%%
 class GroupDatabase:
@@ -702,8 +679,10 @@ class SyncReaders:
     
 #%% Simple class to read the groups extracted from the readers
 
+
+
 # These classes are best suited for sparse recordings
-class GroupReader:
+class FolderedGroupReader:
     def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64, ensure_incremental=True):
         self.folderpath = folderpath
         self.cGrp = -1

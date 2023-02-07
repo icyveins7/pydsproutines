@@ -484,6 +484,14 @@ class GroupReader(SortedFolderReader):
         super().reset()
         self.cGrp = -1 # Reset the group index too
         
+    @property
+    def hasMoreGroups(self):
+        return self.cGrp + 1 < len(self.groups)
+    
+    @property
+    def numGroups(self):
+        return len(self.groups)
+        
     def getGroup(self, prefetchNextGroup: bool=False):
         '''
         Extracts N files, where N is the number of files in the next group.

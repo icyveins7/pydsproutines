@@ -88,6 +88,69 @@ class CupyKernelFilter:
         self.filter_smtaps_kernel = self.module.get_function("filter_smtaps")
         self.filter_smtaps_sminput_kernel = self.module.get_function("filter_smtaps_sminput")
         
+        with open(os.path.join(os.path.dirname(__file__), "custom_kernels/upfirdn.cu"), "r") as fid:
+            sourcecode = fid.read()
+        self.module = cp.RawModule(code=sourcecode)
+        self.upfirdn_naive_kernel = self.module.get_function("upfirdn_naive")
+        
+    def upfirdn_naive(self, d_x: cp.ndarray, d_taps: cp.ndarray, up: int, down: int, THREADS_PER_BLOCK: int=256):
+        '''
+        Runs upfirdn, identical to scipy.signal.upfirdn.
+        This calls a kernel which stores the taps in every block, so the length of the taps array
+        is bounded by the shared memory maximum.
+
+        Parameters
+        ----------
+        d_x : cp.ndarray, cp.complex64
+            Input array.
+        d_taps : cp.ndarray, cp.float32
+            Filter taps array.
+        up : int
+            Upsampling factor.
+        down : int
+            Downsampling factor.
+        THREADS_PER_BLOCK : int, optional
+            Number of threads to use per block. The default is 256.
+
+        Raises
+        ------
+        TypeError
+            When array types are incorrect.
+
+        Returns
+        -------
+        d_out : cp.ndarray, cp.complex64
+            Output array.
+        '''
+        if d_x.dtype != cp.complex64:
+            raise TypeError("d_x must be complex64.")
+            
+        if d_taps.dtype != cp.float32:
+            raise TypeError("d_taps must be float32.")
+            
+        smReq = d_taps.nbytes
+        
+        # Allocate output length (this is designed to match sps.upfirdn)
+        outlen = int(np.ceil((d_x.size * up - (up-1) + d_taps.size-1) / down))
+        d_out = cp.zeros(outlen, cp.complex64)
+        
+        # Run number of blocks to cover the output
+        NUM_BLOCKS = outlen // THREADS_PER_BLOCK
+        NUM_BLOCKS = NUM_BLOCKS + 1 if NUM_BLOCKS * THREADS_PER_BLOCK < outlen else NUM_BLOCKS
+        
+        # Run kernel
+        self.upfirdn_naive_kernel(
+            (NUM_BLOCKS,),(THREADS_PER_BLOCK,),
+            (d_x, d_x.size,
+             d_taps, d_taps.size,
+             up, down,
+             d_out, d_out.size),
+            shared_mem=smReq
+        )
+        
+        return d_out
+        
+        
     def filter_smtaps(self, d_x: cp.ndarray, d_taps: cp.ndarray, THREADS_PER_BLOCK: int=128, OUTPUT_PER_BLK: int=128):
         # Type checking
         assert(d_taps.dtype == cp.float32)
@@ -159,14 +222,7 @@ class CupyKernelFilter:
         
         return d_out
         
-        
-        
-        
-        
-    
-            
-        
-    
+
 #%% Raw kernel for upfirdn
 upFirdnKernel = cp.RawKernel(r'''
 #include <cupy/complex.cuh>

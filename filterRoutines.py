@@ -81,7 +81,7 @@ class CupyFilter:
         
 #%% Raw kernel with shared mem for filtering
 class CupyKernelFilter:
-    def __init__(self):
+    def __init__(self, memory: int=None, memory_dtype: type=cp.complex64):
         with open(os.path.join(os.path.dirname(__file__), "custom_kernels/filter.cu"), "r") as fid:
             sourcecode = fid.read()
         self.module = cp.RawModule(code=sourcecode)
@@ -92,6 +92,11 @@ class CupyKernelFilter:
             sourcecode = fid.read()
         self.module = cp.RawModule(code=sourcecode)
         self.upfirdn_naive_kernel = self.module.get_function("upfirdn_naive")
+
+        if memory is not None:
+            self.delay = cp.zeros(memory, dtype=memory_dtype)
+        else:
+            self.delay = None
         
     def upfirdn_naive(self, d_x: cp.ndarray, d_taps: cp.ndarray, up: int, down: int, THREADS_PER_BLOCK: int=256):
         '''
@@ -149,6 +154,34 @@ class CupyKernelFilter:
         )
         
         return d_out
+
+    def run_upfirdn(self, d_x: cp.ndarray, d_taps: cp.ndarray, up: int, down: int, THREADS_PER_BLOCK: int=256):
+        '''
+        This method wraps the kernel call method with extra delay handling
+        i.e. memory must be pre-allocated which will allow consequent calls to
+        properly include the ending samples of the previous call.
+
+        See upfirdn_naive.
+        '''
+        if self.delay is None:
+            raise TypeError("Delay has not been allocated. Re-initialize with memory argument.")
+
+        # Copy the data into a larger array
+        d_xext = cp.hstack((self.delay, d_x))
+
+        # Perform the filter on the extended array
+        d_out = self.upfirdn_naive(d_xext, d_taps, up, down, THREADS_PER_BLOCK)
+
+        # Copy the new delay into the holding array
+        self.delay[:] = d_x[-self.delay.size:]
+
+        # Skip the delay part, and only return the necessary length
+        length2return = int(d_x.size * up // down)
+        skip = int(self.delay.size * up // down)
+
+        return d_out[skip:skip+length2return]
+
+
         
         
     def filter_smtaps(self, d_x: cp.ndarray, d_taps: cp.ndarray, THREADS_PER_BLOCK: int=128, OUTPUT_PER_BLK: int=128):
@@ -275,35 +308,35 @@ void upfirdn(
 }
 ''', '''upfirdn''')
 
-def cupyUpfirdn(x: cp.ndarray, taps: cp.ndarray, up: int, down: int):
-    # if x.dtype != cp.complex64:
-    #     raise TypeError("x is expected to be type complex64.")
-    # if taps.dtype != cp.float32:
-    #     raise TypeError("taps is expected to be type float32.")
+# def cupyUpfirdn(x: cp.ndarray, taps: cp.ndarray, up: int, down: int):
+#     # if x.dtype != cp.complex64:
+#     #     raise TypeError("x is expected to be type complex64.")
+#     # if taps.dtype != cp.float32:
+#     #     raise TypeError("taps is expected to be type float32.")
         
-    # Allocate output
-    out = cp.zeros(x.size * up // down, dtype=cp.complex64)
+#     # Allocate output
+#     out = cp.zeros(x.size * up // down, dtype=cp.complex64)
         
-    # Define just enough blocks to cover the output
-    THREADS_PER_BLOCK = 256
-    NUM_BLOCKS = out.size // THREADS_PER_BLOCK
-    if NUM_BLOCKS * THREADS_PER_BLOCK < out.size:
-        NUM_BLOCKS += 1
+#     # Define just enough blocks to cover the output
+#     THREADS_PER_BLOCK = 256
+#     NUM_BLOCKS = out.size // THREADS_PER_BLOCK
+#     if NUM_BLOCKS * THREADS_PER_BLOCK < out.size:
+#         NUM_BLOCKS += 1
         
-    # Define the shared memory requirement
-    if taps.size * 4 > 48e3:
-        raise MemoryError("Taps length too large for shared memory.")
-    smReq = taps.size * 4
+#     # Define the shared memory requirement
+#     if taps.size * 4 > 48e3:
+#         raise MemoryError("Taps length too large for shared memory.")
+#     smReq = taps.size * 4
     
-    # Call the kernel
-    upFirdnKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
-                  (x, x.size,
-                   taps, taps.size,
-                   up, down,
-                   out, out.size),
-                  shared_mem=smReq)
+#     # Call the kernel
+#     upFirdnKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+#                   (x, x.size,
+#                    taps, taps.size,
+#                    up, down,
+#                    out, out.size),
+#                   shared_mem=smReq)
     
-    return out
+#     return out
 
 
 upFirdn_smKernel = cp.RawKernel('''
@@ -381,67 +414,67 @@ void upfirdn_sm(
 ''', '''upfirdn_sm''')
 
 
-def cupyUpfirdn_sm(x: cp.ndarray, taps: cp.ndarray, up: int, down: int,
-                   out: cp.ndarray=None, outabs: cp.ndarray=None):
-    '''
-    Runs a custom, shared-memory optimised kernel to perform the upfirdn
-    onboard the GPU. Note that if outputs are incorrect, it is likely that the
-    arrays' dtypes are incorrect.
+# def cupyUpfirdn_sm(x: cp.ndarray, taps: cp.ndarray, up: int, down: int,
+#                    out: cp.ndarray=None, outabs: cp.ndarray=None):
+#     '''
+#     Runs a custom, shared-memory optimised kernel to perform the upfirdn
+#     onboard the GPU. Note that if outputs are incorrect, it is likely that the
+#     arrays' dtypes are incorrect.
 
-    Parameters
-    ----------
-    x : cp.ndarray
-        Input, complex64.
-    taps : cp.ndarray
-        Filter taps, float32.
-    up : int
-        Upsampling factor.
-    down : int
-        Downsampling factor.
-    out : cp.ndarray, optional
-        Output array, if already allocated, complex64. The default is None.
-    outabs : cp.ndarray, optional
-        Abs(output array), if already allocated, float32. The default is None.
+#     Parameters
+#     ----------
+#     x : cp.ndarray
+#         Input, complex64.
+#     taps : cp.ndarray
+#         Filter taps, float32.
+#     up : int
+#         Upsampling factor.
+#     down : int
+#         Downsampling factor.
+#     out : cp.ndarray, optional
+#         Output array, if already allocated, complex64. The default is None.
+#     outabs : cp.ndarray, optional
+#         Abs(output array), if already allocated, float32. The default is None.
 
-    Raises
-    ------
-    MemoryError
-        Raised when the length of taps is too large.
+#     Raises
+#     ------
+#     MemoryError
+#         Raised when the length of taps is too large.
 
-    Returns
-    -------
-    out : cp.ndarray
-        Output array.
-    outabs : cp.ndarray
-        Abs(output array).
+#     Returns
+#     -------
+#     out : cp.ndarray
+#         Output array.
+#     outabs : cp.ndarray
+#         Abs(output array).
 
-    '''
-    # Allocate output
-    if out is None:
-        out = cp.zeros(x.size * up // down, dtype=cp.complex64)
-    if outabs is None:
-        outabs = cp.zeros(x.size * up // down, dtype=cp.float32)
+#     '''
+#     # Allocate output
+#     if out is None:
+#         out = cp.zeros(x.size * up // down, dtype=cp.complex64)
+#     if outabs is None:
+#         outabs = cp.zeros(x.size * up // down, dtype=cp.float32)
     
-    THREADS_PER_BLOCK = 256
-    NUM_BLOCKS = out.size // THREADS_PER_BLOCK
-    NUM_BLOCKS = NUM_BLOCKS + 1 if out.size % THREADS_PER_BLOCK > 0 else NUM_BLOCKS
+#     THREADS_PER_BLOCK = 256
+#     NUM_BLOCKS = out.size // THREADS_PER_BLOCK
+#     NUM_BLOCKS = NUM_BLOCKS + 1 if out.size % THREADS_PER_BLOCK > 0 else NUM_BLOCKS
     
-    # Define the shared memory requirement
-    shm_x_size = ((THREADS_PER_BLOCK * down + taps.size) // up) + 1
-    # print(shm_x_size)
-    if taps.size * 4 + shm_x_size * 8 > 48e3:
-        raise MemoryError("Shared memory requested exceeds 48kB.")
-    smReq = taps.size * 4 + shm_x_size * 8
+#     # Define the shared memory requirement
+#     shm_x_size = ((THREADS_PER_BLOCK * down + taps.size) // up) + 1
+#     # print(shm_x_size)
+#     if taps.size * 4 + shm_x_size * 8 > 48e3:
+#         raise MemoryError("Shared memory requested exceeds 48kB.")
+#     smReq = taps.size * 4 + shm_x_size * 8
     
-    # Call the kernel
-    upFirdn_smKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
-                  (x, x.size,
-                   taps, taps.size,
-                   up, down, shm_x_size,
-                   out, out.size, outabs),
-                  shared_mem=smReq)
+#     # Call the kernel
+#     upFirdn_smKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+#                   (x, x.size,
+#                    taps, taps.size,
+#                    up, down, shm_x_size,
+#                    out, out.size, outabs),
+#                   shared_mem=smReq)
     
-    return out, outabs
+#     return out, outabs
 
 def wola(f_tap, x, Dec, N=None, dtype=np.complex64):
     '''
@@ -565,7 +598,7 @@ class BurstDetector:
         in order to weed out the nonsense ones.
         '''
         if maxLength is None:
-            maxLength = 4294967295 # arbitrarily gonna set uint324294967295 as the max
+            maxLength = 4294967295 # arbitrarily gonna set uint32 4294967295 as the max
         return [i for i in signalIndices if i.size >= minLength and i.size <= maxLength]
 
     @staticmethod

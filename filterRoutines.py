@@ -585,7 +585,16 @@ class BurstDetector:
         self.threshold = None
         self.codebook = None
         
-    def medfilt(self, x):
+    def medfilt(self, x: cp.ndarray):
+        '''
+        Runs the median filter on input complex data.
+        No need to run abs() on your input data first!
+
+        Parameters
+        ----------
+        x : cp.ndarray
+            Input array.
+        '''
         d_x = cp.asarray(x) # Push to gpu if not currently in it
         self.d_absx = cp.abs(d_x)
         self.d_ampSq = self.d_absx * self.d_absx

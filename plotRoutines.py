@@ -263,7 +263,7 @@ def plotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, title=
     
 
 # Pyqtgraph version
-def pgPlotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None): 
+def pgPlotSpectra(dataList, fs, nfft=None, labels=None, colors=None, windowTitle=None, title=None, ax=None): 
     if ax is None:
         win = pg.GraphicsLayoutWidget(title=windowTitle)
         ax = win.addPlot(title=title)
@@ -275,15 +275,20 @@ def pgPlotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, titl
         ax.addLegend()
         
     for i, data in enumerate(dataList):
-        spec = 20*np.log10(np.abs(np.fft.fft(data)))
-        if colors is not None:
-            ax.plot(makeFreq(len(spec), fs[i]), spec, pen=colors[i], name=labels[i] if labels is not None else None)
+        spec = 20*np.log10(np.abs(np.fft.fft(data, n=nfft)))
+        if nfft is None:
+            freqs = makeFreq(len(spec), fs[i])
         else:
-            ax.plot(makeFreq(len(spec), fs[i]), spec, name=labels[i] if labels is not None else None)
+            freqs = makeFreq(nfft, fs[i])
+            
+        if colors is not None:
+            ax.plot(freqs, spec, pen=colors[i], name=labels[i] if labels is not None else None)
+        else:
+            ax.plot(freqs, spec, name=labels[i] if labels is not None else None)
 
     return win, ax
 
-def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None):    
+def plotSpectra(dataList, fs, nfft=None, labels=None, colors=None, windowTitle=None, title=None, ax=None):    
     if ax is None: # hurray for python scoping allowing this
         fig = plt.figure(windowTitle)
         ax = fig.add_subplot(111)
@@ -291,11 +296,16 @@ def plotSpectra(dataList, fs, labels=None, colors=None, windowTitle=None, title=
         fig = None
     
     for i in range(len(dataList)):
-        spec = 20*np.log10(np.abs(np.fft.fft(dataList[i])))
-        if colors is not None:
-            ax.plot(makeFreq(len(spec), fs[i]), spec, colors[i])
+        spec = 20*np.log10(np.abs(np.fft.fft(dataList[i], n=nfft)))
+        if nfft is None:
+            freqs = makeFreq(len(spec), fs[i])
         else:
-            ax.plot(makeFreq(len(spec), fs[i]), spec)
+            freqs = makeFreq(nfft, fs[i])
+
+        if colors is not None:
+            ax.plot(freqs, spec, colors[i])
+        else:
+            ax.plot(freqs, spec)
         
     if labels is not None:
         ax.legend(labels)

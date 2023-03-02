@@ -151,6 +151,10 @@ class FolderReader:
         oneElement = np.array([0],dtype=self.out_dtype)
         self.sizeof = oneElement.nbytes
         self.maxsizeof = int(8e9) # in bytes, maximum usage
+
+    @property
+    def hasMoreFiles(self):
+        return self.fidx < len(self.filepaths)
         
     def refreshFilelists(self):
         baseObj = np.zeros(1, dtype=self.in_dtype)
@@ -211,12 +215,13 @@ class FolderReader:
         # And then we prefetch the additional amount required
         additional = prefetch - len(self.futures)
         for a in range(additional):
-            self.futures.append(
-                futureBinRead(
-                    self.executor, self.filepaths[self.fidx+a],
-                    self.numSampsPerFile, self.in_dtype
+            if self.fidx + a < len(self.filepaths): # We only prefetch if there's files left
+                self.futures.append(
+                    futureBinRead(
+                        self.executor, self.filepaths[self.fidx+a],
+                        self.numSampsPerFile, self.in_dtype
+                    )
                 )
-            )
 
         # Carve out the filepaths to return
         fps = self.filepaths[startingFileIdx:self.fidx]

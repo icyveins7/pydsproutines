@@ -15,6 +15,33 @@ import scipy.signal as sps
 import os
 
 #%%
+def next_fast_len(length: int, maxPrime: int=7):
+    '''
+    Like scipy's next_fast_len, but with a configurable max prime value.
+    This is useful since scipy allows up to primes of 11, but CUDA prefers
+    a max prime of 7.
+
+    Parameters
+    ----------
+    length : int
+        Length of fft.
+    maxPrime : int, optional
+        Maximum prime number factor, by default 7
+    '''
+    primes = sympy.primefactors(length)
+    if np.max(primes) <= maxPrime:
+        return length
+    else:
+        foundGoodPrimes = False
+        while not foundGoodPrimes:
+            length = length + 1
+            if np.max(sympy.primefactors(length)) <= maxPrime:
+                foundGoodPrimes = True
+                break
+
+        return length
+
+#%%
 def czt(x, f1, f2, binWidth, fs):
     '''
     n = (f2-f1)/binWidth + 1
@@ -27,11 +54,7 @@ def czt(x, f1, f2, binWidth, fs):
     k = int((f2-f1)/binWidth + 1)
     m = len(x)
     nfft = m + k
-    foundGoodPrimes = False
-    while not foundGoodPrimes:
-        nfft = nfft + 1
-        if np.max(sympy.primefactors(nfft)) <= 7: # change depending on highest tolerable radix
-            foundGoodPrimes = True
+    nfft = next_fast_len(nfft)
     
     kk = np.arange(-m+1,np.max([k-1,m-1])+1)
     kk2 = kk**2.0 / 2.0

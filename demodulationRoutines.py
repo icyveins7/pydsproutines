@@ -680,6 +680,38 @@ try:
             # self.syms = None # Output mapping to each symbol (0 to M-1)
             # self.matches = None # Output from amble rotation search
             
+        @staticmethod
+        def _getEyeOpeningBatch(
+            xbatch: cp.ndarray, osr: int, abs_xbatch: cp.ndarray,
+            d_xeo: cp.ndarray=None, count: int=None, THREADS_PER_BLOCK: int=128
+        ):
+
+            # Blocks match the number of signals present in the batch, but you can
+            # specify the number of rows if the matrix has unused rows    
+            NUM_BLOCKS = count if count is not None else xbatch.shape[0]
+            
+            # simple shared memory requirements
+            smReq = THREADS_PER_BLOCK * osr * 4
+            
+            # Allocate output if not given
+            if d_xeo is None:
+                d_xeo = cp.zeros((NUM_BLOCKS, xbatch.shape[1]//osr), dtype=cp.complex64)
+            else:
+                # Check the data type and length
+                if d_xeo.dtype != cp.complex64:
+                    raise TypeError("d_xeo must be complex64.")
+                if d_xeo.shape[1] < xbatch.shape[1]//osr:
+                    raise ValueError("d_xeo must have at least %d columns." % (xbatch.shape[1]//osr))
+
+            # Invoke kernel
+            eyeOpeningBatchKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                               (abs_xbatch, abs_xbatch.shape[1], osr, xbatch,
+                                d_xeo),
+                               shared_mem=smReq)
+
+            return d_xeo
+
+
         def getEyeOpeningBatch(self, xbatch: cp.ndarray, osr: int, abs_xbatch: cp.ndarray, count: int=None):
             THREADS_PER_BLOCK = 128
             NUM_BLOCKS = count if count is not None else xbatch.shape[0]

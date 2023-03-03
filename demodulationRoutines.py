@@ -415,17 +415,23 @@ class SimpleDemodulatorQPSK(SimpleDemodulatorPSK):
     '''
     Faster demodulator implementation specifically for QPSK.
     '''
+    gray4 = np.array([
+        [2, 1],
+        [3, 0]
+    ], dtype=np.uint8)
+
     def __init__(self, bitmap: np.ndarray=None, cluster_threshold: float=0.1):
         super().__init__(4, bitmap, cluster_threshold)
     
-        self.gray4 = np.zeros((2,2), dtype=np.uint8)
-        self.gray4[1,1] = 0
-        self.gray4[0,1] = 1
-        self.gray4[0,0] = 2
-        self.gray4[1,0] = 3
+        # self.gray4 = np.zeros((2,2), dtype=np.uint8)
+        # self.gray4[1,1] = 0
+        # self.gray4[0,1] = 1
+        # self.gray4[0,0] = 2
+        # self.gray4[1,0] = 3
         # This is X,Y > 0 gray encoded
-        
-    def mapSyms(self, reimc: np.ndarray):
+
+    @staticmethod
+    def mapSyms(reimc: np.ndarray):
         # Reshape
         reimd = reimc.view(np.float32).reshape((-1,2))
         
@@ -439,7 +445,7 @@ class SimpleDemodulatorQPSK(SimpleDemodulatorPSK):
         # syms = self.gray4[tuple(idx)]
         
         # New one-liner, prevents multiple comparator calls hence faster?
-        syms = self.gray4[tuple((reimd > 0).T.astype(np.uint8))]
+        syms = SimpleDemodulatorQPSK.gray4[tuple((reimd > 0).T.astype(np.uint8))]
         
         return syms
     
@@ -685,7 +691,10 @@ try:
             xbatch: cp.ndarray, osr: int, abs_xbatch: cp.ndarray,
             d_xeo: cp.ndarray=None, count: int=None, THREADS_PER_BLOCK: int=128
         ):
-
+            '''
+            This is the static method version of the other method.
+            Useful if done standalone.
+            '''
             # Blocks match the number of signals present in the batch, but you can
             # specify the number of rows if the matrix has unused rows    
             NUM_BLOCKS = count if count is not None else xbatch.shape[0]
@@ -746,6 +755,46 @@ try:
         def resetBatch(self):
             self.bctr = 0
             
+        @staticmethod
+        def _demodBatch(
+            d_xeo: cp.ndarray,
+            amble: cp.ndarray,
+            numBitsPerBurst: int,
+            searchStart: int=0,
+            searchlength: int=128,
+            THREADS_PER_BLOCK: int=128
+        ):
+            '''
+            Static, standalone method of the other method of the same name.
+            '''
+            NUM_BLOCKS = d_xeo.shape[0]
+
+            # Check shared memory requirements
+            workspaceSize = np.max([THREADS_PER_BLOCK * 4, (searchlength*2 + amble.size)*4])
+            smReq = d_xeo.shape[1] * 8 + workspaceSize # THREADS_PER_BLOCK * 4 + reim.nbytes
+            if smReq > 48000:
+                raise MemoryError("Shared memory requested exceeded 48kB.")
+            
+            # Allocations
+            batch_size = d_xeo.shape[0]
+            d_reimc_batch = cp.zeros_like(d_xeo)
+            d_syms_batch = cp.zeros(d_xeo.shape, dtype=cp.uint32)
+            d_bestMatches = cp.zeros((batch_size), dtype=cp.int32)
+            d_bestRotations = cp.zeros((batch_size), dtype=cp.int32)
+            d_bestMatchIdx = cp.zeros((batch_size), dtype=cp.int32)
+            d_bits_batch = cp.zeros((batch_size, numBitsPerBurst), dtype=cp.uint8)
+            
+
+            lockPhase_mapSyms_singleBlkKernel_qpsk((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                               (d_xeo, d_xeo.shape[1], amble, amble.size, searchStart, searchlength,
+                                d_reimc_batch, d_syms_batch,
+                                d_bestMatches, d_bestRotations, d_bestMatchIdx,
+                                d_bits_batch, numBitsPerBurst),
+                               shared_mem=smReq)
+
+            return d_reimc_batch, d_syms_batch, d_bestMatches, d_bestRotations, d_bestMatchIdx, d_bits_batch
+        
+
         def demodBatch(self, amble: cp.ndarray, searchStart: int=0, searchlength: int=128):
             THREADS_PER_BLOCK = 128
             NUM_BLOCKS = self.bctr

@@ -97,8 +97,16 @@ class CupyKernelFilter:
             self.delay = cp.zeros(memory, dtype=memory_dtype)
         else:
             self.delay = None
+
+    @staticmethod
+    def getUpfirdnSize(originalSize: int, tapsSize: int, up: int, down: int):
+        '''This should match size returned by sps.upfirdn.'''
+        return int(np.ceil((originalSize * up - (up-1) + tapsSize-1) / down))
         
-    def upfirdn_naive(self, d_x: cp.ndarray, d_taps: cp.ndarray, up: int, down: int, THREADS_PER_BLOCK: int=256):
+    def upfirdn_naive(
+        self, d_x: cp.ndarray, d_taps: cp.ndarray, up: int, down: int,
+        THREADS_PER_BLOCK: int=256, alsoReturnAbs: bool=False,
+        d_out: cp.ndarray=None, d_outabs: cp.ndarray=None):
         '''
         Runs upfirdn, identical to scipy.signal.upfirdn.
         This calls a kernel which stores the taps in every block, so the length of the taps array
@@ -116,6 +124,9 @@ class CupyKernelFilter:
             Downsampling factor.
         THREADS_PER_BLOCK : int, optional
             Number of threads to use per block. The default is 256.
+        alsoReturnAbs : bool, optional
+            Specifies whether to concurrently return the abs of the output as a separate array.
+            The default is False.
 
         Raises
         ------
@@ -126,6 +137,8 @@ class CupyKernelFilter:
         -------
         d_out : cp.ndarray, cp.complex64
             Output array.
+        d_outabs : cp.ndarray, cp.float32
+            Optional abs of the output array, which can be specified to be concurrently calculated.
         '''
         if d_x.dtype != cp.complex64:
             raise TypeError("d_x must be complex64.")
@@ -136,24 +149,55 @@ class CupyKernelFilter:
         smReq = d_taps.nbytes
         
         # Allocate output length (this is designed to match sps.upfirdn)
-        outlen = int(np.ceil((d_x.size * up - (up-1) + d_taps.size-1) / down))
-        d_out = cp.zeros(outlen, cp.complex64)
+        outlen = self.getUpfirdnSize(d_x.size, d_taps.size, up, down)
+        if d_out is None:
+            d_out = cp.zeros(outlen, cp.complex64)
+        else:
+            # Ensure correct type and required length
+            if d_out.dtype != cp.complex64:
+                raise TypeError("d_out must be complex64.")
+            if d_out.size < outlen:
+                raise ValueError("d_out must be at least length %d" % (outlen))
         
         # Run number of blocks to cover the output
         NUM_BLOCKS = outlen // THREADS_PER_BLOCK
         NUM_BLOCKS = NUM_BLOCKS + 1 if NUM_BLOCKS * THREADS_PER_BLOCK < outlen else NUM_BLOCKS
         
-        # Run kernel
-        self.upfirdn_naive_kernel(
-            (NUM_BLOCKS,),(THREADS_PER_BLOCK,),
-            (d_x, d_x.size,
-             d_taps, d_taps.size,
-             up, down,
-             d_out, d_out.size),
-            shared_mem=smReq
-        )
+        # Optionally return absolute output as well
+        if alsoReturnAbs:
+            if d_outabs is None:
+                d_outabs = cp.zeros(outlen, cp.float32)
+            else:
+                # Ensure correct type and required length
+                if d_outabs.dtype != cp.float32:
+                    raise TypeError("d_outabs must be float32.")
+                if d_outabs.size < outlen:
+                    raise ValueError("d_outabs must be at least length %d" % (outlen))
         
-        return d_out
+            # Run kernel
+            self.upfirdn_naive_kernel(
+                (NUM_BLOCKS,),(THREADS_PER_BLOCK,),
+                (d_x, d_x.size,
+                d_taps, d_taps.size,
+                up, down,
+                d_out, d_out.size, d_outabs),
+                shared_mem=smReq
+            )
+            
+            return d_out, d_outabs
+
+        else:
+            # Run kernel
+            self.upfirdn_naive_kernel(
+                (NUM_BLOCKS,),(THREADS_PER_BLOCK,),
+                (d_x, d_x.size,
+                d_taps, d_taps.size,
+                up, down,
+                d_out, d_out.size, 0), # Setting NULL to the pointer means it won't be written (see the kernel implementation)
+                shared_mem=smReq
+            )
+            
+            return d_out
 
     def run_upfirdn(self, d_x: cp.ndarray, d_taps: cp.ndarray, up: int, down: int, THREADS_PER_BLOCK: int=256):
         '''

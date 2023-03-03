@@ -5,7 +5,9 @@ void upfirdn_naive(
     const float *d_taps, const int tapslen,
     const int up,
     const int down,
-    complex<float> *d_out, int outlen)
+    complex<float> *d_out,
+    int outlen,
+    float *d_outabs)
 {
     // allocate shared memory
     extern __shared__ double s[];
@@ -43,6 +45,11 @@ void upfirdn_naive(
 
         // write the output to global memory
         d_out[i] = z;
+
+        if (d_outabs != NULL)
+        {
+            d_outabs[i] = abs(z);
+        }
     }
  
 }

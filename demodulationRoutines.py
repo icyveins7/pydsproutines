@@ -11,6 +11,7 @@ from timingRoutines import Timer
 from xcorrRoutines import *
 import warnings
 import matplotlib.pyplot as plt
+from cython_ext.compareIntPreambles import compareIntPreambles
 
 try:
     import cupy as cp
@@ -198,17 +199,21 @@ class SimpleDemodulatorPSK:
         #     for k in range(self.m):
         #         self.matches[i, k] = np.sum(diff == k)
         
-        # Numba loop
-        self.matches = self._ambleSearch(m_amble, search, self.m, syms, length)
+        # # Numba loop
+        # self.matches = self._ambleSearch(m_amble, search, self.m, syms, length)
         
         # # Numba loop v2
         # self.matches = self._ambleSearch(amble, search, self.m, syms, length)
+
+        # Custom dll
+        self.matches = compareIntPreambles(amble, syms, self.m, search[0], search[-1]+1)
                 
         s, rotation = argmax2d(self.matches)
         sample = search[s] # Remember to reference the searched indices
         self.syms = (syms + rotation) % self.m
+        bestMatches = self.matches[s,rotation]
         
-        return self.syms, sample, rotation
+        return self.syms, sample, rotation, bestMatches
     
     @staticmethod
     # @njit('uint32[:,:](uint8[:], int32[:], intc, uint8[:], intc)', cache=True, nogil=True)

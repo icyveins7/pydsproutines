@@ -242,7 +242,7 @@ class DSPConfig(DirectSingleConfig):
     # And with a certain workspace, you only want the associated processes
     @property
     def processes(self):
-        return {self._keySuffix(key): self._proxies[key] for key in list(self.currentSection.keys())}
+        return {self._keySuffix(key): self._proxies[key] for key in list(self.currentSection.keys()) if self._isProcessingSection(key)}
         
     # Auxiliary things..
     def _makeSrcKey(self, src: str):

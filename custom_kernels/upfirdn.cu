@@ -37,7 +37,7 @@ void upfirdn_naive(
         {
             k = j - f;
             // again, only accumulate if we are within range, and we are at a non-zero value of the upsample
-            if ((k % up == 0) && (k / up < len))
+            if ((k % up == 0) && (k / up < len) && (k / up >= 0))
             {
                 z += s_taps[f] * d_x[k / up];
             }

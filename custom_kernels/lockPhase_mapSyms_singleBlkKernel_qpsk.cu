@@ -1,5 +1,55 @@
 #include <cupy/complex.cuh>
 
+/*
+This kernel takes in a matrix of signals, with 1 signal in each row.
+A block is assigned to each signal, which performs the phase-locking to the 
+QPSK constellation (using the SVD method) and then writes the output back to global memory.
+
+Note: the memory block for the matrix inevitably has a fixed number of columns,
+but each signal may occupy less than the maximum number of columns.
+The remaining columns for the signal should be zero-ed out.
+*/
+
+extern "C" __global__
+void demod_qpsk(
+    const complex<float> *d_x,
+    const int xlength,
+    const int numSignals,
+    uint8_t *d_syms
+){
+    // Exit if the block number is more than the number of signals
+    if (blockIdx.x >= numSignals)
+        return;
+
+    // Allocate shared memory to read in the signal (one row)
+    extern __shared__ double s[];
+
+    complex<float> *s_x = (complex<float>*)s; // (xlength) complex floats
+    uint8_t *s_syms = (uint8_t*)&s_x[xlength]; // (xlength) uint8_t
+
+    // Read the row assigned to the current block
+    int blkGlobalOffset = blockIdx.x * xlength;
+    for (int t = threadIdx.x; t < xlength; t += blockDim.x)
+        s_x[t] = d_x[blkGlobalOffset + t];
+
+    // Wait for signal to finish copying to shared memory
+    __syncthreads();
+
+    // For QPSK, square each sample and treat the result as 
+    // an N*2 real matrix. 
+    // x11, x12,
+    // x21, x22,
+    // x31, x32,
+    // ...
+    // Then compute the inner dot product with itself.
+
+
+    // TODO: complete solution
+
+}
+
+
+
 extern "C" __global__
 void lockPhase_mapSyms_singleBlkKernel_qpsk(
     const complex<float> *d_x,

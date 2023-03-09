@@ -657,7 +657,10 @@ try:
     # Raw kernel to lock phase and map syms together
     # NOTE: assuming the entire signal fits in shared memory
     with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "lockPhase_mapSyms_singleBlkKernel_qpsk.cu"), "r") as fid:
-        lockPhase_mapSyms_singleBlkKernel_qpsk = cp.RawKernel(fid.read(), '''lockPhase_mapSyms_singleBlkKernel_qpsk''')
+        sourcecode = fid.read()
+        module = cp.RawModule(code=sourcecode)
+        lockPhase_mapSyms_singleBlkKernel_qpsk = module.get_function("lockPhase_mapSyms_singleBlkKernel_qpsk")
+        demod_qpsk_kernel = module.get_function("demod_qpsk")
     
     class CupyDemodulatorQPSK:
         def __init__(self, batchLength: int, numBitsPerBurst: int, cluster_threshold: float=0.1, batch_size: int=4096):
@@ -691,6 +694,27 @@ try:
             # self.syms = None # Output mapping to each symbol (0 to M-1)
             # self.matches = None # Output from amble rotation search
             
+        @staticmethod
+        def demod(self, d_xbatch: cp.ndarray, THREADS_PER_BLOCK: int=128):
+            numSignals, xlength = d_xbatch.shape
+
+            NUM_BLKS = numSignals
+
+            # Allocate shared mem
+            smReq = xlength * 8 + THREADS_PER_BLOCK * 8
+            if smReq > 48000:
+                raise MemoryError("Requested shared mem exceeds 48kB: %d bytes" % smReq)
+            
+            # Allocate output
+            d_syms = cp.zeros(d_xbatch.shape, dtype=cp.uint8)
+
+            # Invoke kernel
+            demod_qpsk_kernel((NUM_BLKS,),(THREADS_PER_BLOCK,),
+                              (d_xbatch, xlength, numSignals, d_syms),
+                              shared_mem=smReq)
+            
+            return d_syms
+
         @staticmethod
         def _getEyeOpeningBatch(
             xbatch: cp.ndarray, osr: int, abs_xbatch: cp.ndarray,

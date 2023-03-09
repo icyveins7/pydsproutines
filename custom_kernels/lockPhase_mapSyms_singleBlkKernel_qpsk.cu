@@ -2,20 +2,19 @@
 
 /*
 This kernel takes in a matrix of signals, with 1 signal in each row.
-A block is assigned to each signal, which performs the phase-locking to the 
-QPSK constellation (using the SVD method) and then writes the output back to global memory.
+A block is assigned to each signal, which performs the phase-locking to the QPSK constellation,
+maps the values to {0,1,2,3} based on an anticlockwise direction and then writes the output back to global memory.
 
 Note: the memory block for the matrix inevitably has a fixed number of columns,
 but each signal may occupy less than the maximum number of columns.
 The remaining columns for the signal should be zero-ed out.
 */
-
 extern "C" __global__
 void demod_qpsk(
-    const complex<float> *d_x,
-    const int xlength,
-    const int numSignals,
-    uint8_t *d_syms
+    const complex<float> *d_x, // Input matrix, dimensions of numSignals * xlength
+    const int xlength, // Number of columns in d_x (each signal may occupy less than this value, rest of the columns must be zero-ed out)
+    const int numSignals, // Number of signals i.e. rows in d_x
+    uint8_t *d_syms // Output matrix, dimensions also numSignals * xlength
 ){
     // Exit if the block number is more than the number of signals
     if (blockIdx.x >= numSignals)
@@ -25,7 +24,7 @@ void demod_qpsk(
     extern __shared__ double s[];
 
     complex<float> *s_x = (complex<float>*)s; // (xlength) complex floats
-    uint8_t *s_syms = (uint8_t*)&s_x[xlength]; // (xlength) uint8_t
+    complex<float> *s_ws = (complex<float>*)&s_x[xlength]; // (blockDim.x) complex floats
 
     // Read the row assigned to the current block
     int blkGlobalOffset = blockIdx.x * xlength;
@@ -35,16 +34,59 @@ void demod_qpsk(
     // Wait for signal to finish copying to shared memory
     __syncthreads();
 
-    // For QPSK, square each sample and treat the result as 
-    // an N*2 real matrix. 
-    // x11, x12,
-    // x21, x22,
-    // x31, x32,
-    // ...
-    // Then compute the inner dot product with itself.
+    // Take the power 4 of each sample, and sum over them for each thread
+    complex<float> t_xtotal = 0;
+    complex<float> t_x;
+    for (int t = threadIdx.x; t < xlength; t += blockDim.x)
+    {
+        t_x = s_x[t] * s_x[t]; // square it
+        t_x = t_x * t_x; // square it again to get power 4
+        // sum for the current thread
+        t_xtotal += t_x;
+    }
+    // At the end, we write the thread's total to its spot in the shared mem workspace
+    s_ws[threadIdx.x] = t_xtotal;
 
+    // Wait for all threads to finish writing to workspace
+    __syncthreads();
 
-    // TODO: complete solution
+    // Sum over the workspace & compute the angle correction
+    t_xtotal = 0;
+    for (int i = 0; i < blockDim.x; i++){
+        t_xtotal += s_ws[i]; // all threads read the same memory address from shared mem workspace
+    }
+    float angleCorrection = atan2f(t_xtotal.imag(), t_xtotal.real()) / 4; // we divide by 4 to counter the power of 4 we induced
+
+    // Generate the phase correction
+    float real, imag;
+    sincosf(-angleCorrection + 0.78539816340, &imag, &real); // we shift it to pi/4 for gray coding later
+    complex<float> e(real, imag);
+
+    // Apply the phase correction and map the symbol
+    int xsign, ysign;
+    const uint8_t mapping[2][2] = {
+        {0, 3},
+        {1, 2}
+    }
+    for (int i = threadIdx.x; i < xlength; i += blockDim.x)
+    {
+        // Each thread reads its own value and stores in its own register (do not write back to shared mem! no point!)
+        t_x = s_x[i] * e;
+
+        // Map the symbol based on sign of real/imag
+        xsign = signbit(t_x.real()); // signbit returns positive->0, negative->1, which corresponds to the actual sign bit value
+        ysign = signbit(t_x.imag()); // we also cast it so we can manipulate at the byte level later
+
+        // We want to return a single number of {0,1,2,3} based on the following scheme (rotating counter clockwise):
+        // (+, +) = (0, 0) -> 0
+        // (-, +) = (1, 0) -> 1
+        // (-, -) = (1, 1) -> 2
+        // (+, -) = (0, 1) -> 3
+        // See the const mapping array above to verify this is correct.
+
+        // Write to global mem
+        d_syms[blkGlobalOffset + i] = mapping[xsign][ysign];
+    }
 
 }
 

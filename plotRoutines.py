@@ -359,11 +359,41 @@ def plotTrajectory2d(r_x, r_xdot=None, r_xfmt='b.', quiver_scale=None, ax=None):
     
     return ax
 
-def plotConstellation(syms, fmt='.', ax=None):
+def plotConstellation(syms, fmt='.', labels=None, ax=None):
+    '''
+    Plots a constellation for syms.
+    Can be called with a single array or a list of arrays.
+    Single array 
+
+    Parameters
+    ----------
+    syms : np.ndarray (complex64/128) or list of such arrays
+        Input array(s).
+    fmt : str or list of str, optional
+        Format(s) to plot the constellation points. The default is '.'.
+    labels : str or list of str, optional
+        Label(s) for each input array. The default is None.
+    ax : axes object, optional
+        Axes object to plot on.
+        The default is None, which generates a new figure and axes.
+
+    Returns
+    -------
+    ax : Matplotlib.pyplot axes
+        The axes object. Can be used to replot other things.
+
+    '''
     if ax is None:
         fig, ax = plt.subplots(1,1)
         
-    ax.plot(np.real(syms), np.imag(syms), fmt)
+    if isinstance(syms, list):
+        for si, sym in enumerate(syms):
+            ax.plot(np.real(sym), np.imag(sym), fmt[si], label=labels[si])
+    else:
+        ax.plot(np.real(syms), np.imag(syms), fmt, label=labels)
+        
+    if labels is not None:
+        ax.legend()
     ax.axis('equal')
     
     return ax

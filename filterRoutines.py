@@ -98,6 +98,10 @@ class CupyKernelFilter:
         else:
             self.delay = None
 
+    def resetDelay(self):
+        if self.delay is not None:
+            self.delay[:] = 0
+
     @staticmethod
     def getUpfirdnSize(originalSize: int, tapsSize: int, up: int, down: int):
         '''This should match size returned by sps.upfirdn.'''
@@ -228,7 +232,13 @@ class CupyKernelFilter:
 
         
         
-    def filter_smtaps(self, d_x: cp.ndarray, d_taps: cp.ndarray, THREADS_PER_BLOCK: int=128, OUTPUT_PER_BLK: int=128):
+    def filter_smtaps(self,
+        d_x: cp.ndarray,
+        d_taps: cp.ndarray, 
+        THREADS_PER_BLOCK: int=128, 
+        OUTPUT_PER_BLK: int=128,
+        useInternalDelay: bool=False
+    ):
         # Type checking
         assert(d_taps.dtype == cp.float32)
         assert(d_x.dtype == cp.complex64)
@@ -247,17 +257,39 @@ class CupyKernelFilter:
         NUM_BLOCKS = d_x.size // OUTPUT_PER_BLK
         NUM_BLOCKS = NUM_BLOCKS + 1 if d_x.size % OUTPUT_PER_BLK != 0 else NUM_BLOCKS # +1 if remnants
         
+        # Use delay if specified
+        if useInternalDelay:
+            delay = self.delay
+            delaylen = self.delay.size
+        else:
+            delay = 0
+            delaylen = 0
+
         # Run kernel
         self.filter_smtaps_kernel(
             (NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
             (d_x, d_x.size,
              d_taps, d_taps.size,
              OUTPUT_PER_BLK,
-             d_out, d_out.size),
+             d_out, d_out.size,
+             delay, delaylen), # These are optional parameters for the delay
             shared_mem=smReq
         )
         
         return d_out
+
+    def run_filter_smtaps(self, d_x: cp.ndarray, d_taps: cp.ndarray, THREADS_PER_BLOCK: int=128, OUTPUT_PER_BLK: int=128):
+        if self.delay is None:
+            raise TypeError("Delay has not been allocated. Re-initialize with memory argument.")
+
+        # Run the filter (with the delay)
+        d_out = self.filter_smtaps(d_x, d_taps, THREADS_PER_BLOCK, OUTPUT_PER_BLK, True)
+
+        # Extract the delay from this invocation
+        self.delay[:] = d_x[-self.delay.size:]
+
+        return d_out
+ 
     
     def filter_smtaps_sminput(self, d_x: cp.ndarray, d_taps: cp.ndarray, THREADS_PER_BLOCK: int=128):
         # Type checking

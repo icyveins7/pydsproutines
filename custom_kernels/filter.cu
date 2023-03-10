@@ -9,7 +9,8 @@ void filter_smtaps(
     const complex<float> *d_x, const int len,
     const float *d_taps, const int tapslen,
     const int outputPerBlk,
-    complex<float> *d_out, int outlen)
+    complex<float> *d_out, int outlen,
+    const complex<float> *d_delay, const int delaylen)
 {
     // allocate shared memory
     extern __shared__ double s[];
@@ -42,7 +43,9 @@ void filter_smtaps(
         {
             // accumulate
             if (i - j >= 0)
-                z = z + d_x[i - j] * s_taps[j];
+                z = z + d_x[i - j] * s_taps[j]; // this uses the input data
+            else if (delaylen + i - j >= 0 && d_delay != NULL) // d_delay must be supplied for this to work
+                z = z + d_delay[delaylen + i - j] * s_taps[j]; // this uses the delay data (from previous invocations)
         }
 
         // Coalesced writes

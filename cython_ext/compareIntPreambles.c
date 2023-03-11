@@ -23,19 +23,30 @@ extern DLL_EXPORT int compareIntPreambles(
     // Loop over the search
     for (int i = searchStart; i < searchEnd; i++)
     {
-        // Loop over the rotations
-        for (int rot = 0; rot < m; rot++)
+        /* V2 */
+        for (int j = 0; j < preambleLength; j++)
         {
-            // and then loop over the entire preamble
-            for (int j = 0; j < preambleLength; j++)
-            {
-                if (i+j > xlength)
-                    return 1; // should not go out of bounds
-
-                if (preamble[j] == ((x[i+j] + rot) % m))
-                    matches[i * m + rot] += 1;
-            }
+            if (i+j > xlength)
+                return 1;
+            
+            // Calculate the proper rotation by adding m to the input signal
+            matches[i * m + ((preamble[j] + m - x[i+j]) % m)] += 1;
         }
+
+        /* V1 */
+        // // Loop over the rotations
+        // for (int rot = 0; rot < m; rot++)
+        // {
+        //     // and then loop over the entire preamble
+        //     for (int j = 0; j < preambleLength; j++)
+        //     {
+        //         if (i+j > xlength)
+        //             return 1; // should not go out of bounds
+
+        //         if (preamble[j] == ((x[i+j] + rot) % m))
+        //             matches[i * m + rot] += 1;
+        //     }
+        // }
     }
 	
 	return 0;

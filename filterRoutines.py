@@ -764,12 +764,12 @@ class BurstDetector:
             
         return metric, codebooks
     
-    def pgplot(self, ax=None, fs=1):
+    def pgplot(self, ax=None, fs=1, start=0, end=-1):
         if self.d_ampSq is None:
             raise ValueError("Run medfilt() first.")
         
         
-        rwin, rax = pgPlotAmpTime([self.d_ampSq.get(), self.d_medfiltered.get()],
+        rwin, rax = pgPlotAmpTime([self.d_ampSq.get()[start:end], self.d_medfiltered.get()[start:end]],
                                   [fs, fs],
                                   labels=["Power", "Medfilt"],
                                   colors=["r", "b"],

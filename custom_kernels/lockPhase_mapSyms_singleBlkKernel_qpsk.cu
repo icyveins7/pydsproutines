@@ -14,7 +14,7 @@ void demod_qpsk(
     const complex<float> *d_x, // Input matrix, dimensions of numSignals * xlength
     const int xlength, // Number of columns in d_x (each signal may occupy less than this value, rest of the columns must be zero-ed out)
     const int numSignals, // Number of signals i.e. rows in d_x
-    uint8_t *d_syms // Output matrix, dimensions also numSignals * xlength
+    unsigned char *d_syms // Output matrix, dimensions also numSignals * xlength
 ){
     // Exit if the block number is more than the number of signals
     if (blockIdx.x >= numSignals)
@@ -64,10 +64,10 @@ void demod_qpsk(
 
     // Apply the phase correction and map the symbol
     int xsign, ysign;
-    const uint8_t mapping[2][2] = {
+    const unsigned char mapping[2][2] = {
         {0, 3},
         {1, 2}
-    }
+    };
     for (int i = threadIdx.x; i < xlength; i += blockDim.x)
     {
         // Each thread reads its own value and stores in its own register (do not write back to shared mem! no point!)

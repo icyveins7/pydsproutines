@@ -695,8 +695,14 @@ try:
             # self.matches = None # Output from amble rotation search
             
         @staticmethod
-        def demod(self, d_xbatch: cp.ndarray, THREADS_PER_BLOCK: int=128):
-            numSignals, xlength = d_xbatch.shape
+        def demod(d_xbatch: cp.ndarray, THREADS_PER_BLOCK: int=128):
+            if d_xbatch.ndim == 2:
+                numSignals, xlength = d_xbatch.shape
+            elif d_xbatch.ndim == 1:
+                numSignals = 1
+                xlength = d_xbatch.size
+            else:
+                raise ValueError("Input must be 1D or 2D array.")
 
             NUM_BLKS = numSignals
 

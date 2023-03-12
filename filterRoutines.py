@@ -697,6 +697,42 @@ class BurstDetector:
         signalIndices = cp.split(signalIndices, splitIndices.get()) # For cupy, need to pull the split indices to host
         
         return signalIndices
+
+    def autoDetectThreshold(self, noiseLevels: np.ndarray, multiplier: float=1.0):
+        '''
+        Attempts to detect a suitable threshold by estimating the noise level.
+        The noise level is assumed to be the first 'plateau' of sample values from the median filtered power array.
+
+        To estimate this, a histogram is performed on the median filtered array,
+        but this is limited to the noiseLevels input specified; there is no need to calculate bins
+        up to the maximum value in the array.
+        The threshold is then defined as the first bin which is lower than its two adjacent bins.
+        It is clear that doing it this way is probably an over-estimate of the 'mean noise level',
+        so an optional multiplier may be supplied.
+
+        Parameters
+        ----------
+        noiseLevels : np.ndarray
+            Array specifying the bin edges for the histogram.
+            The following advice will be useful:
+                1) First value should be 0 i.e. generate with np.arange(0, ..., ...).
+                2) The step size should be constant, and should be 'fairly large'.
+                   This is to prevent the bin counts from being too sparse and prone to local minima.
+                3) The size of this array will affect computation time, so don't use too many values.
+
+        multiplier : float, optional
+            Constant multiplier that is applied to the detected threshold. The default is 1.0.
+            Since the algorithm essentially slightly overestimates the noise level, it is likely
+            that using a multiplier less than 1.0 will work, especially if combined with the other constraints
+            later on, like the signal length limits.
+        '''
+
+        counts, edges = cp.histogram(self.d_medfiltered, noiseLevels)
+        counts = counts.get()
+        for i in range(counts.size - 1):
+            if counts[i] < counts[i-1] and counts[i] < counts[i+1]:
+                detectedThreshold = noiseLevels[i]
+                return detectedThreshold * multiplier
     
     def detectSingleEmitter(self, ratio: float):
         # To seed the kmeans (which speeds it up ~30x), we find the max, and a 

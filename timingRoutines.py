@@ -39,23 +39,24 @@ class Timer:
         self.t.append(time.perf_counter())
         self.labels.append(label)
         
-    def rpt(self, showTotal: bool=True):
+    def rpt(self, showSteps: bool=True):
         '''
         Reports times elapsed between events.
         '''
-        for i in range(1, len(self.t)):
-            print("%d->%d : %fs. %s" % (
-                i-1, i, self.t[i]-self.t[i-1], self.labels[i]))
+        if showSteps:
+            for i in range(1, len(self.t)):
+                print("%d->%d : %fs. %s" % (
+                    i-1, i, self.t[i]-self.t[i-1], self.labels[i]))
             
-        if showTotal:
-            print("Total: %fs." % (self.t[-1] - self.t[0]))
+        # Always print total
+        print("Total: %fs." % (self.t[-1] - self.t[0]))
             
-    def end(self, label: str=""):
+    def end(self, label: str="", showSteps: bool=True):
         '''
         Convenience function to add an event and report immediately.
         '''
         self.evt(label)
-        self.rpt()
+        self.rpt(showSteps=showSteps)
         
         
 if __name__ == "__main__":

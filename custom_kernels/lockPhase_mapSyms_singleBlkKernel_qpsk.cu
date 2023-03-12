@@ -91,6 +91,102 @@ void demod_qpsk(
 }
 
 
+/*
+This kernel is used to process a matrix of symbols which have been demodulated into 
+unsigned char arrays of values [0, m-1] e.g. for QPSK, {0,1,2,3}.
+Every block works on one signal (one row), and compares that signal to a list of preambles,
+over several search indices, attempting all rotations e.g. QPSK has 4 rotations: 0->1->2->3->0.
+It will return, for this signal, the best number of matches for each preamble,
+its associated search index, and the rotation induced.
+
+Notably, the preambles may be of different lengths; 
+however, there must be sufficient shared memory
+to hold both the signal (within the search range) and all the preambles.
+As an input, the variable length preambles should be concatenated into a single long array and passed in as such.
+A separate array (preambleLengths) will tell the kernel where along this long array each individual preamble occupies.
+Example:
+d_preambles = (preamble 1..) (preamble 2 ...............) (preamble 3........)
+preambleLengths = {32, 128, 64};
+
+Within a block, each thread will tackle one of the search indices. Hence, for searching 128 possible indices,
+128 threads would be ideal. All reads at this point would be within shared memory.
+
+The thread must scan the
+*/
+extern "C" __global__
+void compareIntegerPreambles(
+    const unsigned char *d_syms,
+    const int numSignals,
+    const int symsLength, 
+    const int searchStart,
+    const int searchEnd,
+    const unsigned char *d_preambles,
+    const int numPreambles,
+    const int *preambleLengths,
+    const int m,
+    unsigned int *matches
+){
+    // Exit if the block number is more than the number of signals
+    if (blockIdx.x >= numSignals)
+        return;
+
+    // Allocate shared memory to read in the signal (one row) and preambles
+    extern __shared__ double s[];
+    int *s_preambleLengths = (int*)s; // (numPreambles) ints
+
+    // Read in the preamble lengths first
+    for (int t = threadIdx.x; t < numPreambles; t += blockDim.x){
+        s_preambleLengths[t] = preambleLengths[t];
+    }
+    // Wait for the lengths to be read in
+    __syncthreads();
+
+    // Now check the total length required for all preambles
+    int totalPreambleLength = 0;
+    for (int i = 0; i < numPreambles; i++)
+        totalPreambleLength += s_preambleLengths[i];
+
+    // And then we assign the space for the rest of shared memory
+    unsigned char *s_syms = (unsigned char*)&s_preambleLengths[numPreambles]; // (symsLength) unsigned chars
+    unsigned char *s_preambles = (unsigned char*)&s_syms[symsLength]; // (totalPreambleLength) unsigned chars
+    unsigned int *s_ws = (unsigned int*)&s_preambles[totalPreambleLength]; // (m * (searchEnd-searchStart)) unsigned ints, this is the 'matches' matrix
+
+    // Copy these into shared memory
+    int blkGlobalOffset = blockIdx.x * symsLength;
+    for (int t = threadIdx.x; t < symsLength; t += blockDim.x)
+        s_syms[t] = d_syms[blkGlobalOffset + t]; // Copy only this row
+
+    for (int t = threadIdx.x; t < totalPreambleLength; t += blockDim.x)
+        s_preambles[t] = d_preambles[t]; // Copy the entire concatenated array of preambles
+    
+    // Wait for all shared mem copies to complete
+    __syncthreads();
+
+    // Now we process each preamble individually
+    unsigned char *s_preamble_test = s_preambles;
+    for (int i = 0; i < numPreambles; i++)
+    {
+        if (i > 0) // Increment pointer to the next preamble
+            s_preamble_test = s_preamble_test + s_preambleLengths[i-1];
+
+        // Each thread tackles a search index, looping until all search indices are complete
+        for (int t = threadIdx.x; t < searchEnd - searchStart; t += blockDim.x)
+        {
+            int searchIdx = searchStart + t;
+
+            // Loop over the current preamble
+            for (int j = 0; j < s_preambleLengths[i]; j++)
+            {
+                // Calculate the proper rotation by adding m to the input signal
+                s_ws[t * m + ((s_preamble_test[j] + m - x[t+j]) % m)] += 1;
+
+                //TODO: COMPLETE
+            }
+        }
+    }
+
+}
+
 
 extern "C" __global__
 void lockPhase_mapSyms_singleBlkKernel_qpsk(

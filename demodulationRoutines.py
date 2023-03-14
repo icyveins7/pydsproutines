@@ -190,30 +190,16 @@ class SimpleDemodulatorPSK:
             
         # Naive loop
         length = amble.size
-        m_amble = amble + self.m # Scale it up in order to do uint8 math
         
-        # # Pythonic loop
-        # self.matches = np.zeros((search.size, self.m), dtype=np.uint32)
-        # for i, mi in enumerate(search):
-        #     diff = (m_amble - syms[mi:mi+length]) % self.m
-        #     for k in range(self.m):
-        #         self.matches[i, k] = np.sum(diff == k)
-        
-        # # Numba loop
-        # self.matches = self._ambleSearch(m_amble, search, self.m, syms, length)
-        
-        # # Numba loop v2
-        # self.matches = self._ambleSearch(amble, search, self.m, syms, length)
-
         # Custom dll
         self.matches = compareIntPreambles(amble, syms, self.m, search[0], search[-1]+1)
                 
         s, rotation = argmax2d(self.matches)
         sample = search[s] # Remember to reference the searched indices
-        self.syms = (syms + rotation) % self.m
+        rotatedsyms = (syms + rotation) % self.m # We rotate and return this!
         bestMatches = self.matches[s,rotation]
         
-        return self.syms, sample, rotation, bestMatches
+        return rotatedsyms, sample, rotation, bestMatches
     
     @staticmethod
     # @njit('uint32[:,:](uint8[:], int32[:], intc, uint8[:], intc)', cache=True, nogil=True)
@@ -661,6 +647,7 @@ try:
         module = cp.RawModule(code=sourcecode)
         lockPhase_mapSyms_singleBlkKernel_qpsk = module.get_function("lockPhase_mapSyms_singleBlkKernel_qpsk")
         demod_qpsk_kernel = module.get_function("demod_qpsk")
+        compareIntegerPreambles_kernel = module.get_function("compareIntegerPreambles")
     
     class CupyDemodulatorQPSK:
         def __init__(self, batchLength: int, numBitsPerBurst: int, cluster_threshold: float=0.1, batch_size: int=4096):
@@ -694,6 +681,84 @@ try:
             # self.syms = None # Output mapping to each symbol (0 to M-1)
             # self.matches = None # Output from amble rotation search
             
+        @staticmethod
+        def prepareIntPreambles(
+            integerPreamblesDict: list
+        ):
+            ordering = []
+            lengths = []
+            amalg = []
+            for k, v in integerPreamblesDict.items():
+                ordering.append(k)
+                lengths.append(v.size)
+                amalg.append(v)
+            # Convert to gpu arrays
+            d_amalg = cp.asarray(np.hstack(amalg), dtype=cp.uint8)
+
+            return ordering, lengths, d_amalg
+
+        @staticmethod
+        def compareIntPreambles(
+            d_syms: cp.ndarray,
+            lengths: np.ndarray,
+            d_preamble_concat: cp.ndarray,
+            searchStart: int=0,
+            searchEnd: int=128,
+            THREADS_PER_BLOCK: int=128
+        ):
+            # Check types and lengths
+            symsLength = d_syms.shape[1]
+            numSignals = d_syms.shape[0]
+
+            if np.sum(lengths) != d_preamble_concat.size:
+                raise ValueError("Concatenated length is not equal to sum of lengths!")
+
+            if d_preamble_concat.dtype != cp.uint8:
+                raise TypeError("Concatenated preamble should be type uint8.")
+
+            if d_syms.dtype != cp.uint8:
+                raise TypeError("Symbols matrix should be type uint8.")
+
+            if searchEnd + np.max(lengths) >= symsLength:
+                raise ValueError("Search will extend past the syms length. Shorten the searchEnd.")
+
+            # Convert lengths to gpu array
+            d_lengths = cp.asarray(lengths, dtype=np.int32)
+
+            # Constant
+            m = 4
+
+            # Allocate output   
+            d_matches = cp.zeros(
+                numSignals * len(lengths) * (searchEnd-searchStart) * m,
+                dtype=np.uint32)
+
+            # Allocate shared memory
+            smReq = d_lengths.nbytes + symsLength * 1 + d_preamble_concat.nbytes + (searchEnd-searchStart) * m * 4
+
+            # Invoke kernel
+            NUM_BLKS = numSignals
+            compareIntegerPreambles_kernel(
+                (NUM_BLKS,),(THREADS_PER_BLOCK,),
+                (d_syms,
+                numSignals,
+                symsLength, 
+                searchStart,
+                searchEnd,
+                d_preamble_concat,
+                d_lengths.size,
+                d_lengths,
+                m,
+                d_matches),
+                shared_mem=smReq
+            )
+
+            # Reshape matches for viewability
+            d_matches = d_matches.reshape((numSignals, d_lengths.size, searchEnd-searchStart, m))
+
+            return d_matches
+
+
         @staticmethod
         def demod(d_xbatch: cp.ndarray, THREADS_PER_BLOCK: int=128):
             if d_xbatch.ndim == 2:

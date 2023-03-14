@@ -111,7 +111,13 @@ preambleLengths = {32, 128, 64};
 Within a block, each thread will tackle one of the search indices. Hence, for searching 128 possible indices,
 128 threads would be ideal. All reads at this point would be within shared memory.
 
-The thread must scan the
+The thread must scan - for its current search index - the matching rotation for each preamble sample, and increment the value.
+The resulting matrix is of size (searchSize * m) where each thread increments the 'm' counters in its own row.
+This is then output to global memory appropriately.
+
+Note that the size of the output 'matches' is determined by:
+(numSignals * numPreambles * m). As such, be aware that this may be excessively large
+if (numSignals) is large.
 */
 extern "C" __global__
 void compareIntegerPreambles(
@@ -147,9 +153,24 @@ void compareIntegerPreambles(
         totalPreambleLength += s_preambleLengths[i];
 
     // And then we assign the space for the rest of shared memory
-    unsigned char *s_syms = (unsigned char*)&s_preambleLengths[numPreambles]; // (symsLength) unsigned chars
+    const int matchesSzPerPreamble = m * (searchEnd - searchStart);
+    const int matchesSzPerSignal = numPreambles * matchesSzPerPreamble;
+    const int outputBlkGlobalOffset = blockIdx.x * matchesSzPerSignal;
+
+    unsigned int *s_ws = (unsigned int*)&s_preambleLengths[numPreambles]; // (m * (searchEnd-searchStart)) unsigned ints, this is the 'matches' matrix
+    unsigned char *s_syms = (unsigned char*)&s_ws[matchesSzPerPreamble]; // (symsLength) unsigned chars
     unsigned char *s_preambles = (unsigned char*)&s_syms[symsLength]; // (totalPreambleLength) unsigned chars
-    unsigned int *s_ws = (unsigned int*)&s_preambles[totalPreambleLength]; // (m * (searchEnd-searchStart)) unsigned ints, this is the 'matches' matrix
+    /* IMPORTANT:
+    We stack the shared memory in order of int32->uint32->uint8->uint8
+    because CUDA enforces all pointers of a type to be aligned to an address of that type's size.
+    If we moved the uint32 pointer to the last part of the shared memory,
+    the uint8s may lead to a non-32-bit aligned address as the start of the next memory section,
+    and this will cause a misaligned address error during execution 
+    (
+        NOTE: compilation will be successful,
+        and the kernel will actually run without error if you get lucky!)
+    */
+
 
     // Copy these into shared memory
     int blkGlobalOffset = blockIdx.x * symsLength;
@@ -164,6 +185,9 @@ void compareIntegerPreambles(
 
     // Now we process each preamble individually
     unsigned char *s_preamble_test = s_preambles;
+    
+
+    unsigned char counterIdx;
     for (int i = 0; i < numPreambles; i++)
     {
         if (i > 0) // Increment pointer to the next preamble
@@ -173,16 +197,36 @@ void compareIntegerPreambles(
         for (int t = threadIdx.x; t < searchEnd - searchStart; t += blockDim.x)
         {
             int searchIdx = searchStart + t;
+            
+            // Pre-zero our workspace
+            for (int j = 0; j < m; j++)
+            {
+                s_ws[t*m + j] = 0;
+            }
 
             // Loop over the current preamble
             for (int j = 0; j < s_preambleLengths[i]; j++)
             {
                 // Calculate the proper rotation by adding m to the input signal
-                s_ws[t * m + ((s_preamble_test[j] + m - x[t+j]) % m)] += 1;
-
-                //TODO: COMPLETE
+                // Explicit upcasting
+                counterIdx = (s_preamble_test[j] + (unsigned char)m - s_syms[searchIdx+j]) % m;
+                s_ws[t * m + (int)counterIdx] += 1;
             }
         }
+
+        // Wait for the workspace to be complete
+        __syncthreads();
+
+        // Write our workspace (which is the matches matrix for this preamble)
+        // back to global memory; make sure to skip 
+        for (int t = threadIdx.x; t < matchesSzPerPreamble; t += blockDim.x)
+        {
+            matches[outputBlkGlobalOffset + i * matchesSzPerPreamble + t] = s_ws[t];
+        }
+
+        // Before going to the next preamble, make sure everyone is done
+        __syncthreads();
+
     }
 
 }

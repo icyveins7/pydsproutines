@@ -733,6 +733,8 @@ class BurstDetector:
             if counts[i] < counts[i-1] and counts[i] < counts[i+1]:
                 detectedThreshold = noiseLevels[i]
                 return detectedThreshold * multiplier
+
+        return None # Otherwise return None for failure
     
     def detectSingleEmitter(self, ratio: float):
         # To seed the kmeans (which speeds it up ~30x), we find the max, and a 

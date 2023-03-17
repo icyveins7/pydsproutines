@@ -5,6 +5,8 @@ This kernel takes in a matrix of signals, with 1 signal in each row.
 A block is assigned to each signal, which performs the phase-locking to the QPSK constellation,
 maps the values to {0,1,2,3} based on an anticlockwise direction and then writes the output back to global memory.
 
+NOTE: THIS MAPPING IS NOT THE GRAY CODING CONSTELLATION.
+
 Note: the memory block for the matrix inevitably has a fixed number of columns,
 but each signal may occupy less than the maximum number of columns.
 The remaining columns for the signal should be zero-ed out.

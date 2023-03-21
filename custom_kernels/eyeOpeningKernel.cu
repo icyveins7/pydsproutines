@@ -73,7 +73,7 @@ void getEyeOpening_batch(
     // now the entire block has access to the max, and the argmax (which is the important one)
     // so we use it to copy the particular eye opening index over
     const complex<float> *d_x = &d_x_batch[blockIdx.x * xlength];
-    complex<float> *d_x_eo = &d_x_eo_batch[blockIdx.x * xlength / osr];
+    complex<float> *d_x_eo = &d_x_eo_batch[blockIdx.x * (xlength / osr)]; // DO NOT REMOVE THE CURLY BRACKETS (). IT IS IMPORTANT TO ENSURE THE CORRECT INDEXING.
     int e = *s_eo_argmax;
     for (int i = threadIdx.x; i < xlength / osr; i += blockDim.x)
     {

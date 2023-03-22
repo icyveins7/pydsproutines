@@ -153,8 +153,8 @@ def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None, aut
         # Correct for half the bin widths
         xstep = width / heatmap.shape[0]
         ystep = height / heatmap.shape[1]
-        width = width + xstep
-        height = height + ystep
+        # width = width + xstep
+        # height = height + ystep
         x0 = x0 - xstep/2
         y0 = y0 - ystep/2
     

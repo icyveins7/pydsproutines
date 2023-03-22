@@ -28,6 +28,62 @@ def geodeticLLA2ecef(lat_rad, lon_rad, h):
     
     return np.vstack((x,y,z))
 
+#%% Doppler convention routines
+def calculateRangeRate(
+    tx_x: np.ndarray,
+    rx_x: np.ndarray,
+    tx_xdot: np.ndarray=np.zeros(3),
+    rx_xdot: np.ndarray=np.zeros(3)
+):
+    # We use the direction of the wave
+    dirvec = rx_x - tx_x
+    # Normalise by it
+    dirvec = dirvec/np.linalg.norm(dirvec)
+    # Find the speed parallel to this direction vector
+    tx_xdot_p = np.dot(tx_xdot, dirvec)
+    rx_xdot_p = np.dot(rx_xdot, dirvec)
+    # The range rate is characterised by the (rx speed - tx speed)
+    # This can be seen by noting the conditions for rx and tx respectively
+    # If RX moves away from the incoming wave ie same direction, 
+    # range rate is increasing, and vice versa.
+    # If TX moves back from the outgoing wave ie opposite direction,
+    # range rate is increasing, and vice versa.
+    rdot = rx_xdot_p - tx_xdot_p
+
+    return rdot
+
+def calculateDoppler(
+    f0: float,
+    tx_x: np.ndarray,
+    rx_x: np.ndarray,
+    tx_xdot: np.ndarray=np.zeros(3),
+    rx_xdot: np.ndarray=np.zeros(3),
+    lightspd: float=299792458.0
+):
+    # To calculate Doppler, simply get the range rate
+    rdot = calculateRangeRate(tx_x, rx_x, tx_xdot, rx_xdot)
+    # And then take the reverse of it with a scaling
+    doppler = -rdot/lightspd*f0
+    return doppler
+
+#%% Satellite related measurement routines
+def removeDownlinkRangeDiff(rx: np.ndarray, s1x: np.ndarray, s2x: np.ndarray, rangediff: np.ndarray):
+    downlinkrangediff = rangeDifferenceOfArrival(rx, s1x, s2x)
+    return rangediff - downlinkrangediff, downlinkrangediff
+
+def removeDownlinkDopplerDiff(
+    rx: np.ndarray, s1x: np.ndarray, s2x: np.ndarray,
+    s1v: np.ndarray, s2v: np.ndarray, fdoa: float, f0down: float,
+    lightspd: float=299792458.0
+):
+    rdot1 = calculateRangeRate(s1x, rx, tx_xdot=s1v)
+    rdot2 = calculateRangeRate(s2x, rx, tx_xdot=s2v)
+    downlinkFDOA = (-rdot2+rdot1)*f0down/lightspd
+    return fdoa - downlinkFDOA, downlinkFDOA
+
+    downlinkrangeratediff = rdot2 - rdot1
+    return rangeratediff - downlinkrangeratediff, downlinkrangeratediff
+
 #%% Hyperbola routines
 # @njit(nogil=True)
 def rangeOfArrival(x, s_i):
@@ -960,6 +1016,7 @@ class LatLonGridLocalizerTD(TDMixin, LatLonGridLocalizer):
 
 class LatLonGridLocalizerTDFD(TDFDMixin, LatLonGridLocalizer):
     pass
+
 
 #%%
 try:

@@ -16,4 +16,4 @@ __pycache__/
 *.bak
 *.nvvp
 *.vscode/
-
+*.idea/

@@ -31,7 +31,29 @@ def geodeticLLA2ecef(lat_rad, lon_rad, h):
 #%% Hyperbola routines
 # @njit(nogil=True)
 def rangeOfArrival(x, s_i):
-    rho = np.linalg.norm(x-s_i)
+    """
+    Computes the range of arrival between vectors.
+    This is simply the norm of the difference between the vectors.
+    The shapes of the two inputs are irrelevant as long as they are broadcastable via numpy's rules,
+    but the norm is always taken over the last index.
+
+    For the common case of 2-D arrays, this means that each row of the input array is treated as a vector.
+    E.g. for M x 3 arrays, the range of arrivals is a length M vector.
+
+    Parameters
+    ----------
+    x : array_like
+        The first vector.
+    s_i : array_like
+        The second vector.
+        Naming convention is simply due to the 'sensor - target x' convention.
+
+    Returns
+    -------
+    rho : array_like
+        The range of arrival.
+    """
+    rho = np.linalg.norm(x-s_i, axis=-1)
     return rho
 
 # @njit(nogil=True)

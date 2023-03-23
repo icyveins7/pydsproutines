@@ -12,6 +12,8 @@ from scipy.stats.distributions import chi2
 import time
 from skyfield.api import wgs84
 from plotRoutines import *
+from satelliteRoutines import *
+import skyfield.api
 
 #%% Coordinate transformations
 def geodeticLLA2ecef(lat_rad, lon_rad, h):
@@ -66,23 +68,7 @@ def calculateDoppler(
     doppler = -rdot/lightspd*f0
     return doppler
 
-#%% Satellite related measurement routines
-def removeDownlinkRangeDiff(rx: np.ndarray, s1x: np.ndarray, s2x: np.ndarray, rangediff: np.ndarray):
-    downlinkrangediff = rangeDifferenceOfArrival(rx, s1x, s2x)
-    return rangediff - downlinkrangediff, downlinkrangediff
 
-def removeDownlinkDopplerDiff(
-    rx: np.ndarray, s1x: np.ndarray, s2x: np.ndarray,
-    s1v: np.ndarray, s2v: np.ndarray, fdoa: float, f0down: float,
-    lightspd: float=299792458.0
-):
-    rdot1 = calculateRangeRate(s1x, rx, tx_xdot=s1v)
-    rdot2 = calculateRangeRate(s2x, rx, tx_xdot=s2v)
-    downlinkFDOA = (-rdot2+rdot1)*f0down/lightspd
-    return fdoa - downlinkFDOA, downlinkFDOA
-
-    downlinkrangeratediff = rdot2 - rdot1
-    return rangeratediff - downlinkrangeratediff, downlinkrangeratediff
 
 #%% Hyperbola routines
 # @njit(nogil=True)
@@ -1016,6 +1002,122 @@ class LatLonGridLocalizerTD(TDMixin, LatLonGridLocalizer):
 
 class LatLonGridLocalizerTDFD(TDFDMixin, LatLonGridLocalizer):
     pass
+
+#%% Satellite related routines and classes
+def removeDownlinkRangeDiff(rx: np.ndarray, s1x: np.ndarray, s2x: np.ndarray, rangediff: np.ndarray):
+    downlinkrangediff = rangeDifferenceOfArrival(rx, s1x, s2x)
+    return rangediff - downlinkrangediff, downlinkrangediff
+
+def removeDownlinkDopplerDiff(
+    rx: np.ndarray, s1x: np.ndarray, s2x: np.ndarray,
+    s1v: np.ndarray, s2v: np.ndarray, fdoa: float, f0down: float,
+    lightspd: float=299792458.0
+):
+    rdot1 = calculateRangeRate(s1x, rx, tx_xdot=s1v)
+    rdot2 = calculateRangeRate(s2x, rx, tx_xdot=s2v)
+    downlinkFDOA = (-rdot2+rdot1)*f0down/lightspd
+    return fdoa - downlinkFDOA, downlinkFDOA
+
+    downlinkrangeratediff = rdot2 - rdot1
+    return rangeratediff - downlinkrangeratediff, downlinkrangeratediff
+
+
+class SatellitePairTDFDMixin(TDFDMixin):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs) # Pass on everything
+
+        # Add placeholders to check readiness
+        self.prisat = None
+        self.secsat = None
+        self.rxecef = None
+
+    @property
+    def ready(self):
+        """
+        Checks if the RX position and the satellite objects have been set.
+        """
+        if self.rxecef is None or self.prisat is None or self.secsat is None:
+            return False
+        return True
+
+    def configurePrimarySatellite(self, sat: skyfield.api.EarthSatellite):
+        self.prisat = sat
+
+    def configureSecondarySatellite(self, sat: skyfield.api.EarthSatellite):
+        self.secsat = sat
+
+    def setRXposition(self, rxecef: np.ndarray):
+        self.rxecef = rxecef
+
+    def _generateSatellitesPosVel(self, times: np.ndarray):
+        # Generate geocentric class instances
+        prigeocentrics = [sf_propagate_satellite_to_gpstime(self.prisat, time) for i in times]
+        secgeocentrics = [sf_propagate_satellite_to_gpstime(self.secsat, time) for i in times]
+
+        # Extract the position and velocity in ECEF (i.e. ITRS)
+        pri_x_list = np.zeros((len(times),3))
+        pri_xdot_list = np.zeros((len(times),3))
+        sec_x_list = np.zeros((len(times),3))
+        sec_xdot_list = np.zeros((len(times),3))
+        for i in range(len(times)):
+            pri_x, pri_xdot = sf_geocentric_to_itrs(prigeocentrics[i], returnVelocity=True)
+            sec_x, sec_xdot = sf_geocentric_to_itrs(secgeocentrics[i], returnVelocity=True)
+            # Place into giant matrix
+            pri_x_list[i,:] = pri_x.m
+            pri_xdot_list[i,:] = pri_xdot.m_per_s
+            sec_x_list[i,:] = sec_x.m
+            sec_xdot_list[i,:] = sec_xdot.m_per_s
+
+        return pri_x_list, pri_xdot_list, sec_x_list, sec_xdot_list
+
+    def run(self,
+            times, tdoa_list, td_sigma_list,
+            fdoa_list, fd_sigma_list, fc_up, fc_down):
+        '''
+        Performs TDOA+FDOA weighted least squares error calculations on every point in the grid.
+        TDOAs are assumed to be measured as (time to sensor 2) - (time to sensor 1).
+        This convention holds for FDOA as well.
+
+        Parameters
+        ----------
+        times : np.ndarray
+            Length K array of TDOA measurement times (in UTC seconds).
+            This is used to propagate the satellites to their 
+            correct positions/velocities at each measurement.
+        tdoa_list : np.ndarray
+            Length K array of TDOA measurements (in seconds).
+        td_sigma_list : np.ndarray
+            Length K array of TDOA measurement uncertainties (in seconds).
+        fdoa_list : np.ndarray
+            Length K array of FDOA measurements (in Hz).
+        fd_sigma_list : np.ndarray
+            Length K array of FDOA measurement uncertainties (in Hz).
+        fc_up : float
+            Centre frequency of the uplink.
+        fc_down : float
+            Centre frequency of the downlink.
+
+        Returns
+        -------
+        cost_grid : np.ndarray
+            Length N array. The least squares errors for every grid point.
+        '''
+
+        pri_x_list, pri_xdot_list, sec_x_list, sec_xdot_list = self._generateSatellitesPosVel(
+            times
+        )
+
+        cost_grid = super().run(
+            pri_x_list, sec_x_list, tdoa_list, td_sigma_list,
+            pri_xdot_list, sec_xdot_list, fdoa_list, fd_sigma_list, fc_up)
+
+        return cost_grid
+
+        
+
+        
+
+        
 
 
 #%%

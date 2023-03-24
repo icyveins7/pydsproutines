@@ -295,6 +295,14 @@ class DSPConfig(DirectSingleConfig):
     
 #%% Many cases involve processing only one signal at a time i.e. only 1 process for each workspace
 class SingleProcessDSPConfig(DSPConfig):
+    """
+    This will assume only 1 process is present per workspace.
+    If there are more, it will always only read the first one.
+    Since there is only 1 process, the 'src' and 'sig' readers have been 
+    short-circuited here to grant direct access i.e.
+        cfg.src == cfg.process.src
+        cfg.sig == cfg.process.sig
+    """
     @property
     def process(self):
         return list(self.processes.items())[0][1]
@@ -307,6 +315,21 @@ class SingleProcessDSPConfig(DSPConfig):
     @property
     def sig(self):
         return self.process.sig
+
+#%% A good bunch of other cases involve processing signals pair-wise e.g. TDOA/FDOA etc.
+class DoubleProcessDSPConfig(DSPConfig):
+    """
+    This will assume only 2 processes are present per workspace.
+    If there are more, it will always only read the first two.
+    The processes are accessed via the '.primary' and '.secondary' getters.
+    """
+    @property
+    def primary(self):
+        return list(self.processes.items())[0][1]
+
+    @property
+    def secondary(self):
+        return list(self.processes.items())[1][1]
 
 #%% Intend to deprecate from this onwards, bad format to do things..
 class SingleSourceConfigMixin:

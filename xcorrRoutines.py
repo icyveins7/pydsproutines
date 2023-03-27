@@ -16,6 +16,7 @@ from musicRoutines import MUSIC
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sqlite3 as sq
 import concurrent.futures
+from cupyExtensions import *
 
 try:
     import cupy as cp

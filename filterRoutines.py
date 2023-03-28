@@ -650,6 +650,48 @@ class Channeliser:
     
 
 #%%
+with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "thresholding.cu"), "r") as fid:
+    _thresholdingModule = cp.RawModule(code=fid.read())
+    _thresholdEdgesKernel = _thresholdingModule.get_function("thresholdEdges")
+
+def cupyThresholdEdges(
+    d_x: cp.ndarray, threshold: float,
+    THREADS_PER_BLOCK: int=128,
+    edgesMaxPerBlock: int=None, # Generally can set it to half the threads per block or even less
+    ignoreEdgesCount: bool=True
+):
+    # Enforce types
+    if d_x.dtype != cp.float32:
+        raise TypeError("d_x must be float32.")
+
+    # Determine exact minimum required number of blocks
+    NUM_BLKS = d_x.size // THREADS_PER_BLOCK
+    if NUM_BLKS * THREADS_PER_BLOCK < d_x.size:
+        NUM_BLKS += 1
+
+    # Allocate output
+    if edgesMaxPerBlock is None:
+        edgesMaxPerBlock = THREADS_PER_BLOCK
+    d_edges = cp.zeros((NUM_BLKS, edgesMaxPerBlock), dtype=cp.int32)
+    d_edgeBlockCounts = cp.zeros(NUM_BLKS, dtype=cp.int32)
+
+    # Run kernel
+    _thresholdEdgesKernel(
+        (NUM_BLKS,),(THREADS_PER_BLOCK,),
+        (d_x, np.float32(threshold), d_x.size, # Make sure we cast the threshold!
+        d_edges, edgesMaxPerBlock, d_edgeBlockCounts),
+        shared_mem=THREADS_PER_BLOCK * 5
+    )
+
+    # Raise error if checking is enabled
+    if not ignoreEdgesCount and cp.any(d_edgeBlockCounts > edgesMaxPerBlock):
+        raise RuntimeError("Some blocks have dropped their edges!")
+
+    
+
+    return d_edges, d_edgeBlockCounts
+
+
 class BurstDetector:
     def __init__(self, medfiltlen: int):
         self.medfiltlen = medfiltlen

@@ -10,6 +10,27 @@ Other generic cupy extensions that don't fit anywhere else..
 import cupy as cp
 import os
 
+#%% Convenience function
+def cupyModuleToKernelsLoader(modulefilename: str, kernelNames: list):
+    """
+    Helper function to generate the CuPy kernel objects from a module.
+    The module is expected to reside in the custom_kernels folder.
+
+    Examples:
+        kernel1, kernel2 = cupyModuleToKernelsLoader("mymodule.cu", ["mykern1","mykern2"])
+        kernel1, = cupyModuleToKernelsLoader("mymodule.cu", "mykern1")
+    """
+    if isinstance(kernelNames, str):
+        kernelNames = [kernelNames]
+    kernels = []
+    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", modulefilename), "r") as fid:
+        _module = cp.RawModule(code=fid.read())
+        for kernelName in kernelNames:
+            kernels.append(_module.get_function(kernelName))
+
+    return kernels
+
+
 #%% A block-group paired kernel copy
 copy_groups_kernel32fc = cp.RawKernel(r'''
     #include <cupy/complex.cuh>
@@ -69,6 +90,43 @@ def cupyCopyGroups32fc(x: cp.ndarray, y: cp.ndarray,
     copy_groups_kernel32fc((NUM_BLOCKS,), (threads_per_blk,),
                            (x, y, xStarts, lengths, yStarts))
 
+#%%
+_argmax3d_uint32kernel, = cupyModuleToKernelsLoader("argmax.cu", "multiArgmax3d_uint32")
+def cupyArgmax3d_uint32(d_x: cp.ndarray, THREADS_PER_BLOCK: int=128, alsoReturnMaxValue: bool=False):
+    # Input checks
+    if d_x.dtype != cp.uint32:
+        raise TypeError("d_x must be uint32.")
+    if d_x.ndim != 4:
+        raise ValueError("d_x must be 4-d. Argmax taken over the last 3 dimensions.")
+
+    # Extract the dimensions
+    numItems, dim1, dim2, dim3 = d_x.shape
+    # Allocate output
+    d_argmax = cp.zeros((numItems, 3), dtype=cp.uint32)
+    # Calculate shared mem
+    smReq = THREADS_PER_BLOCK * 4 * 2
+
+    # Execute kernel
+    NUM_BLKS = numItems
+
+    if alsoReturnMaxValue:
+        d_max = cp.zeros(numItems, dtype=cp.uint32)
+        _argmax3d_uint32kernel(
+            (NUM_BLKS,),(THREADS_PER_BLOCK,),
+            (d_x, numItems, dim1, dim2, dim3, d_argmax, d_max),
+            shared_mem=smReq
+        )
+
+        return d_argmax, d_max
+
+    else:
+        _argmax3d_uint32kernel(
+            (NUM_BLKS,),(THREADS_PER_BLOCK,),
+            (d_x, numItems, dim1, dim2, dim3, d_argmax, 0), # Set nullptr to last arg
+            shared_mem=smReq
+        )
+
+        return d_argmax
 
 #%% 
 with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "multiplySlices.cu"), "r") as fid:

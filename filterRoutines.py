@@ -653,20 +653,21 @@ class Channeliser:
 with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "thresholding.cu"), "r") as fid:
     _thresholdingModule = cp.RawModule(code=fid.read())
     _thresholdEdgesKernel = _thresholdingModule.get_function("thresholdEdges")
+    _gatherThresholdEdgesKernel = _thresholdingModule.get_function("gatherThresholdEdgesResults")
 
 def cupyThresholdEdges(
     d_x: cp.ndarray, threshold: float,
     THREADS_PER_BLOCK: int=128,
     edgesMaxPerBlock: int=None, # Generally can set it to half the threads per block or even less
-    ignoreEdgesCount: bool=True
+    ignoreEdgesCountCheck: bool=True
 ):
     # Enforce types
     if d_x.dtype != cp.float32:
         raise TypeError("d_x must be float32.")
 
     # Determine exact minimum required number of blocks
-    NUM_BLKS = d_x.size // THREADS_PER_BLOCK
-    if NUM_BLKS * THREADS_PER_BLOCK < d_x.size:
+    NUM_BLKS = d_x.size // (THREADS_PER_BLOCK - 2) # We actually only write -2 of the block size
+    if NUM_BLKS * (THREADS_PER_BLOCK - 2) < d_x.size:
         NUM_BLKS += 1
 
     # Allocate output
@@ -682,14 +683,49 @@ def cupyThresholdEdges(
         d_edges, edgesMaxPerBlock, d_edgeBlockCounts),
         shared_mem=THREADS_PER_BLOCK * 5
     )
+    d_edges = d_edges
 
-    # Raise error if checking is enabled
-    if not ignoreEdgesCount and cp.any(d_edgeBlockCounts > edgesMaxPerBlock):
+    # Raise error if checking is enabled (this is very expensive)
+    if not ignoreEdgesCountCheck and cp.any(d_edgeBlockCounts > edgesMaxPerBlock):
         raise RuntimeError("Some blocks have dropped their edges!")
 
-    
-
     return d_edges, d_edgeBlockCounts
+
+def cupyGatherEdges(
+    d_edges: cp.ndarray,
+    d_edgeBlockCounts: cp.ndarray,
+    minimumLength: int=0,
+    maximumLength: int=2147483647
+):
+    # Counting the appropriate length for the output
+    totalEdges = cp.sum(d_edgeBlockCounts).item()
+    if totalEdges % 2 == 0:
+        totalEdges += 2
+    else:
+        totalEdges += 1
+
+    # Allocate output
+    d_sliceIndices = cp.zeros(totalEdges, dtype=cp.int32)
+    d_totalCount = cp.zeros(1, dtype=cp.int32)
+
+    # Execute kernel
+    NUM_BLKS = 1
+    THREADS_PER_BLOCK = 1024
+
+    _gatherThresholdEdgesKernel(
+        (NUM_BLKS,), (THREADS_PER_BLOCK,),
+        (d_edges, d_edges.shape[1],
+        d_edges.shape[0], d_edgeBlockCounts,
+        minimumLength, maximumLength,
+        d_sliceIndices, d_totalCount),
+        shared_mem=d_edges.shape[1] * 4
+    )
+    # print(d_totalCount.item())
+    # Cut the excess off
+    d_sliceIndices = d_sliceIndices.reshape((-1,2))[:d_totalCount.item(), :]
+
+    return d_sliceIndices
+
 
 
 class BurstDetector:
@@ -739,6 +775,27 @@ class BurstDetector:
         signalIndices = cp.split(signalIndices, splitIndices.get()) # For cupy, need to pull the split indices to host
         
         return signalIndices
+
+    def detectViaThresholdWithLengthLimits(self,
+        threshold: float,
+        minLength: int=0,
+        maxLength: int=2147483647
+    ):
+        self.threshold = threshold
+        # Call custom kernel to find edges
+        d_edges, d_edgeBlockCounts = cupyThresholdEdges(
+            self.d_medfiltered, threshold,
+            edgesMaxPerBlock=32,
+            ignoreEdgesCountCheck=True)
+        # Call custom kernel to gather edges into pair-wise slice indices
+        signalIndices = cupyGatherEdges(
+            d_edges,
+            d_edgeBlockCounts, 
+            minimumLength=minLength,
+            maximumLength=maxLength)
+            
+        return signalIndices
+
 
     def autoDetectThreshold(self, noiseLevels: np.ndarray, multiplier: float=1.0):
         '''

@@ -44,7 +44,7 @@ void thresholdEdges(
     // Define the index that this thread represents in the global array
     int globalIdx = threadIdx.x + startIdx;
 
-    // You can only read in from the input within bounds
+    // You can only process the input within bounds
     if (globalIdx < length)
     {
         // We first read into the thread variable
@@ -53,63 +53,63 @@ void thresholdEdges(
         s_markers[threadIdx.x] = x > threshold ? 1 : 0; // 1 if over threshold, 0 if not
         // Then pre-zero all the edges in shared mem
         s_edges[threadIdx.x] = 0; // This is okay, since 0 cannot be a valid edge by definition (cannot see left neighbour)
-    }
+
+        // Wait for shared mem
+        __syncthreads();
+
+        // === FINDING EDGES ===
+        // Ignore the first and last sample
+        if (threadIdx.x !=0 && threadIdx.x != blockDim.x-1)
+        {
+            // First check if the sample passes the threshold
+            if (s_markers[threadIdx.x] == 1)
+            {
+                // Is it a left edge?
+                if (s_markers[threadIdx.x-1] == 0 && s_markers[threadIdx.x+1] == 1)
+                {
+                    s_edges[threadIdx.x] = globalIdx; // write as a 'left edge'
+                }
+                // Or a right edge?
+                else if (s_markers[threadIdx.x-1] == 1 && s_markers[threadIdx.x+1] == 0)
+                {
+                    s_edges[threadIdx.x] = -globalIdx; // write as a 'right edge' using negative sign
+                }
+            }
+        }
+        // Wait for sync
+        __syncthreads();
+
+        // We repurpose the markers shared mem here to use 1 integer space, since its no longer needed
+        // (generally markers allocation is more than this, requirement is blockDim > 4 threads)
+        int *count = (int*)&s_markers[0];
+
+        // Use first thread to push to the front and count
+        if (threadIdx.x == 0)
+        {
+            *count = 0;
+            for (int i = 0; i < blockDim.x; i++)
+            {
+                if (s_edges[i] != 0)
+                {
+                    s_edges[*count] = s_edges[i];
+                    *count = *count + 1;
+                    // Re-zero the one we read
+                    s_edges[i] = 0;
+                }
+            }
+        }
+        // Wait for sync
+        __syncthreads();
+
+        // Then push the data back to global memory, up to the count or the max, whichever is smaller
+        if (threadIdx.x < *count && threadIdx.x < edgesMaxPerBlock)
+        {
+            d_edges[blockIdx.x * edgesMaxPerBlock + threadIdx.x] = s_edges[threadIdx.x];
+        }
+        if (threadIdx.x == 0)
+            d_edgeBlockCounts[blockIdx.x] = *count; // write the actual count, for back-checking
     
-    // Wait for shared mem
-    __syncthreads();
-
-    // === FINDING EDGES ===
-    // Ignore the first and last sample
-    if (threadIdx.x !=0 && threadIdx.x != blockDim.x-1)
-    {
-        // First check if the sample passes the threshold
-        if (s_markers[threadIdx.x] == 1)
-        {
-            // Is it a left edge?
-            if (s_markers[threadIdx.x-1] == 0 && s_markers[threadIdx.x+1] == 1)
-            {
-                s_edges[threadIdx.x] = globalIdx; // write as a 'left edge'
-            }
-            // Or a right edge?
-            else if (s_markers[threadIdx.x-1] == 1 && s_markers[threadIdx.x+1] == 0)
-            {
-                s_edges[threadIdx.x] = -globalIdx; // write as a 'right edge' using negative sign
-            }
-        }
     }
-    // Wait for sync
-    __syncthreads();
-
-    // We repurpose the markers shared mem here to use 1 integer space, since its no longer needed
-    // (generally markers allocation is more than this, requirement is blockDim > 4 threads)
-    int *count = (int*)&s_markers[0];
-
-    // Use first thread to push to the front and count
-    if (threadIdx.x == 0)
-    {
-        *count = 0;
-        for (int i = 0; i < blockDim.x; i++)
-        {
-            if (s_edges[i] != 0)
-            {
-                s_edges[*count] = s_edges[i];
-                *count = *count + 1;
-                // Re-zero the one we read
-                s_edges[i] = 0;
-            }
-        }
-    }
-    // Wait for sync
-    __syncthreads();
-
-    // Then push the data back to global memory, up to the count or the max, whichever is smaller
-    if (threadIdx.x < *count && threadIdx.x < edgesMaxPerBlock)
-    {
-        d_edges[blockIdx.x * edgesMaxPerBlock + threadIdx.x] = s_edges[threadIdx.x];
-    }
-    if (threadIdx.x == 0)
-        d_edgeBlockCounts[blockIdx.x] = *count; // write the actual count, for back-checking
- 
 }
 
 /*
@@ -126,6 +126,34 @@ We also output a counter for each of the blocks in the above kernel
 The goal is to gather all the non-zeros to the front, in one array.
 This becomes the final indices. The only safe way to do this is to move all this in
 one single block.
+
+Possible scenarios for output allocation:
+1) Starts with a right edge, ends with a left edge
+    -X .... Y
+    Total number of edges is even.
+    Required allocation should be +2 of the total length,
+    to accomodate 'unknowns' for the first and last slices.
+
+2) Starts with a left edge, ends with a right edge
+    X ..... -Y
+    Total number of edges is even.
+    Required allocation should be exactly the total length.
+
+3) Starts with a left edge, ends with a left edge
+    X .... Y
+    Total number of edges is odd.
+    Required allocation should be exactly +1 of the total length,
+    to accomodate 'unknown' for the last slice.
+
+4) Starts with a right edge, ends with a right edge
+    -X .... -Y
+    Total number of edges is odd.
+    Required allocation should be exactly +1 of the total length,
+    to accomodate 'unknown' for the first slice.
+
+Note that the first edge may appear in the N'th row, so it is not possible to know beforehand
+and output the left/right-ness of the first edge from the previous kernel.
+Therefore, the best case should be even->+2 length, odd->+1 length.
 */
 extern "C" __global__
 void gatherThresholdEdgesResults(
@@ -133,17 +161,21 @@ void gatherThresholdEdgesResults(
     const int edgesMaxPerBlock,
     const int NUM_PREV_BLKS,
     const int *d_edgeBlockCounts, // (NUM_PREV_BLOCKS)
-    int *d_sliceIndices
+    const int minimumWidth, // if not required, set to 0
+    const int maximumWidth, // if not required, set to int32 max i.e. 2147483647
+    int *d_sliceIndices,
+    int *d_totalCount
 ){
     // allocate shared memory
     extern __shared__ double s[];
 
     int *s_edges = (int*)s; // (edgesMaxPerBlock) ints
-
+    
     // Loop over each counter
     int blockCount;
     int idx = 0; // This is only used by the first thread to know where we are in the output
-    bool firstEdgeProcessed = false;
+
+    int left = 0, right = 0;
     for (int i = 0; i < NUM_PREV_BLKS; i++)
     {
         blockCount = d_edgeBlockCounts[i];
@@ -158,24 +190,37 @@ void gatherThresholdEdgesResults(
             // Then use first thread to push into the global output
             if (threadIdx.x == 0)
             {
+                // We loop over each edge, but only write once we've found a pair
                 for (int j = 0; j < edgesMaxPerBlock; j++)
                 {
-                    if (!firstEdgeProcessed && s_edges[j] != 0)
-                    {
-                        // check if the first one is left or right
-                        idx = s_edges[j] > 0 ? 0 : 1; // if its a left edge (+ve) then start at 0, otherwise start at 1
-                        firstEdgeProcessed = true;
-                    }
+                    // if this is a left edge, just cache it for now
+                    if (s_edges[j] > 0)
+                        left = s_edges[j];
 
-                    // from then on, just write the absolute value
-                    if (s_edges[j] != 0)
+                    // if its a right edge,
+                    else if (s_edges[j] < 0)
                     {
-                        d_sliceIndices[idx] = s_edges[j];
-                        idx++;
+                        right = abs(s_edges[j]); // take the abs
+                        // check whether it satisfies the limits
+                        if (right - left >= minimumWidth && right - left <= maximumWidth)
+                        {
+                            // then we write to global
+                            d_sliceIndices[idx] = left;
+                            idx++;
+                            d_sliceIndices[idx] = right;
+                            idx++;
+                            // reset
+                            left = 0;
+                            right = 0;
+                        }
                     }
   
                 }
             } // END OF OUTPUT TO GLOBAL USING FIRST THREAD
         }
     }
+
+    // At the very end, update the total useful count
+    if (threadIdx.x == 0)
+        d_totalCount[0] = idx / 2;
 }

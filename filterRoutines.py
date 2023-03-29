@@ -781,6 +781,17 @@ class BurstDetector:
         minLength: int=0,
         maxLength: int=2147483647
     ):
+        """
+        Returns a Nx2 array on-device that corresponds to the start and end indices (inclusive)
+        of threshold-ed slices. This is done with the two custom kernels above,
+        and internally incorporates the minimum and maximum length of slices,
+        discarding the ones that fail this check.
+
+        This differs from the V1 combination of detectViaThreshold(),
+        getStartAndEndIdx() and imposeSignalLengthLimits(), which have to be used together
+        to achieve a similar Nx2 array structure (technically, also requires vstack()).
+        This previous requirement was around 5-8x slower within the interpreter during testing.
+        """
         self.threshold = threshold
         # Call custom kernel to find edges
         d_edges, d_edgeBlockCounts = cupyThresholdEdges(
@@ -793,7 +804,7 @@ class BurstDetector:
             d_edgeBlockCounts, 
             minimumLength=minLength,
             maximumLength=maxLength)
-            
+
         return signalIndices
 
 

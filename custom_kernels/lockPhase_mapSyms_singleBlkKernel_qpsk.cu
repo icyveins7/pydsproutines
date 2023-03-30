@@ -1,6 +1,100 @@
 #include <cupy/complex.cuh>
 
 /*
+This kernel is designed to work on one 'signal' for each block.
+A signal is defined by a row from a matrix, with each element representing a symbol.
+E.g. for QPSK the values would be {0,1,2,3}, defined as unsigned chars i.e uint8.
+Each signal takes a reference from an index matrix (see argmax.cu),
+ where each row corresponds to the following in order:
+A: key index
+B: sample index
+C: rotation
+
+The key index references an array of key lengths, where the slice from the input signal is made as follows:
+x[keyLengths[A] + B : N]
+where N is a desired stop sample, extracted from a separate array,
+ specific to each block i.e. each signal.
+
+The output is gray-mapped in the following configuration:
+
+    1   |   0            1 (01)  |  3 (11)    
+    ---------   ====>    -----------------
+    2   |   3            0 (00)  |  2 (10)
+
+Original scenario:
+    Given a number of preambles, test each signal against all preambles (compareIntPreambles kernel)
+    and then find the best preamble match(A), the preamble starting index (B), and the
+    rotation required to fit the preamble (C); see argmax.cu.
+
+    This kernel then extracts the signal (minus the preamble) up to a certain desired length, for each signal,
+    performing the rotation C in the process. After this, the resulting symbols are in the correct
+    rotation order, and have been cut to the exact length stipulated, so they are ready to be decoded/interpreted.
+
+*/
+extern "C" __global__
+void cutAndRotatePSKSymbolsFromPossiblePreambles_Gray(
+    const unsigned int *d_indexMatrix, // numRows x 3
+    const int numRows,
+    const unsigned char *d_syms, // numRows * symsLength
+    const int symsLength,
+    const unsigned int *d_keyLengths,
+    const unsigned int *d_sampleStops, // numRows
+    const unsigned char m, // modulation order e.g. BPSK = 2, QPSK = 4, 8PSK = 8
+    const int outLength,
+    unsigned char * d_out, // numRows * outlength
+    unsigned int *d_count // numRows or NULL
+){
+    // Exit if block index is more than the row number
+    if (blockIdx.x >= numRows)
+        return;
+
+    // Allocate shared memory to read in the index matrix row
+    extern __shared__ double s[];
+
+    unsigned int *s_indexRow = (unsigned int*)s; // (3) unsigned ints
+
+    if (threadIdx.x < 3)
+        s_indexRow[threadIdx.x] = d_indexMatrix[blockIdx.x * 3 + threadIdx.x];
+    __syncthreads();
+
+    // Interpret the 3 values
+    const unsigned int keyLength = d_keyLengths[s_indexRow[0]];
+    const unsigned int sampleStart = s_indexRow[1] ;
+    const unsigned char rotation = (const unsigned char)s_indexRow[2];
+    
+    // Read the length requirement for this row
+    const unsigned int sampleStop = d_sampleStops[blockIdx.x];
+
+    // Get the pointer to the input row for this block
+    const unsigned char *syms = &d_syms[symsLength * blockIdx.x];
+    // And the output row for this block
+    unsigned char *out = &d_out[outLength * blockIdx.x];
+    // Compute the offset for this block
+    const unsigned int offset = keyLength + sampleStart;
+    unsigned int totalWrite = sampleStop - offset;
+    // Extract, rotate, and write
+    unsigned char val;
+    // Gray mapping
+    unsigned char gray[4] = {3,1,0,2};
+
+    for (int t = threadIdx.x; t < totalWrite; t += blockDim.x)
+    {
+        // Make sure in bounds for both read and write
+        if (t < outLength && offset + t < symsLength)
+        {
+            val = syms[offset + t]; // Read
+            val = (val + rotation) % m; // Rotate
+            val = gray[val]; // Gray map
+            out[t] = val; // Write
+        }
+    }
+
+    if (threadIdx.x == 0 && d_count != NULL)
+        d_count[blockIdx.x] = totalWrite;
+}
+
+
+/*
 This kernel takes in a matrix of signals, with 1 signal in each row.
 A block is assigned to each signal, which performs the phase-locking to the QPSK constellation,
 maps the values to {0,1,2,3} based on an anticlockwise direction and then writes the output back to global memory.

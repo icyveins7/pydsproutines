@@ -634,6 +634,7 @@ except:
 try:
     import cupy as cp
     import os
+    from cupyExtensions import cupyModuleToKernelsLoader, cupyRequireDtype
 
     
     # Raw kernel to get many eye openings at once as a batch
@@ -642,12 +643,24 @@ try:
     
     # Raw kernel to lock phase and map syms together
     # NOTE: assuming the entire signal fits in shared memory
-    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "lockPhase_mapSyms_singleBlkKernel_qpsk.cu"), "r") as fid:
-        sourcecode = fid.read()
-        module = cp.RawModule(code=sourcecode)
-        lockPhase_mapSyms_singleBlkKernel_qpsk = module.get_function("lockPhase_mapSyms_singleBlkKernel_qpsk")
-        demod_qpsk_kernel = module.get_function("demod_qpsk")
-        compareIntegerPreambles_kernel = module.get_function("compareIntegerPreambles")
+    # with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "lockPhase_mapSyms_singleBlkKernel_qpsk.cu"), "r") as fid:
+    #     sourcecode = fid.read()
+    #     module = cp.RawModule(code=sourcecode)
+    #     lockPhase_mapSyms_singleBlkKernel_qpsk = module.get_function("lockPhase_mapSyms_singleBlkKernel_qpsk")
+    #     demod_qpsk_kernel = module.get_function("demod_qpsk")
+    #     compareIntegerPreambles_kernel = module.get_function("compareIntegerPreambles")
+
+    (lockPhase_mapSyms_singleBlkKernel_qpsk,
+     demod_qpsk_kernel,
+     compareIntegerPreambles_kernel,
+     cutAndRotate_gray_kernel) = cupyModuleToKernelsLoader(
+        "lockPhase_mapSyms_singleBlkKernel_qpsk.cu",
+        [
+            "lockPhase_mapSyms_singleBlkKernel_qpsk",
+            "demod_qpsk",
+            "compareIntegerPreambles",
+            "cutAndRotatePSKSymbolsFromPossiblePreambles_Gray"
+        ])
     
     class CupyDemodulatorQPSK:
         def __init__(self, batchLength: int, numBitsPerBurst: int, cluster_threshold: float=0.1, batch_size: int=4096):
@@ -681,6 +694,84 @@ try:
             # self.syms = None # Output mapping to each symbol (0 to M-1)
             # self.matches = None # Output from amble rotation search
             
+        @staticmethod
+        def cutAndRotateFromPreambles(
+            d_argmaxMatches: cp.ndarray,
+            d_syms: cp.ndarray,
+            d_preambleLengths: cp.ndarray,
+            d_sampleStops: cp.ndarray,
+            outLength: int=None,
+            THREADS_PER_BLK: int=128,
+            alsoReturnWrittenCounts: bool=False
+        ):
+            # Performing checks
+            cupyRequireDtype(cp.uint32, d_argmaxMatches)
+            cupyRequireDtype(cp.uint32, d_preambleLengths)
+            cupyRequireDtype(cp.uint32, d_sampleStops)
+            cupyRequireDtype(cp.uint8, d_syms)
+
+            # Get dimensions and check
+            numRows, symsLength = d_syms.shape
+            if d_argmaxMatches.shape[0] != numRows or d_argmaxMatches.shape[1] != 3:
+                raise ValueError("d_argmaxMatches must be %d x 3" % (numRows))
+            if d_sampleStops.size != numRows:
+                raise ValueError("d_sampleStops must be length %d" % (numRows))
+            
+            # Define modulation order
+            m = 4
+
+            # Allocate shared mem
+            smReq = 3 * 4
+
+            # Allocate output
+            if outLength is None:
+                outLength = symsLength
+            d_out = cp.zeros((numRows, outLength), dtype=cp.uint8)
+
+            # Invoke kernel
+            NUM_BLKS = numRows
+            if alsoReturnWrittenCounts:
+                d_count = cp.zeros(numRows, dtype=cp.uint32)
+                cutAndRotate_gray_kernel(
+                    (NUM_BLKS,), (THREADS_PER_BLK,),
+                    (
+                        d_argmaxMatches,
+                        numRows,
+                        d_syms,
+                        symsLength,
+                        d_preambleLengths,
+                        d_sampleStops,
+                        np.uint8(m),
+                        outLength,
+                        d_out,
+                        d_count
+                    ),
+                    shared_mem = smReq
+                )
+
+                return d_out, d_count
+
+
+            else:
+                cutAndRotate_gray_kernel(
+                    (NUM_BLKS,), (THREADS_PER_BLK,),
+                    (
+                        d_argmaxMatches,
+                        numRows,
+                        d_syms,
+                        symsLength,
+                        d_preambleLengths,
+                        d_sampleStops,
+                        np.uint8(m),
+                        outLength,
+                        d_out,
+                        0
+                    ),
+                    shared_mem = smReq
+                )
+
+                return d_out
+
         @staticmethod
         def prepareIntPreambles(
             integerPreamblesDict: list

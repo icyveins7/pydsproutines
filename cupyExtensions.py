@@ -10,7 +10,7 @@ Other generic cupy extensions that don't fit anywhere else..
 import cupy as cp
 import os
 
-#%% Convenience function
+#%% Convenience functions
 def cupyModuleToKernelsLoader(modulefilename: str, kernelNames: list):
     """
     Helper function to generate the CuPy kernel objects from a module.
@@ -29,6 +29,13 @@ def cupyModuleToKernelsLoader(modulefilename: str, kernelNames: list):
             kernels.append(_module.get_function(kernelName))
 
     return kernels
+
+def cupyRequireDtype(dtype: type, var: cp.ndarray):
+    """
+    Example: cupyRequireDtype(cp.uint32, myarray)
+    """
+    if var.dtype != dtype:
+        raise TypeError("Must be %s, found %s" % (dtype, var.dtype))
 
 
 #%% A block-group paired kernel copy

@@ -17,7 +17,7 @@ try:
         # Default searchEnd value
         if searchEnd is None:
             searchEnd = x.size - preamble.size
-        elif searchEnd > x.size - preamble.size:
+        elif searchEnd > x.size - preamble.size + 1:
             raise ValueError("searchEnd must fit the preamble length")
         
         if preamble.dtype != np.uint8:

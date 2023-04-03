@@ -1427,8 +1427,8 @@ if os.name == 'nt': # Load the directory on windows
 try: 
     from cython_ext.CyGroupXcorrFFT import CyGroupXcorrFFT
     
-except:
-    print("Unable to load cythonised xcorrRoutines")
+except Exception as e:
+    print("Unable to load cythonised xcorrRoutines: %s" % (e))
 
 #%% Database for storing CAFs
 class CafDb:

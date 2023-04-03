@@ -13,11 +13,11 @@ import numpy
 
 extensions = [
     Extension("CyGroupXcorrFFT", ["CyGroupXcorrFFT.pyx"],
-              include_dirs=[numpy.get_include()],
+              include_dirs=[numpy.get_include(), "../"],
               libraries=["ippcore", "ipps"],
               library_dirs=[],
               language = "c++")
     ]
 
 setup(ext_modules=cythonize(extensions,
-                            compiler_directives={'language_level' : 3}))
+                            compiler_directives={'language_level' : 3, 'embedsignature': True}))

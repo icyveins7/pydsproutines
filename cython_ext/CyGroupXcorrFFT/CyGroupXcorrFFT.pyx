@@ -4,6 +4,10 @@ cimport numpy as np
 from GroupXcorrFFT cimport GroupXcorrFFT, Ipp32fc, Ipp32f, Ipp64f, bool
 
 cdef class CyGroupXcorrFFT:
+    """
+    Cythonised version of GroupXcorrFFT.
+    """
+
     cdef GroupXcorrFFT* gxcfft
     
     def __cinit__(self,
@@ -11,6 +15,9 @@ cdef class CyGroupXcorrFFT:
                   np.ndarray[np.int32_t, ndim=1] offsets,
                   int fs, int fftlen=-1,
                   bool autoConj=True):
+        """
+        Instantiates a CyGroupXcorrFFT object.
+        """
         
         self.gxcfft = new GroupXcorrFFT(
             <Ipp32fc*>ygroups.data, <int>ygroups.shape[0], <int>ygroups.shape[1],
@@ -27,6 +34,17 @@ cdef class CyGroupXcorrFFT:
               np.ndarray[np.complex64_t, ndim=1] rx,
               np.ndarray[np.int32_t, ndim=1] shifts,
               int NUM_THREADS=1):
+        """
+        Main computation method.
+
+        Parameters
+        ----------
+        rx : np.ndarray[np.complex64_t, ndim=1]
+            Input array.
+        shifts : np.ndarray[np.int32_t, ndim=1]
+            Input indices.
+        NUM_THREADS : int, default=1.
+        """
         
         # Compute lengths to pass in
         cdef int rxlen = <int>rx.size

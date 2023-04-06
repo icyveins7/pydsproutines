@@ -13,7 +13,7 @@ import numpy
 
 extensions = [
     Extension("PySampledLinearInterpolator", ["PySampledLinearInterpolator.pyx"],
-              include_dirs=[numpy.get_include()],
+              include_dirs=[numpy.get_include(), "../../ipp_ext/include"],
               libraries=["ippcore", "ipps", "ippvm"],
               library_dirs=[],
               language = "c++")

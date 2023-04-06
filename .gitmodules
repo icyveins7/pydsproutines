@@ -1,0 +1,3 @@
+[submodule "ipp_ext"]
+	path = ipp_ext
+	url = https://github.com/icyveins7/ipp_ext

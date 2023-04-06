@@ -9,7 +9,14 @@ Structure of this subfolder is as follows:
 from .MyModuleName import MyModuleName # This is the usual scenario where the .pyd shares the same name as the class for example
 ```
 
-4. Then the module should be accessible by doing the following:
+4. Make sure you build in place:
+
+```bash
+python setup_mymodule.py build_ext --inplace
+python setup_mymodule.py clean --all # you can also do this to clear the extraneous build output after
+```
+
+5. Then the module should be accessible by doing the following:
 
 ```python
 from cython_ext.subfolder import MyModuleName

@@ -33,11 +33,8 @@ private:
     ippe::vector<Ipp32fc> m_cutout;
 	Ipp32f m_cutoutNormSq;
 
-	// workspace
+	// threads
 	std::vector<std::thread> m_threads;
-    std::vector<ippe::DFTCToC<Ipp32fc>> m_ffts;
-	std::vector<ippe::vector<Ipp32fc>> m_work_32fc_1;
-	std::vector<ippe::vector<Ipp32fc>> m_work_32fc_2;
 
 	// internal work method
 	void xcorr_thread(

@@ -12,7 +12,7 @@ cdef extern from "IppXcorrFFT.h":
     cdef cppclass IppXcorrFFT_32fc:
         IppXcorrFFT_32fc(Ipp32fc*, int, int, bool) except +
 
-        void xcorr(Ipp32fc*, int, int, int, int)
+        void xcorr_array(Ipp32fc*, int, int, int, int, float*, int*, int)
     
         vector[float] m_productpeaks
         vector[int] m_freqlistinds

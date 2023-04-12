@@ -18,6 +18,9 @@ import sqlite3 as sq
 import concurrent.futures
 from cupyExtensions import *
 
+# Import the cythonised fastXcorr
+from cython_ext.CyIppXcorrFFT import CyIppXcorrFFT
+
 try:
     import cupy as cp
     

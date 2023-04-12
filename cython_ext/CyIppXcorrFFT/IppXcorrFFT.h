@@ -22,6 +22,17 @@ public:
 		const int idxStep
 	);
 
+	void xcorr_array(
+		const Ipp32fc* src,
+        const int srclen,
+        const int startIdx, 
+        const int endIdx, 
+        const int idxStep,
+		float *productpeaks,
+		int *freqlistinds,
+		int outputlength
+	);
+
 	// output vectors
 	std::vector<float> m_productpeaks;
 	std::vector<int> m_freqlistinds;
@@ -43,7 +54,11 @@ private:
 		const int startIdx, 
 		const int endIdx, 
 		const int idxStep,
-		const int tIdx
+		const int tIdx,
+		float *productpeaks,
+		int *freqlistinds
 	);
+
+	int getOutputLength(int startIdx, int endIdx, int idxStep);
 
 };

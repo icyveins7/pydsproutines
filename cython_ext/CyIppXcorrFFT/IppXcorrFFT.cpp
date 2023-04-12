@@ -1,5 +1,16 @@
 #include "IppXcorrFFT.h"
 
+int IppXcorrFFT_32fc::getOutputLength(
+	const int startIdx,
+	const int endIdx,
+	const int idxStep
+){
+	int length = (endIdx - startIdx) / idxStep;
+	if ((endIdx - startIdx) % idxStep != 0)
+	    length += 1;
+	return length;
+}
+
 void IppXcorrFFT_32fc::xcorr(
 	const Ipp32fc* src,
 	const int srclen,
@@ -8,7 +19,7 @@ void IppXcorrFFT_32fc::xcorr(
 	const int idxStep
 ){
 	// resize the outputs accordingly
-	int outputlen = (endIdx - startIdx + 1) / idxStep;
+	int outputlen = getOutputLength(startIdx, endIdx, idxStep);
 	m_productpeaks.resize(outputlen);
 	m_freqlistinds.resize(outputlen);
 
@@ -16,7 +27,7 @@ void IppXcorrFFT_32fc::xcorr(
 	m_threads.resize(m_num_threads);
 	for (int i = 0; i < m_num_threads; i++)
 	{
-		printf("Launching thread %d\n", i);
+		// printf("Launching thread %d\n", i);
 		m_threads[i] = std::thread(
 			&IppXcorrFFT_32fc::xcorr_thread,
 			this, 
@@ -25,7 +36,51 @@ void IppXcorrFFT_32fc::xcorr(
 			startIdx, 
 			endIdx, 
 			idxStep,
-			i // thread id
+			i, // thread id
+			m_productpeaks.data(),
+			m_freqlistinds.data()
+		);
+	}
+
+	// wait for all threads to finish
+    for (int i = 0; i < m_num_threads; i++)
+	{
+		m_threads[i].join();
+	}
+}
+
+void IppXcorrFFT_32fc::xcorr_array(
+	const Ipp32fc* src,
+	const int srclen,
+	const int startIdx, 
+	const int endIdx, 
+	const int idxStep,
+	float *productpeaks,
+	int *freqlistinds,
+	int outputlength
+){
+	// check the output length is 'correct' as a validation mechanic
+	if (getOutputLength(startIdx, endIdx, idxStep) != outputlength)
+	{
+		throw std::runtime_error("Output length is not correct");
+	}
+
+	// start threads to iterate over
+	m_threads.resize(m_num_threads);
+	for (int i = 0; i < m_num_threads; i++)
+	{
+		// printf("Launching thread %d\n", i);
+		m_threads[i] = std::thread(
+			&IppXcorrFFT_32fc::xcorr_thread,
+			this, 
+			src, 
+			srclen, 
+			startIdx, 
+			endIdx, 
+			idxStep,
+			i, // thread id
+			productpeaks,
+            freqlistinds
 		);
 	}
 
@@ -42,8 +97,12 @@ void IppXcorrFFT_32fc::xcorr_thread(
     const int startIdx,
 	const int endIdx,
     const int idxStep,
-    const int tIdx
+    const int tIdx,
+	float *productpeaks,
+    int *freqlistinds
 ){
+	int outputlen = getOutputLength(startIdx, endIdx, idxStep);
+
 	Ipp32f maxval;
 	int maxind;
 	Ipp64f slicenorm;
@@ -55,7 +114,7 @@ void IppXcorrFFT_32fc::xcorr_thread(
 	ippe::vector<Ipp32fc> work_32fc_2(m_cutoutlen);
 
     int i;
-	for (int t = tIdx; t < m_productpeaks.size(); t += m_num_threads)
+	for (int t = tIdx; t < outputlen; t += m_num_threads)
 	{
 		// Define the accessor index for the src
 		i = startIdx + t * idxStep; 
@@ -65,8 +124,8 @@ void IppXcorrFFT_32fc::xcorr_thread(
 		// Don't compute if we're out of range
 		if (i < 0 || i + m_cutoutlen > srclen)
 		{
-			m_productpeaks[t] = 0.0f;
-			m_freqlistinds[t] = 0;
+			productpeaks[t] = 0.0f;
+			freqlistinds[t] = 0;
 			continue;
 		}
 
@@ -112,8 +171,8 @@ void IppXcorrFFT_32fc::xcorr_thread(
 		ippsNorm_L2_32fc64f(&src[i], m_cutoutlen, &slicenorm);
 
 		// compute the output with scaling
-		m_productpeaks.at(t) = maxval / m_cutoutNormSq / (Ipp32f)(slicenorm * slicenorm);
-		m_freqlistinds.at(t) = maxind;
+		productpeaks[t] = maxval / m_cutoutNormSq / (Ipp32f)(slicenorm * slicenorm);
+		freqlistinds[t] = maxind;
 
 	}
 }

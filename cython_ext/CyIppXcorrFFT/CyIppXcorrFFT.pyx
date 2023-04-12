@@ -32,14 +32,24 @@ cdef class CyIppXcorrFFT:
               int endIdx,
               int step):
         
+        # allocate numpy array output
+        cdef length = len(np.arange(startIdx, endIdx, step))
+        cdef np.ndarray productpeaks = np.zeros(length, dtype=np.float32)
+        cdef np.ndarray freqlistinds = np.zeros(length, dtype=np.int32)
+
         # Call the internal method
-        self.xcfft.xcorr(
+        self.xcfft.xcorr_array(
             <Ipp32fc*>rx.data,
             <int>rx.size,
             startIdx,
             endIdx,
-            step
+            step,
+            <float*>productpeaks.data,
+            <int*>freqlistinds.data,
+            length
         )
+
+        return productpeaks, freqlistinds
 
     def results(self):
         return self.xcfft.m_productpeaks, self.xcfft.m_freqlistinds

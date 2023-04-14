@@ -226,7 +226,7 @@ class FolderReader:
         # Carve out the filepaths to return
         fps = self.filepaths[startingFileIdx:self.fidx]
         # Flatten
-        data = data.flatten()
+        data = data.reshape(-1) # This is faster than flatten()?
 
         return data, fps
         

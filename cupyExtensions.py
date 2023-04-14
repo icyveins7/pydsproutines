@@ -8,6 +8,7 @@ Other generic cupy extensions that don't fit anywhere else..
 """
 
 import cupy as cp
+import numpy as np
 import os
 
 #%% Convenience functions
@@ -97,8 +98,40 @@ def cupyCopyGroups32fc(x: cp.ndarray, y: cp.ndarray,
     copy_groups_kernel32fc((NUM_BLOCKS,), (threads_per_blk,),
                            (x, y, xStarts, lengths, yStarts))
 
+_copySlicesToMatrix_32fckernel, = cupyModuleToKernelsLoader(
+    "copying.cu", 
+    "copySlicesToMatrix_32fc")
+
+def cupyCopySlicesToMatrix_32fc(
+    d_x: cp.ndarray,
+    d_sliceBounds: cp.ndarray,
+    rowLength: int=None,
+    THREADS_PER_BLOCK: int=128
+):
+    # Checks
+    cupyRequireDtype(cp.complex64, d_x)
+    cupyRequireDtype(cp.int32, d_sliceBounds)
+
+    # Allocate output
+    numSlices = d_sliceBounds.shape[0]
+    if rowLength is None:
+        rowLength = cp.max(d_sliceBounds[:,1]-d_sliceBounds[:,0]) # Generate the required length (slower)
+    d_out = cp.zeros((numSlices, rowLength), dtype=cp.complex64) # Produce the length requested/generated
+
+    # Execute
+    NUM_BLKS = numSlices
+    _copySlicesToMatrix_32fckernel(
+        (NUM_BLKS,),(THREADS_PER_BLOCK,),
+        (d_x, d_x.size, d_sliceBounds,
+        numSlices, rowLength, d_out)
+    )
+    return d_out
+
 #%%
-_argmax3d_uint32kernel, = cupyModuleToKernelsLoader("argmax.cu", "multiArgmax3d_uint32")
+_argmax3d_uint32kernel, _argmaxAbsRows_cplx64kernel = cupyModuleToKernelsLoader(
+    "argmax.cu", 
+    ["multiArgmax3d_uint32", "multiArgmaxAbsRows_complex64"]
+)
 def cupyArgmax3d_uint32(d_x: cp.ndarray, THREADS_PER_BLOCK: int=128, alsoReturnMaxValue: bool=False):
     # Input checks
     if d_x.dtype != cp.uint32:
@@ -134,6 +167,25 @@ def cupyArgmax3d_uint32(d_x: cp.ndarray, THREADS_PER_BLOCK: int=128, alsoReturnM
         )
 
         return d_argmax
+
+def cupyArgmaxAbsRows_complex64(d_x: cp.ndarray, THREADS_PER_BLOCK: int=128):
+    cupyRequireDtype(cp.complex64, d_x)
+
+    # Allocate output
+    numRows, length = d_x.shape
+    d_argmax = cp.zeros(numRows, dtype=cp.uint32)
+
+    # Shared mem req
+    smReq = THREADS_PER_BLOCK * (4 + 4)
+
+    # Execute
+    NUM_BLKS = numRows
+    _argmaxAbsRows_cplx64kernel(
+        (NUM_BLKS,), (THREADS_PER_BLOCK,),
+        (d_x, numRows, length, d_argmax),
+        shared_mem=smReq
+    )
+    return d_argmax
 
 #%% 
 with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "multiplySlices.cu"), "r") as fid:
@@ -183,7 +235,7 @@ def multiplySlicesOptimistically(
 
     # Set default number of blocks to fully use the SMs
     if NUM_BLKS is None:
-        dev = cupy.cuda.Device()
+        dev = cp.cuda.Device()
         maxthreads = dev.attributes['MultiProcessorCount'] * dev.attributes['MaxThreadsPerMultiProcessor']
         NUM_BLKS = maxthreads // THREADS_PER_BLOCK
     

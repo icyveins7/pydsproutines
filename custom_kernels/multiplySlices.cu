@@ -72,7 +72,11 @@ void multiplySlicesWithIndexedRowsOptimistic(
 
         // Write the output to global mem
         for (int t = threadIdx.x; t < sliceLength; t += blockDim.x)
-            d_out[i*outlength + t] = s_row[t] * d_x[sliceStart + t];
+        {
+            if (sliceStart + t >= 0 && sliceStart + t < xlength)
+                d_out[i*outlength + t] = s_row[t] * d_x[sliceStart + t];    
+        }
+            
         
     }
 

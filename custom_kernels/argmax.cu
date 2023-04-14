@@ -79,3 +79,56 @@ void multiArgmax3d_uint32(
         d_max[blockIdx.x] = s_item[0];
 
 }
+
+
+// Multi argmax on every row of a complex 2D matrix, with internal abs performed
+// Each block tackles 1 row.
+extern "C" __global__
+void multiArgmaxAbsRows_complex64(
+    const complex<float> *d_x,
+    const int numRows, // dimension 1 of d_x
+    const int length,  // dimension 2 of d_x
+    unsigned int *d_argmax // output, has length numRows
+){
+    // allocate shared memory
+    extern __shared__ double s[];
+
+    float *s_ws = (float*)s; // (blockDim) floats
+    unsigned int *s_idx = (unsigned int*)&s_ws[blockDim.x]; // (blockDim) unsigned ints
+
+    // pre-zero the workspace
+    s_ws[threadIdx.x] = 0.0f;
+    s_idx[threadIdx.x] = 0;
+
+    // define the row we are working on for this block
+    const complex<float>* d_row = &d_x[blockIdx.x * length];
+
+    // load and compare at the same time
+    float absval;
+    for (int t = threadIdx.x; t < length; t += blockDim.x)
+    {
+        absval = abs(d_row[t]);
+        if (absval > s_ws[threadIdx.x]) // update the workspace values for this thread
+        {
+            s_ws[threadIdx.x] = absval;
+            s_idx[threadIdx.x] = t;
+        }
+    }
+    __syncthreads();
+
+    // now compare across the workspace with parallel reductions
+    for (unsigned int s = blockDim.x/2; s > 0; s >>= 1)
+    {
+        if (threadIdx.x < s){
+            if (s_ws[threadIdx.x + s] > s_ws[threadIdx.x]){
+                s_ws[threadIdx.x] = s_ws[threadIdx.x + s];
+                s_idx[threadIdx.x] = s_idx[threadIdx.x + s];
+            }
+        }
+        __syncthreads();
+    }
+
+    // max argument is in the first workspace value now, write it to global output
+    if (threadIdx.x == 0)
+        d_argmax[blockIdx.x] = s_idx[0];
+}

@@ -45,12 +45,13 @@ def compareValues(x: np.ndarray, y: np.ndarray, plotAbs=False):
     print(y_nonzero[iip])
     fracChg = np.abs(x_nonzero[iip]-y_nonzero[iip]) / np.abs(x_nonzero[iip])
     
-    return rawChg, fracChg
-    
     if plotAbs:
         plt.figure()
         plt.plot(np.abs(x), label='x')
         plt.plot(np.abs(y), label='y')
         plt.plot(np.abs(x-y), 'k--', label='x-y')
         plt.legend()
+
+    return rawChg, fracChg
+    
     

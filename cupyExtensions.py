@@ -37,6 +37,10 @@ def cupyRequireDtype(dtype: type, var: cp.ndarray):
     """
     if var.dtype != dtype:
         raise TypeError("Must be %s, found %s" % (dtype, var.dtype))
+    
+def cupyCheckExceedsSharedMem(requestedBytes: int, maximumBytes: int=48000):
+    if requestedBytes > maximumBytes:
+        raise MemoryError("Shared memory requested %d bytes exceeds maximum %d bytes" % (requestedBytes, maximumBytes))
 
 
 #%% A block-group paired kernel copy

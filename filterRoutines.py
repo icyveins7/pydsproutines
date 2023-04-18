@@ -14,6 +14,7 @@ import cupyx.scipy.signal as cpsps
 import cpuWola as cpw
 from plotRoutines import *
 import scipy.cluster.vq as spc
+from cupyExtensions import *
 
 #%% 
 # Note that this function, which uses the cupy convolve, which in turn performs ffts,
@@ -92,6 +93,7 @@ class CupyKernelFilter:
             sourcecode = fid.read()
         self.module = cp.RawModule(code=sourcecode)
         self.upfirdn_naive_kernel = self.module.get_function("upfirdn_naive")
+        self.upfirdn_sm_kernel = self.module.get_function("upfirdn_sm")
 
         if memory is not None:
             self.delay = cp.zeros(memory, dtype=memory_dtype)
@@ -106,7 +108,76 @@ class CupyKernelFilter:
     def getUpfirdnSize(originalSize: int, tapsSize: int, up: int, down: int):
         '''This should match size returned by sps.upfirdn.'''
         return int(np.ceil((originalSize * up - (up-1) + tapsSize-1) / down))
+    
+
+    def upfirdn_sm(
+        self, d_x: cp.ndarray, d_taps: cp.ndarray, up: int, down: int,
+        THREADS_PER_BLOCK: int=256, alsoReturnAbs: bool=False,
+        d_out: cp.ndarray=None, d_outabs: cp.ndarray=None
+    ):
+        # Check types
+        cupyRequireDtype(cp.complex64, d_x)
+        cupyRequireDtype(cp.float32, d_taps)
+    
+        # Check 2-D
+        if d_x.ndim != 2:
+            raise TypeError("d_x must be 2-D.")
         
+        # Define number of blocks as number of rows
+        NUM_BLOCKS = d_x.shape[0]
+        # print("NUM_BLOCKS = %d" % NUM_BLOCKS)
+
+        # Calculate shared memory requirements
+        interrimLength = (THREADS_PER_BLOCK-1) * down + d_taps.size
+        inputWorkspaceLength = interrimLength // up if interrimLength % up == 0 else interrimLength // up + 1
+        # print("inputWorkspaceLength = %d" % inputWorkspaceLength)
+
+        smReq = d_taps.nbytes
+        smReq += inputWorkspaceLength * 8 # complex64
+        cupyCheckExceedsSharedMem(smReq)
+        # print("Total shared memory requirements = %d bytes" % smReq)
+
+        # Allocate output
+        outlen = self.getUpfirdnSize(d_x.shape[1], d_taps.size, up, down)
+        if d_out is None:
+            d_out = cp.zeros((d_x.shape[0], outlen), dtype=cp.complex64)
+        else:
+            if d_out.shape != (d_x.shape[0], outlen):
+                raise ValueError("d_out must have dimensions (%d, %d)." % (d_x.shape[0], outlen))
+            cupyRequireDtype(cp.complex64, d_out)
+
+        # Execute kernel
+        if alsoReturnAbs:
+            if d_outabs is None:
+                d_outabs = cp.zeros((d_x.shape[0], outlen), dtype=cp.float32)
+            else:
+                if d_outabs.shape!= (d_x.shape[0], outlen):
+                    raise ValueError("d_outabs must have dimensions (%d, %d)." % (d_x.shape[0], outlen))
+                cupyRequireDtype(cp.float32, d_outabs)
+
+            self.upfirdn_sm_kernel(
+                (NUM_BLOCKS,), (THREADS_PER_BLOCK,),
+                (d_x, d_x.shape[1],
+                d_taps, d_taps.size,
+                up, down,
+                d_out, outlen, d_outabs),
+                shared_mem=smReq
+            )
+
+            return d_out, d_outabs
+        
+        else:
+            self.upfirdn_sm_kernel(
+                (NUM_BLOCKS,), (THREADS_PER_BLOCK,),
+                (d_x, d_x.shape[1],
+                d_taps, d_taps.size,
+                up, down,
+                d_out, outlen, 0),
+                shared_mem=smReq
+            )
+
+            return d_out
+
     def upfirdn_naive(
         self, d_x: cp.ndarray, d_taps: cp.ndarray, up: int, down: int,
         THREADS_PER_BLOCK: int=256, alsoReturnAbs: bool=False,
@@ -228,10 +299,7 @@ class CupyKernelFilter:
         skip = int(self.delay.size * up // down)
 
         return d_out[skip:skip+length2return]
-
-
-        
-        
+ 
     def filter_smtaps(self,
         d_x: cp.ndarray,
         d_taps: cp.ndarray, 
@@ -330,227 +398,6 @@ class CupyKernelFilter:
         )
         
         return d_out
-        
-
-#%% Raw kernel for upfirdn
-upFirdnKernel = cp.RawKernel(r'''
-#include <cupy/complex.cuh>
-extern "C" __global__
-void upfirdn(
-    const complex<float> *d_x, const int len,
-    const float *d_taps, const int tapslen,
-    const int up,
-    const int down,
-    complex<float> *d_out, int outlen)
-{
-    // allocate shared memory
-    extern __shared__ double s[];
-    
-    float *s_taps = (float*)s; // (tapslen) floats
-    /* Tally:  */
-
-    // load shared memory
-    for (int t = threadIdx.x; t < tapslen; t = t + blockDim.x){
-        s_taps[t] = d_taps[t];
-    }
-
-    __syncthreads();
-    
-    // Define the indices to write to for this block
-    int outStart = blockIdx.x * blockDim.x;
-    int outEnd = min((blockIdx.x + 1) * blockDim.x, outlen); // The last block must stop at the length
-    
-    int i0, j;
-    complex<float> z = 0; // Stack-variable for each thread
-    
-    // Loop over the output for this block
-    for (int k = outStart + threadIdx.x; k < outEnd; k += blockDim.x) // technically this loop is pointless, since each thread performs one computation only
-    {
-        i0 = (down*k + tapslen/2) % up;
-        
-        for (int i = i0; i < tapslen; i += up){
-            j = (down * k + tapslen/2 - i) / up;
-            
-            if (j < len && j >= 0)
-            {
-                z = z + s_taps[i] * d_x[j];
-            }
-        }
-        
-        // Write z to global memory
-        d_out[k] = z;
-    }
- 
-}
-''', '''upfirdn''')
-
-# def cupyUpfirdn(x: cp.ndarray, taps: cp.ndarray, up: int, down: int):
-#     # if x.dtype != cp.complex64:
-#     #     raise TypeError("x is expected to be type complex64.")
-#     # if taps.dtype != cp.float32:
-#     #     raise TypeError("taps is expected to be type float32.")
-        
-#     # Allocate output
-#     out = cp.zeros(x.size * up // down, dtype=cp.complex64)
-        
-#     # Define just enough blocks to cover the output
-#     THREADS_PER_BLOCK = 256
-#     NUM_BLOCKS = out.size // THREADS_PER_BLOCK
-#     if NUM_BLOCKS * THREADS_PER_BLOCK < out.size:
-#         NUM_BLOCKS += 1
-        
-#     # Define the shared memory requirement
-#     if taps.size * 4 > 48e3:
-#         raise MemoryError("Taps length too large for shared memory.")
-#     smReq = taps.size * 4
-    
-#     # Call the kernel
-#     upFirdnKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
-#                   (x, x.size,
-#                    taps, taps.size,
-#                    up, down,
-#                    out, out.size),
-#                   shared_mem=smReq)
-    
-#     return out
-
-
-upFirdn_smKernel = cp.RawKernel('''
-#include <cupy/complex.cuh>
-extern "C" __global__
-void upfirdn_sm(
-    const complex<float> *d_x, const int len,
-    const float *d_taps, const int tapslen,
-    const int up,
-    const int down,
-    const int shm_x_size,
-    complex<float> *d_out, int outlen, float *d_outabs)
-{
-    // allocate shared memory
-    extern __shared__ double s[];
-    
-    float *s_taps = (float*)s; // (tapslen) floats
-    complex<float> *s_x = (complex<float>*)&s_taps[tapslen]; // (shm_x_size) complex floats
-    /* Tally:  */
-
-    // load shared memory
-    for (int t = threadIdx.x; t < tapslen; t = t + blockDim.x){
-        s_taps[t] = d_taps[t];
-    }
-    
-    // Define the indices to write to for this block
-    int outStart = blockIdx.x * blockDim.x + tapslen / 2;
-    int outEnd = min((blockIdx.x + 1) * blockDim.x + tapslen / 2, outlen + tapslen/2);
-    
-    // calculate the offset for this block
-    int blockReadOffset = (outStart * down - tapslen) / up; // TODO: define this
-    // note that shm_x_size must this extra front buffer as well
-    for (int t = threadIdx.x; t < shm_x_size; t = t + blockDim.x)
-    {
-        if (t + blockReadOffset >= 0 && t + blockReadOffset < len){ // only read if in range
-            s_x[t] = d_x[t + blockReadOffset];
-        }
-        else{
-            s_x[t] = 0;
-        }
-    }
-    __syncthreads();
-    
-    // Begin computations
-    int i0, j;
-    complex<float> z = 0; // Stack-variable for each thread
-    
-    // Make it simple, every thread writes 1 output
-    int k = threadIdx.x + outStart;
-    if (k < outEnd)
-    {
-        for (int i = 0; i < tapslen; i++)
-        {
-            i0 = down * k - i;
-            // don't bother reading if its non-zero
-            if (i0 % up == 0){
-                j = i0 / up; // this is the access into the 'x' array
-                j = j - blockReadOffset; // we only copied a section into shared memory, so change the index
-                
-                if (j < shm_x_size && j >= 0) // cannot read out of bounds
-                {
-                    z = z + s_taps[i] * s_x[j];
-                }
-            }
-            
-        }
-        
-        // write to global memory, coalesced, and offset half the filter automatically
-        d_out[k - tapslen / 2] = z;
-        d_outabs[k - tapslen / 2] = abs(z);
-    }
-
- 
-}
-''', '''upfirdn_sm''')
-
-
-# def cupyUpfirdn_sm(x: cp.ndarray, taps: cp.ndarray, up: int, down: int,
-#                    out: cp.ndarray=None, outabs: cp.ndarray=None):
-#     '''
-#     Runs a custom, shared-memory optimised kernel to perform the upfirdn
-#     onboard the GPU. Note that if outputs are incorrect, it is likely that the
-#     arrays' dtypes are incorrect.
-
-#     Parameters
-#     ----------
-#     x : cp.ndarray
-#         Input, complex64.
-#     taps : cp.ndarray
-#         Filter taps, float32.
-#     up : int
-#         Upsampling factor.
-#     down : int
-#         Downsampling factor.
-#     out : cp.ndarray, optional
-#         Output array, if already allocated, complex64. The default is None.
-#     outabs : cp.ndarray, optional
-#         Abs(output array), if already allocated, float32. The default is None.
-
-#     Raises
-#     ------
-#     MemoryError
-#         Raised when the length of taps is too large.
-
-#     Returns
-#     -------
-#     out : cp.ndarray
-#         Output array.
-#     outabs : cp.ndarray
-#         Abs(output array).
-
-#     '''
-#     # Allocate output
-#     if out is None:
-#         out = cp.zeros(x.size * up // down, dtype=cp.complex64)
-#     if outabs is None:
-#         outabs = cp.zeros(x.size * up // down, dtype=cp.float32)
-    
-#     THREADS_PER_BLOCK = 256
-#     NUM_BLOCKS = out.size // THREADS_PER_BLOCK
-#     NUM_BLOCKS = NUM_BLOCKS + 1 if out.size % THREADS_PER_BLOCK > 0 else NUM_BLOCKS
-    
-#     # Define the shared memory requirement
-#     shm_x_size = ((THREADS_PER_BLOCK * down + taps.size) // up) + 1
-#     # print(shm_x_size)
-#     if taps.size * 4 + shm_x_size * 8 > 48e3:
-#         raise MemoryError("Shared memory requested exceeds 48kB.")
-#     smReq = taps.size * 4 + shm_x_size * 8
-    
-#     # Call the kernel
-#     upFirdn_smKernel((NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
-#                   (x, x.size,
-#                    taps, taps.size,
-#                    up, down, shm_x_size,
-#                    out, out.size, outabs),
-#                   shared_mem=smReq)
-    
-#     return out, outabs
 
 def wola(f_tap, x, Dec, N=None, dtype=np.complex64):
     '''

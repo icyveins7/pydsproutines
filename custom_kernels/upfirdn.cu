@@ -60,7 +60,6 @@ void upfirdn_naive(
 
 // This kernel attempts to compute upfirdn for one signal in each block.
 // Hence spawn as many blocks as there are signals.
-// TODO: TEST
 
 extern "C" __global__
 void upfirdn_sm(
@@ -75,6 +74,8 @@ void upfirdn_sm(
     // Calculate the required input length for the workspace, including filter lookback
     const int interrimLength = ((blockDim.x-1) * down + tapslen);
     const int inputWorkspaceLength = interrimLength % up == 0 ? interrimLength / up : interrimLength / up + 1;
+    // // DEBUG: as a safety net, always allocate one more?
+    // const int inputWorkspaceLength = interrimLength / up + 2;
 
     // allocate shared memory
     extern __shared__ double s[];
@@ -92,29 +93,38 @@ void upfirdn_sm(
     }
     __syncthreads();
 
-    // Loop over the block until we cover the entire input
+    // Point directly to the row for this block for easy access
     const complex<float> *d_row = &d_x[blockIdx.x * len];
-    int l0, n0, l, m, n, lws;
+    int l0, n0, l, m, n, lws, l1, n1;
     complex<float> out;
-    int numLoopsRequired = len % blockDim.x == 0 ? len / blockDim.x : len / blockDim.x + 1;
+
+    // Loop over the block until we cover the entire input
+    int numLoopsRequired = outlen % blockDim.x == 0 ? outlen / blockDim.x : outlen / blockDim.x + 1;
     for (int i = 0; i < numLoopsRequired; i++)
     {
-        // Determine the first output index
+        // Determine the first output index for this loop
         n0 = i * blockDim.x;
+        // Define the global output index for this thread
+        n = threadIdx.x + n0;
 
         // Determine the first input index required
         l0 = (n0 * down - (tapslen-1)) % up == 0 ? (n0 * down - (tapslen-1)) / up : (n0 * down - (tapslen-1)) / up + 1;
+        // // As a safety net, always read even earlier?
+        // l0 = (n0 * down - (tapslen-1)) / up;
+
+        // // DEBUG: What's the last input index that will need to be read?
+        // n1 = n0 + blockDim.x - 1;
+        // l1 = (n1 * down) / up;
 
         // Copy the input workspace
         for (int t = threadIdx.x; t < inputWorkspaceLength; t = t + blockDim.x){
-            // Note that for the first loop, this may be negative, so don't read out of range
-            if (l0 + t >= 0)
+            // Don't read beyond the current row
+            if (l0 + t >= 0 && l0 + t < len)
                 s_xws[t] = d_row[l0 + t];
+            else
+                s_xws[t] = 0.0f;
         }
         __syncthreads();
-
-        // Define the global output index for this thread
-        n = threadIdx.x + n0;
 
         // Perform the accumulation
         out = 0;
@@ -131,15 +141,23 @@ void upfirdn_sm(
                 // What is its associated workspace index?
                 lws = l - l0;
 
-                // Accumulate the product
-                out += s_taps[f] * s_xws[lws];
+                // Accumulate the product if the workspace index is in bounds
+                if (lws >= 0 && lws < inputWorkspaceLength)
+                    out += s_taps[f] * s_xws[lws];
             }       
         }
 
-        // Write to global output
-        d_out[blockIdx.x * len + n] = out;
-        if (d_outabs != NULL)
-            d_outabs[blockIdx.x * len + n] = abs(out);
+        // Write to global output, but only in range
+        if (n < outlen)
+        {
+            d_out[blockIdx.x * outlen + n] = out;
+            if (d_outabs != NULL)
+                d_outabs[blockIdx.x * outlen + n] = abs(out);
+        }
+        // You must syncthreads here, or else some warps might start to
+        // rewrite the workspace before the entire block is done!
+        __syncthreads();
+            
     }
  
 }

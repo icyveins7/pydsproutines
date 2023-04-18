@@ -115,6 +115,41 @@ class CupyKernelFilter:
         THREADS_PER_BLOCK: int=256, alsoReturnAbs: bool=False,
         d_out: cp.ndarray=None, d_outabs: cp.ndarray=None
     ):
+        """
+        Runs upfirdn on every row of the input matrix, similar to scipy.signal.upfirdn.
+        This calls a kernel which stores both the taps in each block's shared memory, and also utilises a
+        shared memory workspace to minimize global memory reads of the input. The effect of this is that for enough rows
+        i.e. when the GPU is well-utilised, this kernel will outperform the naive kernel by about 10x from measurements.
+
+        Parameters
+        ----------
+        d_x : cp.ndarray, cp.complex64
+            2-D input array, where each signal occupies a row. Ensure C-contiguous array.
+        d_taps : cp.ndarray, cp.float32
+            Filter taps array.
+        up : int
+            Upsampling factor.
+        down : int
+            Downsampling factor.
+        THREADS_PER_BLOCK : int, optional
+            Number of threads to use per block. The default is 256.
+        alsoReturnAbs : bool, optional
+            Specifies whether to concurrently return the abs of the output as a separate array.
+            The default is False.
+
+        Raises
+        ------
+        TypeError
+            When array types are incorrect.
+
+        Returns
+        -------
+        d_out : cp.ndarray, cp.complex64
+            2-D output array. Lengths will be verified to be the required length based on the input matrix shape.
+        d_outabs : cp.ndarray, cp.float32
+            Optional abs of the output array, which can be specified to be concurrently calculated.
+
+        """
         # Check types
         cupyRequireDtype(cp.complex64, d_x)
         cupyRequireDtype(cp.float32, d_taps)

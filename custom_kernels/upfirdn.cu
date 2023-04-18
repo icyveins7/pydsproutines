@@ -59,8 +59,12 @@ void upfirdn_naive(
 }
 
 // This kernel attempts to compute upfirdn for one signal in each block.
-// Hence spawn as many blocks as there are signals.
-
+// Hence spawn as many blocks as there are signals i.e. rows in the input matrix.
+// The general idea is to pull in a section of the input, required for a single loop of writing.
+// For N threads, each loop will attempt to write N outputs, and reverse calculate the number of inputs
+// that will need to be accessed, and place that in a shared memory workspace. This prevents multiple reads
+// into global memory. The convention of the workspace length is strictly calculated, and must be replicated
+// in the outer calling function to ensure that the required shared memory is available.
 extern "C" __global__
 void upfirdn_sm(
     const complex<float> *d_x, const int len,
@@ -74,8 +78,6 @@ void upfirdn_sm(
     // Calculate the required input length for the workspace, including filter lookback
     const int interrimLength = ((blockDim.x-1) * down + tapslen);
     const int inputWorkspaceLength = interrimLength % up == 0 ? interrimLength / up : interrimLength / up + 1;
-    // // DEBUG: as a safety net, always allocate one more?
-    // const int inputWorkspaceLength = interrimLength / up + 2;
 
     // allocate shared memory
     extern __shared__ double s[];
@@ -95,7 +97,7 @@ void upfirdn_sm(
 
     // Point directly to the row for this block for easy access
     const complex<float> *d_row = &d_x[blockIdx.x * len];
-    int l0, n0, l, m, n, lws, l1, n1;
+    int l0, n0, l, m, n, lws, np0, lp0, globalOffset;
     complex<float> out;
 
     // Loop over the block until we cover the entire input
@@ -109,15 +111,27 @@ void upfirdn_sm(
 
         // Determine the first input index required
         l0 = (n0 * down - (tapslen-1)) % up == 0 ? (n0 * down - (tapslen-1)) / up : (n0 * down - (tapslen-1)) / up + 1;
-        // // As a safety net, always read even earlier?
-        // l0 = (n0 * down - (tapslen-1)) / up;
 
-        // // DEBUG: What's the last input index that will need to be read?
-        // n1 = n0 + blockDim.x - 1;
-        // l1 = (n1 * down) / up;
+        // What was the previous first input index?
+        np0 = (i-1) * blockDim.x;
+        lp0 = (np0 * down - (tapslen-1)) % up == 0 ? (np0 * down - (tapslen-1)) / up : (np0 * down - (tapslen-1)) / up + 1;
 
-        // Copy the input workspace
-        for (int t = threadIdx.x; t < inputWorkspaceLength; t = t + blockDim.x){
+        // Can we move any of the current workspace backwards?
+        globalOffset = 0;
+        if (l0 < lp0 + inputWorkspaceLength)
+        {
+            globalOffset = lp0 + inputWorkspaceLength - l0; // we define this to know how much remainder we need to pull from global mem later
+            // Then move what we can
+            for (int t = threadIdx.x; t < globalOffset; t = t + blockDim.x)
+            {
+                // Move the ending bits to the front
+                s_xws[t] = s_xws[t + l0 - lp0];
+            }
+            __syncthreads(); // wait to move to the front first before we pull more from global memory
+        }
+
+        // Copy the input workspace from global memory, for the remainder
+        for (int t = globalOffset + threadIdx.x; t < inputWorkspaceLength; t = t + blockDim.x){
             // Don't read beyond the current row
             if (l0 + t >= 0 && l0 + t < len)
                 s_xws[t] = d_row[l0 + t];

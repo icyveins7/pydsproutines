@@ -25,8 +25,8 @@ for test in range(testIterations):
     
     # Instantiate kernel filter
     cpkf = CupyKernelFilter()
-    up = 5
-    down = 3
+    up = 3
+    down = 2
     
     # Run the upfirdn over each row manually
     d_manualout = cp.zeros(

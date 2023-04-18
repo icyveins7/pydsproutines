@@ -83,6 +83,8 @@ class DirectSingleConfig(ConfigParser):
         # Note that you must set the optionxform before reading
         if filename is None:
             filename = os.path.splitext(__main__.__file__)[0] + ".ini"
+        if not os.path.exists(filename):
+            raise FileNotFoundError(filename)
         self.read(filename)
         self.currentSection = None
         

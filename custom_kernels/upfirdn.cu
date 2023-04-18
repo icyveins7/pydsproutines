@@ -89,10 +89,10 @@ void upfirdn_sm(
     for (int t = threadIdx.x; t < tapslen; t = t + blockDim.x){
         s_taps[t] = d_taps[t];
     }
-    // zero the input workspace
-    for (int t = threadIdx.x; t < inputWorkspaceLength; t = t + blockDim.x){
-        s_xws[t] = 0;
-    }
+    // // zero the input workspace (we actually don't need this)
+    // for (int t = threadIdx.x; t < inputWorkspaceLength; t = t + blockDim.x){
+    //     s_xws[t] = complex<float>(0.0, 0.0);
+    // }
     __syncthreads();
 
     // Point directly to the row for this block for easy access
@@ -117,19 +117,24 @@ void upfirdn_sm(
         lp0 = (np0 * down - (tapslen-1)) % up == 0 ? (np0 * down - (tapslen-1)) / up : (np0 * down - (tapslen-1)) / up + 1;
 
         // Can we move any of the current workspace backwards?
-        globalOffset = 0;
-        if (l0 < lp0 + inputWorkspaceLength)
+        if (i > 0)
         {
             globalOffset = lp0 + inputWorkspaceLength - l0; // we define this to know how much remainder we need to pull from global mem later
-            // Then move what we can
-            for (int t = threadIdx.x; t < globalOffset; t = t + blockDim.x)
+            // we don't make assumptions on the overlap, so we can only use 1 thread for moving
+            // otherwise we might end up with some threads writing over the value that another thread is reading
+            if (l0 < lp0 + inputWorkspaceLength && threadIdx.x == 0) 
             {
-                // Move the ending bits to the front
-                s_xws[t] = s_xws[t + l0 - lp0];
+                for (int j = 0; j < globalOffset; j++)
+                {
+                    s_xws[j] = s_xws[j + l0 - lp0];
+                }
             }
-            __syncthreads(); // wait to move to the front first before we pull more from global memory
+            __syncthreads();
         }
-
+        else{ // the first loop does not have an initialised workspace, so we cannot move, just pull all from global mem
+            globalOffset = 0; // this tells the next section to read the entire workspace
+        }
+        
         // Copy the input workspace from global memory, for the remainder
         for (int t = globalOffset + threadIdx.x; t < inputWorkspaceLength; t = t + blockDim.x){
             // Don't read beyond the current row

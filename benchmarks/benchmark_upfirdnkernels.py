@@ -8,6 +8,10 @@ closeAllFigs()
 import numpy as np
 import scipy.signal as sps
 import matplotlib.pyplot as plt
+import random
+
+uplist = [5,7,11]
+downlist = [2,3]
 
 # Test iterations
 testIterations = 10
@@ -25,8 +29,9 @@ for test in range(testIterations):
     
     # Instantiate kernel filter
     cpkf = CupyKernelFilter()
-    up = 3
-    down = 2
+    up = random.choice(uplist)
+    down = random.choice(downlist)
+    print("Using up=%d, down=%d" % (up,down))
     
     # Run the upfirdn over each row manually
     d_manualout = cp.zeros(
@@ -57,6 +62,6 @@ for test in range(testIterations):
     print("==== Comparing CPU to GPU (single row) ====")
     compareValues(h_out.reshape(-1), d_manualout.reshape(-1).get())
     print("==== Comparing GPU (single row) to GPU (all rows) ====")
-    rawChg, fracChg = compareValues(d_manualout.reshape(-1).get(), d_out.reshape(-1).get())
+    rawChg, fracChg = compareValues(d_manualout.reshape(-1).get(), d_out.reshape(-1).get(), plotAbs=True)
     print("\nGreatest changes:\n%g raw\n%g frac" % (rawChg, fracChg))
     assert(fracChg < 1e-4)

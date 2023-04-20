@@ -245,6 +245,7 @@ def multiplySlicesOptimistically(
     
     # Calculate shared mem
     smReq = rowLength * 8
+    cupyCheckExceedsSharedMem(smReq)
 
     # Run kernel
     _multiplySlicesWithIndexedRowsOptimisticKernel(

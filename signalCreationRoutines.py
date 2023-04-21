@@ -47,6 +47,28 @@ def randPSKsyms(length: int, m: int, dtype=np.complex128):
     return symsFromBits(bits, m, dtype), bits
 
 def randnoise(length, bw_signal, chnBW, snr_inband_linear, sigPwr = 1.0):
+    """
+    Generates an array of gaussian noise.
+
+    Parameters
+    ----------
+    length : int
+        Length of output array.
+    bw_signal : float
+        Bandwidth of the signal that this noise will be added to.
+    chnBW : float
+        Bandwidth of the noise i.e. usually the sampling rate.
+    snr_inband_linear : float
+        The desired SNR of the signal that this noise will be added to.
+    sigPwr : float, optional
+        The target signal power. This helps to scale the noise to the desired SNR.
+        The default is 1.0.
+
+    Returns
+    -------
+    noise : np.ndarray, np.complex128
+        Noise array.
+    """
     basicnoise = (np.random.randn(length) + 1j*np.random.randn(length))/np.sqrt(2) * np.sqrt(sigPwr)
     noise = basicnoise * np.sqrt(1.0/snr_inband_linear) * np.sqrt(chnBW/bw_signal) # pretty sure this is correct now..
     return noise

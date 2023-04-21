@@ -10,7 +10,8 @@ void filter_smtaps(
     const float *d_taps, const int tapslen,
     const int outputPerBlk,
     complex<float> *d_out, int outlen,
-    const complex<float> *d_delay, const int delaylen)
+    const complex<float> *d_delay, const int delaylen,
+    const int dsr, const int dsPhase)
 {
     // allocate shared memory
     extern __shared__ double s[];
@@ -27,12 +28,14 @@ void filter_smtaps(
     
     // Begin computations
     int i; // output index
+    int k; // reference index (not equal to output if downsample is >1)
     complex<float> z; // stack-var for each thread
     for (int t = threadIdx.x; t < outputPerBlk; t = t + blockDim.x)
     {
         z = 0; // reset before the output
 
-        i = blockIdx.x * outputPerBlk + t; // This is the output index
+        i = blockIdx.x * outputPerBlk + t; // This is the thread's output index
+        k = i * dsr + dsPhase; // This is the reference index
 
         // Exit if we hit the end
         if (i >= outlen)
@@ -42,10 +45,10 @@ void filter_smtaps(
         for (int j = 0; j < tapslen; j++)
         {
             // accumulate
-            if (i - j >= 0)
-                z = z + d_x[i - j] * s_taps[j]; // this uses the input data
-            else if (delaylen + i - j >= 0 && d_delay != NULL) // d_delay must be supplied for this to work
-                z = z + d_delay[delaylen + i - j] * s_taps[j]; // this uses the delay data (from previous invocations)
+            if (k - j >= 0)
+                z = z + d_x[k - j] * s_taps[j]; // this uses the input data
+            else if (delaylen + k - j >= 0 && d_delay != NULL) // d_delay must be supplied for this to work
+                z = z + d_delay[delaylen + k - j] * s_taps[j]; // this uses the delay data (from previous invocations)
         }
 
         // Coalesced writes

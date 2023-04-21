@@ -340,21 +340,28 @@ class CupyKernelFilter:
         d_taps: cp.ndarray, 
         THREADS_PER_BLOCK: int=128, 
         OUTPUT_PER_BLK: int=128,
-        useInternalDelay: bool=False
+        useInternalDelay: bool=False,
+        dsr: int=1,
+        dsPhase: int=0
     ):
         # Type checking
-        assert(d_taps.dtype == cp.float32)
-        assert(d_x.dtype == cp.complex64)
+        cupyRequireDtype(cp.float32, d_taps)
+        cupyRequireDtype(cp.complex64, d_x)
         # Dimension checking
         assert(d_x.ndim == 1 and d_taps.ndim == 1)
-        # Maximum length checking
-        assert(d_taps.nbytes <= 48000)
+        # Ensure logical dsPhase
+        if dsPhase >= dsr or dsPhase < 0:
+            raise ValueError("dsPhase must be between in the range [0,dsr-1].")
         
         # Allocate output
-        d_out = cp.zeros(d_x.size, dtype=cp.complex64)
+        outlength = (d_x.size - dsPhase) // dsr
+        if (d_x.size - dsPhase) % dsr != 0:
+            outlength += 1
+        d_out = cp.zeros(outlength, dtype=cp.complex64)
         
         # Calculate shared memory requirement
         smReq = d_taps.nbytes
+        cupyCheckExceedsSharedMem(smReq)
         
         # Calculate number of blocks required and the output size per block
         NUM_BLOCKS = d_x.size // OUTPUT_PER_BLK
@@ -375,7 +382,8 @@ class CupyKernelFilter:
              d_taps, d_taps.size,
              OUTPUT_PER_BLK,
              d_out, d_out.size,
-             delay, delaylen), # These are optional parameters for the delay
+             delay, delaylen, # These are optional parameters for the delay
+             dsr, dsPhase), # These are downsample parameters, see defaults
             shared_mem=smReq
         )
         

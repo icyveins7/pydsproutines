@@ -330,7 +330,11 @@ def fastXcorr(cutout, rx, freqsearch=False, outputCAF=False, shifts=None, absRes
             return result
     
 
-def fineFreqTimeSearch(x_aligned, y_aligned, fineRes, freqfound, freqRes, fs, td_scan_range, steeringvec=None):
+def fineFreqTimeSearch(x_aligned, y_aligned, 
+                       fineRes, freqfound, 
+                       freqRes, fs, 
+                       td_scan_range, steeringvec=None,
+                       td_scan_freqBounds=None):
     '''
     Performs a finer search to align frequency and time, in two separate processes.
     As such, this function may not result in the global minimum for TDOA/FDOA in 2-D, but will perform much
@@ -383,6 +387,12 @@ def fineFreqTimeSearch(x_aligned, y_aligned, fineRes, freqfound, freqRes, fs, td
     x_fft = np.fft.fft(x_aligned)
     y_fft = np.fft.fft(y_aligned)
     rx_vec = x_fft * y_fft.conj()
+
+    if td_scan_freqBounds is not None:
+        freqvec = makeFreq(y_fft.size, fs)
+        rx_vec[np.argwhere(np.logical_or(
+            freqvec < td_scan_freqBounds[0], freqvec >= td_scan_freqBounds[1]
+        )).reshape(-1)] = 0
     
     cost_vec = np.dot(rx_vec, steeringvec.conj().T)/np.linalg.norm(x_fft)/np.linalg.norm(y_fft)
     idx_td = np.argmax(np.abs(cost_vec))
@@ -397,6 +407,39 @@ def makeTimeScanSteervec(td_scan_range, fs, siglen):
     
     return mat
 
+#%% TODO: refactor , add docstrings
+class GenXcorr:
+    def __init__(self, td_scan_range, fs, siglen):
+        self.td_scan_range = td_scan_range
+        self.fs = fs
+        self.sigFreq = makeFreq(siglen, fs)
+        self.steeringvec = self._makeTimeScanSteervec()
+        self.td_scan_freqBounds = None
+
+    def _makeTimeScanSteervec(self):
+        mat = np.exp(1j*2*np.pi*self.sigFreq * self.td_scan_range.reshape((-1,1)))
+        return mat
+    
+    def setTDscan_freqBounds(self, td_scan_freqBounds: np.ndarray):
+        self.td_scan_freqBounds = td_scan_freqBounds
+
+    def xcorr(self, x: np.ndarray, y: np.ndarray):
+        x_fft = np.fft.fft(x)
+        y_fft = np.fft.fft(y)
+        rx_vec = x_fft * y_fft.conj()
+
+        if self.td_scan_freqBounds is not None:
+            rx_vec[np.argwhere(np.logical_or(
+                self.sigFreq < self.td_scan_freqBounds[0], self.sigFreq >= self.td_scan_freqBounds[1]
+            )).reshape(-1)] = 0
+        
+        cost_vec = np.dot(rx_vec, self.steeringvec.conj().T)/np.linalg.norm(x_fft)/np.linalg.norm(y_fft)
+        idx_td = np.argmax(np.abs(cost_vec))
+        timediff = self.td_scan_range[idx_td]
+        
+        return timediff, cost_vec
+
+#%%
 def convertQF2toSNR(qf2):
     """For xcorr against pure signal."""
     return qf2/(1.0-qf2)

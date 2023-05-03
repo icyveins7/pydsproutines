@@ -231,7 +231,7 @@ def multiplySlicesOptimistically(
     # Check if outlength satisfies all the slices
     if outlength is None:
         outlength = rowLength
-    if not np.all(d_sliceLengths.get() < outlength):
+    if not np.all(d_sliceLengths.get() <= outlength):
         raise ValueError("Some slices exceed the output length!")
     
     # Allocate output

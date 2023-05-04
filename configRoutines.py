@@ -327,11 +327,46 @@ class DoubleProcessDSPConfig(DSPConfig):
     """
     @property
     def primary(self):
+        """
+        Returns the primary process.
+        """
         return list(self.processes.items())[0][1]
 
     @property
     def secondary(self):
+        """
+        Returns the secondary process.
+        """
         return list(self.processes.items())[1][1]
+
+    # Provide a lot of sensible aliases?
+    @property
+    def prifs(self):
+        """
+        Alias for self.primary.src.fs
+        """
+        return self.primary.src.fs
+
+    @property
+    def secfs(self):
+        """
+        Alias for self.secondary.src.fs
+        """
+        return self.secondary.src.fs
+
+    @property
+    def pridir(self):
+        """
+        Alias for self.primary.src.srcdir
+        """
+        return self.primary.src.srcdir
+
+    @property
+    def secdir(self):
+        """
+        Alias for self.secondary.src.srcdir
+        """
+        return self.secondary.src.srcdir
 
 #%% Intend to deprecate from this onwards, bad format to do things..
 class SingleSourceConfigMixin:

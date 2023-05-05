@@ -214,6 +214,38 @@ def pgPlotPhasorVsTime(complexData, color=(1.0,1.0,1.0,1.0), start=0, end=200, s
     
     return view
 
+
+def plotRealImag(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None, idxbounds=None):
+    if ax is None: # hurray for python scoping allowing this
+        fig = plt.figure(windowTitle)
+        ax = fig.add_subplot(111)
+    else:
+        fig = None
+    
+    for i, data in enumerate(dataList):
+        real = np.real(data)
+        imag = np.imag(data)
+        t = np.arange(data.size) / fs[i]
+        if idxbounds is not None:
+            t = t[idxbounds[i][0]:idxbounds[i][1]]
+            real = real[idxbounds[i][0]:idxbounds[i][1]]
+            imag = imag[idxbounds[i][0]:idxbounds[i][1]]
+        if colors is not None:
+            ax.plot(t, real, colors[i]+'-')
+            ax.plot(t, imag, colors[i]+'--')
+        else:
+            ax.plot(t, real, '-')
+            ax.plot(t, imag, '--')
+        
+    if labels is not None:
+        reimlabels = [[labels[i]+'Real', labels[i]+'Imag'] for i in range(len(labels))]
+        reimlabels = [i for sublist in reimlabels for i in sublist]
+        ax.legend(reimlabels)
+    
+    ax.set_title(title)
+    
+    return fig, ax
+
 # Pyqtgraph version
 def pgPlotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, title=None, ax=None): 
     if ax is None:

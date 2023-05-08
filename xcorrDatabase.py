@@ -105,13 +105,11 @@ class XcorrDB(sew.Database):
 
     ########## Constructor
     def __init__(self, *args, **kwargs):
-        """
-        Forwards all constructor arguments to sew.Database.__init__().
-        """
         super().__init__(*args, **kwargs)
 
         # Always create the xcorr metadata table
         self._createMetaXcorrsTable()
+        self.reloadTables()
 
     def _createMetaXcorrsTable(self):
         """
@@ -121,12 +119,37 @@ class XcorrDB(sew.Database):
             self.xcorr_metadata_fmt,
             self.xcorr_metadata_tblname
         )
+
+    def reloadTables(self):
+        super().reloadTables()
+        # We re-class our tables to match our internal formats, as a hotfix until sew is updated
+        for tblname, table in self._tables.items():
+            if isinstance(table, sew.MetaTableProxy):
+                metatable = XcorrMetaTableProxy(
+                    table._parent,
+                    table._tbl,
+                    table._fmt
+                )
+                self._tables[tblname] = metatable
+            elif isinstance(table, sew.DataTableProxy):
+                datatable = XcorrResultsTableProxy(
+                    table._parent,
+                    table._tbl,
+                    table._fmt,
+                    table._metadatatable
+                )
+                self._tables[tblname] = datatable
+
     
     def createXcorrResultsTable(
         self,
-        results_tblfmt: dict,
         results_tblname: str,
-        metadata: list,
+        fc: float,
+        fs: int,
+        s1: str,
+        s2: str,
+        xctype: int,
+        desc: bytes = None,
         **kwargs
     ):
         """
@@ -135,24 +158,156 @@ class XcorrDB(sew.Database):
 
         Parameters
         ----------
-        results_tblfmt : dict
-            The format of the xcorr results table.
-            This can usually be one of the following:
-            XcorrDB._xcorr_type0results_fmt,
-            XcorrDB._xcorr_type1results_fmt,
-            XcorrDB._xcorr_type2results_fmt
         results_tblname : str
             The name of the xcorr results table.
-        metadata : list
-            The metadata for the xcorr results table. This will be inserted into
-            the metadata table.
+        fc : float
+            Centre frequency of arrays used in the xcorr.
+        fs : int
+            Sample rate of arrays used in the xcorr.
+        s1 : str
+            Name of source 1 (Generally where the cutout/preamble/template is from).
+        s2 : str
+            Name of source 2.
+        xctype : int
+            0: peak values only, 1: 1-D results, 2: 2-D results.
+        desc : bytes, optional
+            Any extra description parameters for storage.
+        kwargs : dict
+            Refer to sew.Database.createDataTable().
         """
         
+        if xctype == 0:
+            fmt = XcorrDB._xcorr_type0results_fmt(self)
+        elif xctype == 1:
+            fmt = XcorrDB._xcorr_type1results_fmt(self)
+        elif xctype == 2:
+            fmt = XcorrDB._xcorr_type2results_fmt(self)
+        else:
+            raise ValueError(f"xctype must be 0, 1, or 2, not {xctype}")
+
         self.createDataTable(
-            results_tblfmt,
+            fmt,
             results_tblname,
-            metadata,
+            [fc, fs, s1, s2, xctype, desc], # Format it into a list
             self.xcorr_metadata_tblname,
-            **kwargs
-        )
+            **kwargs)
+
+
+
+#%%
+class XcorrMetaTableProxy(sew.MetaTableProxy):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs) # Should automatically refer to parent docstring
+
+#%%
+class XcorrResultsTableProxy(sew.DataTableProxy):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs) # Should automatically refer to parent docstring
+        # Cache the metadata
+        self._cacheMetadata = None
+
+    # Define properties for the metadata
+    @property
+    def fc(self):
+        self._cacheMetadata = self.getMetadata() if self._cacheMetadata is None else self._cacheMetadata
+        return self._cacheMetadata["fc"]
+    
+    @property
+    def fs(self):
+        self._cacheMetadata = self.getMetadata() if self._cacheMetadata is None else self._cacheMetadata
+        return self._cacheMetadata["fs"]
+    
+    @property
+    def s1(self):
+        self._cacheMetadata = self.getMetadata() if self._cacheMetadata is None else self._cacheMetadata
+        return self._cacheMetadata["s1"]
+    
+    @property
+    def s2(self):
+        self._cacheMetadata = self.getMetadata() if self._cacheMetadata is None else self._cacheMetadata
+        return self._cacheMetadata["s2"]
+    
+    @property
+    def xctype(self):
+        self._cacheMetadata = self.getMetadata() if self._cacheMetadata is None else self._cacheMetadata
+        return self._cacheMetadata["xctype"]
+    
+    @property
+    def desc(self):
+        self._cacheMetadata = self.getMetadata() if self._cacheMetadata is None else self._cacheMetadata
+        return self._cacheMetadata["desc"]
+    
+
+    
+
+
+#%% Run some unit tests?
+if __name__ == "__main__":
+    import unittest
+
+    class TestXcorrDB(unittest.TestCase):
+        def setUp(self):
+            self.db = XcorrDB(":memory:")
+
+        # Check metadata table exists
+        def test_checkMetaTable(self):
+            self.assertTrue(
+                self.db.xcorr_metadata_tblname in self.db.tables,
+                "Metadata table was not found."
+            )
+
+        # Add a typical data table
+        def test_addResultsTable(self):
+            tblname = "results"
+
+            self.db.createXcorrResultsTable(
+                tblname,
+                1e9,
+                1000,
+                "source1",
+                "source2",
+                0
+            )
+            self.db.reloadTables()
+            self.assertTrue(
+                tblname in self.db.tables,
+                "Results table was not found."
+            )
+
+            # Retrieve the created table
+            results = self.db[tblname]
+            # Check that the metadata is correctly entered
+            self.assertEqual(
+                1e9, results.fc,
+                "fc is not equal."
+            )
+            self.assertEqual(
+                1000, results.fs,
+                "fs is not equal."
+            )
+            self.assertEqual(
+                "source1", results.s1,
+                "s1 is not equal."
+            )
+            self.assertEqual(
+                "source2", results.s2,
+                "s2 is not equal."
+            )
+            self.assertEqual(
+                0, results.xctype,
+                "xctype is not equal."
+            )
+            self.assertEqual(
+                None, results.desc,
+                "desc is not equal."
+            )
+
+            print(list(results.columns.keys()))
+
+
+
+    unittest.main()
+
+
+    
 

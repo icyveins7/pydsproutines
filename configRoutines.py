@@ -133,6 +133,15 @@ class SourceSectionProxy(SectionProxy):
     @property
     def dtype(self):
         return self.get('dtype')
+
+    @property
+    def lonlatalt(self):
+        """
+        Assumed to be in units deg,deg,m.
+        """
+        llastr = self.get('lonlatalt')
+        lon,lat,alt = [float(i) for i in llastr.split(",")]
+        return lon, lat, alt
     
 #%%
 class SignalSectionProxy(SectionProxy):

@@ -16,7 +16,7 @@ This is my sqlite3 wrapper. I will be using this as the base, rather than the de
 import sew
 
 from copy import deepcopy
-
+import numpy as np
 
 #%% Define the class
 class XcorrDB(sew.Database):
@@ -124,7 +124,8 @@ class XcorrDB(sew.Database):
         """
         self.createMetaTable(
             self.xcorr_metadata_fmt,
-            self.xcorr_metadata_tblname
+            self.xcorr_metadata_tblname,
+            ifNotExists=True
         )
 
     def reloadTables(self):
@@ -241,6 +242,14 @@ class XcorrResultsTableProxy(sew.DataTableProxy):
     def desc(self):
         self._cacheMetadata = self.getMetadata() if self._cacheMetadata is None else self._cacheMetadata
         return self._cacheMetadata["desc"]
+
+    ### Some helper functions
+    def regenerateTDscanRange(self, td_scan_start: float, td_scan_numsteps: int, td_scan_step: float):
+        return np.arange(td_scan_numsteps) * td_scan_step + td_scan_start
+
+    def regenerate1Dqf2(self, qf2: bytes, dtype: type=np.float64):
+        return np.frombuffer(qf2, dtype=dtype)
+
     
 #%% Run some unit tests?
 if __name__ == "__main__":

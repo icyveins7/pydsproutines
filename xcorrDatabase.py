@@ -44,18 +44,25 @@ class XcorrDB(sew.Database):
             ["time_sec", "INTEGER"], # GPS time of cutout
             ["tidx", "INTEGER"], # Index of cutout from source 1
             ["cutoutlen", "INTEGER"], # Length of cutout array
-            ["td_scan_start", "REAL"], # Offset from tidx to start scanning at, in seconds
-            ["td_scan_end", "REAL"], # Offset from tidx to end scanning at, in seconds
-            ["td_scan_step", "REAL"], # Scan step size, in seconds (set to 1 sample duration if no subsample scans)
+            ["td_scan_start", "REAL"], # Offset from tidx to start scanning at, in seconds; generally this is at sample level
+            ["td_scan_numsteps", "INTEGER"], # Number of scan steps; this is preferable to using an end value, as we prevent floating point ambiguities; this is also at sample level
+            ["td_scan_step", "REAL"], # Scan step size, in seconds (if this is <1 sample duration, it is implicit that a subsample scan was done)
             ["fd_scan_start", "REAL"], # Similar ranges for FDOA
-            ["fd_scan_end", "REAL"], # Perhaps set to all 0s if FFT resolution is used?
+            ["fd_scan_numsteps", "INTEGER"], # Can be set to 0 if equal to cutoutlen i.e. natural FFT is used
             ["fd_scan_step", "REAL"], # Otherwise this is assumed to be using a CZT?
             ["rfd_scan_start", "REAL"], # Similar ranges for RFDOA
-            ["rfd_scan_end", "REAL"],
+            ["rfd_scan_numsteps", "INTEGER"],
             ["rfd_scan_step", "REAL"]
         ],
-        'conds': []
+        'conds': [
+            "UNIQUE(time_sec, tidx, cutoutlen, td_scan_start, td_scan_numsteps, td_scan_step, fd_scan_start, fd_scan_numsteps, fd_scan_step, rfd_scan_start, rfd_scan_numsteps, rfd_scan_step)"
+        ]
     }
+
+    # Define constants for the types
+    TYPE_PEAKVALUES = 0
+    TYPE_1D = 1
+    TYPE_2D = 2
 
     @staticmethod
     def _xcorr_type0results_fmt(self):
@@ -192,8 +199,6 @@ class XcorrDB(sew.Database):
             self.xcorr_metadata_tblname,
             **kwargs)
 
-
-
 #%%
 class XcorrMetaTableProxy(sew.MetaTableProxy):
     def __init__(self, *args, **kwargs):
@@ -237,10 +242,6 @@ class XcorrResultsTableProxy(sew.DataTableProxy):
         self._cacheMetadata = self.getMetadata() if self._cacheMetadata is None else self._cacheMetadata
         return self._cacheMetadata["desc"]
     
-
-    
-
-
 #%% Run some unit tests?
 if __name__ == "__main__":
     import unittest
@@ -256,7 +257,7 @@ if __name__ == "__main__":
                 "Metadata table was not found."
             )
 
-        # Add a typical data table
+        # Add a typical data table for type 0
         def test_addResultsTable(self):
             tblname = "results"
 
@@ -266,7 +267,7 @@ if __name__ == "__main__":
                 1000,
                 "source1",
                 "source2",
-                0
+                0 # This is the type
             )
             self.db.reloadTables()
             self.assertTrue(
@@ -302,12 +303,48 @@ if __name__ == "__main__":
                 "desc is not equal."
             )
 
-            print(list(results.columns.keys()))
-
-
+            # Insert some data
+            # For type 0, format is
+            # ["time_sec", "INTEGER"], # GPS time of cutout
+            # ["tidx", "INTEGER"], # Index of cutout from source 1
+            # ["cutoutlen", "INTEGER"], # Length of cutout array
+            # ["td_scan_start", "REAL"], # Offset from tidx to start scanning at, in seconds
+            # ["td_scan_numsteps", "INTEGER"], # Number of scan steps; this is preferable to using an end value, as we prevent floating point ambiguities
+            # ["td_scan_step", "REAL"], # Scan step size, in seconds (set to 1 sample duration if no subsample scans)
+            # ["fd_scan_start", "REAL"], # Similar ranges for FDOA
+            # ["fd_scan_numsteps", "INTEGER"], # Can be set to 0 if equal to cutoutlen i.e. natural FFT is used
+            # ["fd_scan_step", "REAL"], # Otherwise this is assumed to be using a CZT?
+            # ["rfd_scan_start", "REAL"], # Similar ranges for RFDOA
+            # ["rfd_scan_numsteps", "INTEGER"],
+            # ["rfd_scan_step", "REAL"]
+            # ["qf2", "REAL"],
+            # ["td", "REAL"],
+            # ["td_sigma", "REAL"],
+            # ["fd", "REAL"],
+            # ["fd_sigma", "REAL"],
+            # ["rfd", "REAL"],
+            # ["rfd_sigma", "REAL"]
+            inserted = {
+                "time_sec": 1234567890,
+                "tidx": 123,
+                "cutoutlen": 10000,
+                "td_scan_start": -1e-3,
+                "td_scan_numsteps": 10000,
+                "td_scan_step": 1e-6,
+                "qf2": 0.9,
+                "td": 0,
+                "td_sigma": 1e-7
+            }
+            results.insertOne(
+                inserted,
+                commitNow=True
+            )
+            # Extract the data and check
+            results.select("*")
+            r = self.db.fetchone()
+            for k in inserted:
+                self.assertEqual(
+                    r[k], inserted[k]
+                )
 
     unittest.main()
-
-
-    
-

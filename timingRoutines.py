@@ -42,6 +42,11 @@ class Timer:
     def rpt(self, showSteps: bool=True):
         '''
         Reports times elapsed between events.
+
+        Returns
+        -------
+        total : float
+            Total duration of the timer, in seconds.
         '''
         if showSteps:
             for i in range(1, len(self.t)):
@@ -49,14 +54,22 @@ class Timer:
                     i-1, i, self.t[i]-self.t[i-1], self.labels[i]))
             
         # Always print total
-        print("Total: %fs." % (self.t[-1] - self.t[0]))
+        total = self.t[-1] - self.t[0]
+        print("Total: %fs." % (total))
+        return total
             
     def end(self, label: str="", showSteps: bool=True):
         '''
         Convenience function to add an event and report immediately.
+
+        Returns
+        -------
+        total : float
+            Total duration of the timer, in seconds.
         '''
         self.evt(label)
-        self.rpt(showSteps=showSteps)
+        total = self.rpt(showSteps=showSteps)
+        return total
         
         
 if __name__ == "__main__":

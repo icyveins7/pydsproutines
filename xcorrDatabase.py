@@ -17,6 +17,8 @@ import sew
 
 from copy import deepcopy
 import numpy as np
+import sqlite3
+import matplotlib.pyplot as plt
 
 #%% Define the class
 class XcorrDB(sew.Database):
@@ -52,10 +54,11 @@ class XcorrDB(sew.Database):
             ["fd_scan_step", "REAL"], # Otherwise this is assumed to be using a CZT?
             ["rfd_scan_start", "REAL"], # Similar ranges for RFDOA
             ["rfd_scan_numsteps", "INTEGER"],
-            ["rfd_scan_step", "REAL"]
+            ["rfd_scan_step", "REAL"],
+            ["desc", "BLOB"] # Arbitrary extra description parameters for this particular xcorr
         ],
         'conds': [
-            "UNIQUE(time_sec, tidx, cutoutlen, td_scan_start, td_scan_numsteps, td_scan_step, fd_scan_start, fd_scan_numsteps, fd_scan_step, rfd_scan_start, rfd_scan_numsteps, rfd_scan_step)"
+            "UNIQUE(time_sec, tidx, cutoutlen, td_scan_start, td_scan_numsteps, td_scan_step, fd_scan_start, fd_scan_numsteps, fd_scan_step, rfd_scan_start, rfd_scan_numsteps, rfd_scan_step, desc)"
         ]
     }
 
@@ -91,9 +94,9 @@ class XcorrDB(sew.Database):
         """
         fmt = deepcopy(self.xcorr_results_fmt) # We don't want to modify the static formats
         fmt['cols'].extend([
-            ["qf2", "BLOB"],
-            ["freqIdx", "BLOB"],
-            ["rfdIdx", "BLOB"]
+            ["qf2", "BLOB"], # Recommended to be 64-bit floating
+            ["freqIdx", "BLOB"], # Recommended to be 32-bit unsigned int
+            ["rfdIdx", "BLOB"] # Recommended to be 32-bit unsigned int
         ])
         return fmt
     
@@ -247,8 +250,34 @@ class XcorrResultsTableProxy(sew.DataTableProxy):
     def regenerateTDscanRange(self, td_scan_start: float, td_scan_numsteps: int, td_scan_step: float):
         return np.arange(td_scan_numsteps) * td_scan_step + td_scan_start
 
-    def regenerate1Dqf2(self, qf2: bytes, dtype: type=np.float64):
+    def regenerate1Darray(self, qf2: bytes, dtype: type=np.float64):
         return np.frombuffer(qf2, dtype=dtype)
+
+    def plot1Dresult(self, row: sqlite3.Row, qf2type: type=np.float64, freqindtype: type=np.uint32):
+        tdrange = self.regenerateTDscanRange(
+            row['td_scan_start'], 
+            row['td_scan_numsteps'],
+            row['td_scan_step'])
+        qf2 = self.regenerate1Darray(row['qf2'], dtype=qf2type)
+        freqinds = self.regenerate1Darray(row['freqIdx'], dtype=freqindtype)
+        fig, ax = plt.subplots(2,1,num="%s, %d" % (self._tbl, row['time_sec']), sharex=True)
+        ax[0].plot(tdrange, qf2)
+        ax[1].plot(tdrange, freqinds)
+        ax[1].set_xlabel("TDOA (s)")
+        ax[0].set_ylabel("$QF^2$")
+        ax[1].set_ylabel("Max Freq. Index")
+
+        # Get the maximum and show it for convenience
+        mi = np.argmax(qf2)
+        tdest = tdrange[mi]
+        qf2est = qf2[mi]
+        freqIdxest = freqinds[mi]
+        ax[0].plot(tdest, qf2est, 'rx')
+        ax[1].plot(tdest, freqIdxest, 'rx')
+        ax[0].set_title("$TD_{est} = %g, QF^2 = %g, f_i = %d$" % (tdest, qf2est, freqIdxest))
+
+        return fig, ax
+
 
     
 #%% Run some unit tests?

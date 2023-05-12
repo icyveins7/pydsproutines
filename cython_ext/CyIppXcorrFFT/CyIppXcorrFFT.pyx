@@ -6,6 +6,18 @@ from IppXcorrFFT cimport IppXcorrFFT_32fc, Ipp32fc, bool
 cdef class CyIppXcorrFFT:
     """
     Cythonised version of IppXcorrFFT.
+
+    Init arguments are listed here due to embedsignature failing to
+    include it in __cinit__.
+
+    Parameters
+    ----------
+    cutout : np.ndarray[np.complex64_t, ndim=1]
+        Cutout to use in the correlation.
+    num_threads : int
+        Number of threads to use. Default is 1.
+    autoConj : bool
+        Conjugates the cutout before saving it. Default is True.
     """
 
     cdef IppXcorrFFT_32fc* xcfft
@@ -31,6 +43,22 @@ cdef class CyIppXcorrFFT:
               int startIdx,
               int endIdx,
               int step):
+        """
+        Performs the xcorr with FFT on the input array, using the internally saved
+        cutout template.
+
+        Parameters
+        ----------
+        rx : np.ndarray[np.complex64_t, ndim=1]
+            Input array.
+        startIdx : int
+            Index of the first element in rx to start scanning in the correlation.
+        endIdx : int
+            Index of the last element to rx (not inclusive) to start scanning in the correlation.
+        step : int
+            Step size to use in the correlation.
+            To scan every sample, use step=1.
+        """
         
         # allocate numpy array output
         cdef length = len(np.arange(startIdx, endIdx, step))

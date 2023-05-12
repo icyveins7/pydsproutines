@@ -1476,101 +1476,54 @@ try:
 except Exception as e:
     print("Unable to load cythonised xcorrRoutines: %s" % (e))
 
-#%% Database for storing CAFs
-class CafDb:
-    # Class-wide constants, ordered lists are important here for reference
-    tableMetadata = ["freqdim", "freq0", "freqstep", "timedim", "time0", "timestep", "dtype", "src0", "src1"]
-    tableTypes = ["INTEGER", "REAL", "REAL", "INTEGER", "REAL", "REAL", "TEXT", "TEXT", "TEXT"]
-    dtypeDict = {"32f": np.float32,
-                 "64f": np.float64,
-                 "32fc": np.complex64,
-                 "64fc": np.complex128}
+#%% Computational complexity estimation
+from spectralRoutines import next_fast_len
 
-    def __init__(self, dbpath="cafs.db"):
-        self.dbpath = dbpath
-        self.con = sq.connect(self.dbpath)
-        self.con.row_factory = sq.Row
-        self.cur = self.con.cursor()
-        
-        # Placeholders for reference
-        self.metadict = {}
+def computeFastXcorrComplexity(
+    N: int,
+    K: int=1
+):
+    """
+    Computes the complexity of the fast xcorr routines, like fastXcorr.
+    This is a sliding window multiply -> FFT, so most of the cost is spent in the FFT.
 
-        self.initMetadata()
-        self.reloadMetadata()
+    Parameters
+    ----------
+    N : int or np.ndarray
+        Length of cutout i.e. length of FFT. Log2 complexity is assumed.
+    K : int or np.ndarray
+        Number of sample shifts i.e. number of FFTs used, since 1 FFT per sample shift.
+    """
+    return K * N * np.log2(N)
 
-    def _getMetadataSubstmt(self, appendTablename=False):
-        base = ["%s %s" % (meta, ttype) for meta,ttype in zip(self.tableMetadata,self.tableTypes)]
-        if appendTablename:
-            base.insert(0,"tablename TEXT")
-        return ', '.join(base)
+def computeGroupXcorrCZTcomplexity(
+    m: int,
+    L: int,
+    n: int,
+    K: int=1
+):
+    """
+    Computes the complexity of the group xcorr routines using CZT, like groupXcorrCZT.
+    This is a sliding window multiply -> CZT, so most of the cost is spent in the CZT.
+    Note that the CZT incurs a cost of 2 FFTs, each of slightly longer length (usually)
+    than the actual cutout.
 
-    def initMetadata(self):
-        stmt = "create table if not exists metadata(%s)" % self._getMetadataSubstmt(appendTablename=True)
+    The cost of the phase corrections required for each group have been ignored here.
 
-        self.cur.execute(stmt)
-        self.con.commit()
-
-    def reloadMetadata(self):
-        self.cur.execute("select * from metadata")
-        self.metadict.clear()
-        metadata = self.cur.fetchall()
-        for meta in metadata:
-            self.metadict[meta[0]] = {
-                metaname: metaval for metaname, metaval in zip(self.tableMetadata, meta[1:])
-            }
-        
-        return metadata
-
-    def addTable(self,
-        table: str,
-        freqdim: int, freq0: float, freqstep: float,
-        timedim: int, time0: float, timestep: float,
-        dtype: str="64f", src0: str=None, src1: str=None):
-
-        # First add to metadata
-        self.cur.execute("insert into metadata values(?,?,?,?,?,?,?,?,?,?)",
-            (table, freqdim, freq0, freqstep, timedim, time0, timestep, dtype, src0, src1)
-        )
-
-        # Then create the empty table
-        self.cur.execute("create table if not exists %s(idx INTEGER PRIMARY KEY, caf BLOB, comment TEXT)" % table)
-        # Reload the internal dict
-        self.reloadMetadata()
-
-        self.con.commit()
-        
-    def addCaf(self, table: str, caf: np.ndarray, idx: int=None, comment: str=None):
-        if table not in self.metadict:
-            raise ValueError("No such table, please add the table first.")
-        if idx is None:
-            self.cur.execute("select MAX(idx) from %s" % table)
-            r = self.cur.fetchone()
-            if r[0] is None:
-                idx = 0
-            else:
-                idx = r[0] + 1
-            print("Automatically set idx to %d" % idx)
-            
-        stmt = "insert or replace into %s values(?,?,?)" % table
-        self.cur.execute(stmt, (idx, caf.tobytes(), comment))
-        self.con.commit()
-        
-    def dropTable(self, table: str):
-        self.cur.execute("drop table %s" % table)
-        self.cur.execute("delete from metadata where tablename=?", (table,))
-        self.con.commit()
-        self.reloadMetadata()
-        
-    def getCaf(self, table: str, idx: int):
-        self.cur.execute("select caf, comment from %s where idx=?" % table, (idx,))
-        r = self.cur.fetchone()
-        caf, comment = r
-        # Retrieve the dimensions and type
-        caf = np.frombuffer(caf, dtype=self.dtypeDict[self.metadict[table]['dtype']]).reshape(
-            self.metadict[table]['freqdim'],self.metadict[table]['timedim'])
-        
-        return caf, comment
-        
+    Parameters
+    ----------
+    m : int
+        Number of bursts/groups.
+    L : int
+        Length of each group in samples.
+    n : int
+        Number of points in the CZT. The complexity of the CZT is essentially 2 FFTs
+        of length (CZT points + L)
+    K : int
+        Number of sample shifts i.e. number of CZTs used, since 1 CZT per sample shift.
+    """
+    Lc = next_fast_len(L + n)
+    return K * m * 2 * Lc * np.log2(Lc)
 
     
 

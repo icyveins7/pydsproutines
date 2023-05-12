@@ -18,8 +18,7 @@ import sqlite3 as sq
 import concurrent.futures
 from cupyExtensions import *
 
-# Import the cythonised fastXcorr
-from cython_ext.CyIppXcorrFFT import CyIppXcorrFFT
+
 
 try:
     import cupy as cp
@@ -1473,6 +1472,13 @@ if os.name == 'nt': # Load the directory on windows
 try: 
     from cython_ext.CyGroupXcorrFFT import CyGroupXcorrFFT
     
+except Exception as e:
+    print("Unable to load cythonised xcorrRoutines: %s" % (e))
+
+# Import the cythonised fastXcorr
+try:
+    from cython_ext.CyIppXcorrFFT import CyIppXcorrFFT
+
 except Exception as e:
     print("Unable to load cythonised xcorrRoutines: %s" % (e))
 

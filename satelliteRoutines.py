@@ -15,138 +15,26 @@ from sgp4.api import WGS72OLD, WGS72, WGS84
 from sgp4.api import SGP4_ERRORS
 from skyfield.positionlib import Geocentric
 
-
-#%% TLE Parser
-class TLEfile:
-    def __init__(self, filepath: str):
-        self.filepath = filepath # To help remember which file this is
-        with open(filepath, "r") as fid:
-            self.lines = fid.readlines()
-            
-        self.tles = self._parse()
-            
-    # Internal parsing method
-    def _parse(self):
-        tles = dict()
-        currentSat = None
-        for line in self.lines:
-            if not re.match("\\d \\d+", line):
-                currentSat = line.strip()
-                tles[currentSat] = []
-            else:
-                tles[currentSat].append(line.strip())
-                assert(len(tles[currentSat]) <= 2)
-                
-        return tles
-    
-    # Convenient getter
-    def __getitem__(self, key):
-        return self.tles[key]
-        
-
-#%% Some convenient wrappers for pure SGP4
-class Satellite:
-    # Redirector for constants
-    consts = {
-        'wgs84': WGS84,
-        'wgs72': WGS72,
-        'wgs72old': WGS72OLD
-    }
-    
-    def __init__(self, tle: list, name: str=None, const: str='wgs84'):
-        self.tle = tle
-        self.name = name
-        self.const = self.consts[const]
-        # Call the sgp4 stuff
-        self.satrec = Satrec.twoline2rv(*tle, self.const)
-        
-    @classmethod
-    def fromName(cls, tle: TLEfile, name: str, const: str='wgs84'):
-        '''
-        Automatically constructs from a TLEfile instance (see above) and a desired satellite name.
-
-        Parameters
-        ----------
-        tle : TLEfile
-            A prepared TLEfile class instance.
-        name : str
-            Desired name of satellite.
-        const : str, optional
-            Gravity constant. The default is 'wgs84'.
-
-        '''
-        return cls(tle[name], name, const)
-    
-    def _parseErrors(self, e: int):
-        if np.any(e != 0):
-            # Get the first instance and return the error
-            idx = np.argmax(e != 0) # This returns on the first True
-            raise Exception(SGP4_ERRORS[e[idx]])
-    
-    ### Main propagation methods
-    def propagate(self, jd: np.ndarray, fr: np.ndarray):
-        '''
-        This is just a redirect to the sgp4 call. We assume array inputs.
-        '''
-        e, r, v = self.satrec.sgp4_array(jd, fr)
-        self._parseErrors(e)
-        return r, v
-    
-    def propagateFrom(self, jd0: float, fr0: float, start: float, stop: float, step: float):
-        fr = fr0 + np.arange(start, stop, step)
-        jd = jd0 + np.zeros(fr.size)
-        r, v = self.propagate(jd, fr)
-        return r, v
-    
-    def propagateFromEpoch(self, start: float, stop: float, step: float):
-        r, v = self.propagateFrom(
-            self.satrec.jdsatepoch,
-            self.satrec.jdsatepochF,
-            start,
-            stop,
-            step
-        )
-        return r, v
-    
-    def propagateSecondsFromEpoch(self, seconds: float):
-        '''
-        Not advisable to use this as it reverts to Pythonic scalars, hence slow.
-        '''
-        e, r, v = self.satrec.sgp4_tsince(seconds/60.0)
-        return e, r, v
-        
-    def propagateUtcTimestamps(self, timestamps: np.ndarray):
-        pass
-
-#%% However, skyfield offers very similar functionality
+#%% Wrapper over skyfield's EarthSatellite, to restore constants functionality
 from skyfield.api import EarthSatellite, load, wgs84
 from skyfield.framelib import itrs
+
+class Satellite(EarthSatellite):
+    """
+    Refer to the source code on github to confirm that these are the only changes necessary.
+    
+    This can then be used as a drop in replacement for skyfield.
+    """
+    def __init__(self, line1, line2, name=None, ts=None, const=WGS72):
+        super().__init__(line1, line2, name=name, ts=ts) # This ignores the const
+        # So remake the satrec with the const now
+        self.model = Satrec.twoline2rv(line1, line2, const)
+        self._setup(self.model)
 
 #%% Below we list some common functionality in wrapped functions
 # They are more of a quick reference so we don't have to look it up in the docs.
 
-def sf_get_satellite_from_tle(tle: TLEfile, name: str):
-    """
-    Get a satellite from a TLE file.
-
-    Parameters
-    ----------
-    tle : TLEfile
-        A path to a TLE file.
-    name : str
-        Desired name of satellite.
-
-    Returns
-    -------
-    satellite : Satellite
-        A satellite class instance.
-    """
-    satellites = load.tle_file(tle)
-    # Load by name
-    satellites = {sat.name: sat for sat in satellites}
-    return satellites[name]
-
-def sf_propagate_satellite_to_gpstime(satellite: EarthSatellite, gpstime: float):
+def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float):
     """
     Propagate a satellite to a GPSTime.
     Note that this is not a very optimized function.

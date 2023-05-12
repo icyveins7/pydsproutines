@@ -109,8 +109,3 @@ if __name__ == "__main__":
     print(r)
     print(v)
     
-    #%%
-    sat = Satellite([s,t])
-    r, v = sat.propagate(jd, fr)
-    r, v = sat.propagateFromEpoch(-1.0, 1.0, 0.001)
-    

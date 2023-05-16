@@ -10,7 +10,8 @@ import scipy as sp
 from scipy.stats.distributions import chi2
 # from numba import jit, njit
 import time
-from skyfield.api import wgs84
+from skyfield.api import wgs84, load, Distance
+
 from plotRoutines import *
 from satelliteRoutines import *
 import skyfield.api
@@ -29,6 +30,29 @@ def geodeticLLA2ecef(lat_rad, lon_rad, h):
     z = (b**2/a**2 * N + h) * np.sin(lat_rad)
     
     return np.vstack((x,y,z))
+
+def ecef2geodeticLLA(x: np.ndarray):
+    if not isinstance(x, np.ndarray):
+        raise TypeError("Must be numpy array.")
+    
+    now = load.timescale().now() # Can re-use since ITRS is time-agnostic
+
+    # A single 3-d position
+    if x.ndim == 1 and x.size == 3:
+        x = x.reshape((1, 3))
+        
+    # Multiple 3-d positions, one in each row
+    if x.shape[1] == 3:
+        lle_list = np.zeros(x.shape)
+        for i, row in enumerate(x):
+            pos = ITRSPosition(Distance(m=row))
+            latlonele = wgs84.subpoint_of(pos)
+            lle_list[i,:] = latlonele.latitude.degrees, latlonele.longitude.degrees, latlonele.elevation.m
+
+        return lle_list
+
+    else:
+        raise ValueError("Invalid dimensions.")
 
 #%% Doppler convention routines
 def calculateRangeRate(

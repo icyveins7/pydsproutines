@@ -54,7 +54,7 @@ def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float):
     """
     ts = load.timescale()
     dd = dt.datetime.fromtimestamp(gpstime, tz=dt.timezone.utc)
-    t = ts.utc(dd.year, dd.month, dd.day, dd.hour, dd.minute, dd.second)
+    t = ts.utc(dd.year, dd.month, dd.day, dd.hour, dd.minute, dd.second+dd.microsecond/1e6)
     return satellite.at(t)
 
 def sf_geocentric_to_itrs(geocentric: Geocentric, returnVelocity: bool=False):

@@ -11,6 +11,7 @@ from scipy.stats.distributions import chi2
 # from numba import jit, njit
 import time
 from skyfield.api import wgs84, load, Distance
+from skyfield.toposlib import ITRSPosition
 
 from plotRoutines import *
 from satelliteRoutines import *

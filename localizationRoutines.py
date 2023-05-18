@@ -19,6 +19,9 @@ import skyfield.api
 
 #%% Coordinate transformations
 def geodeticLLA2ecef(lat_rad, lon_rad, h):
+    # Some error checking
+    if np.abs(lat_rad) > np.pi/2 or np.abs(lon_rad) > np.pi:
+        raise ValueError("Latitude and longitude magnitudes are too large. Did you forget to convert to radians?")
     # This should replicate wgs84.latlon().itrs_xyz.m (which also works on arrays)
     # Speedwise, this is about 2-3x faster, since it skips all the object instantiations
     # Reference https://en.wikipedia.org/wiki/Geodetic_coordinates

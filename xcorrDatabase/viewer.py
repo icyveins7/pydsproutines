@@ -1,6 +1,8 @@
 from ._core import *
 
 import dearpygui.dearpygui as dpg
+import os
+import time
 
 #%% Boilerplate
 dpg.create_context()
@@ -8,12 +10,29 @@ dpg.create_viewport()
 dpg.setup_dearpygui()
 
 
-#%% Main window on start-up
-xdb = [] # To store database objects (may open more than 1)
+#%% Database file opener window on start-up
+xdb = dict() # To store database objects, path->database object
+# xdb_windows = dict() # To store windows, path->window object
 
 def open_db():
-    xdb.append(XcorrDB(dpg.get_value("dbpathinput")))
-    print(xdb)
+    dbpath = dpg.get_value("dbpathinput")
+    if dbpath in xdb:
+        dpg.set_value("opendb_result", "Database already opened.")
+
+    elif os.path.exists(dbpath):
+        xdb[dbpath] = XcorrDB(dbpath)
+        dpg.set_value("opendb_result", "Successfully opened database.")
+        print(xdb)
+        # Add a window
+        dpg.add_window(
+            label=dbpath, indent=1,
+            width=700, tag="window_%s" % (dbpath),
+            on_close=clear_db_window, user_data=dbpath
+        )
+    
+    else:
+        dpg.set_value("opendb_result", "Database not found. Check your path.")
+
 
 def set_db_path(sender, app_data):
     dpg.set_value("dbpathinput", app_data['file_path_name'])
@@ -33,6 +52,17 @@ with dpg.window(label="Open an XcorrDB", no_close=True, width=700):
         dpg.add_button(label="Browse", callback=lambda: dpg.show_item("file_dialog_id"))
 
     dpg.add_button(label="Open", callback=open_db)
+    dpg.add_text(tag="opendb_result")
+
+    for dbpath in xdb:
+        dpg.add_text("Opened: %s" % (dbpath))
+
+#%%
+def clear_db_window(sender, app_data, user_data):
+    print(user_data)
+    xdb.pop(user_data)
+    dpg.delete_item(user_data)
+
     
 #%% Boilerplate
 dpg.show_viewport()

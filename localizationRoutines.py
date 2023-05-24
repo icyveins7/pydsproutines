@@ -921,6 +921,9 @@ class TDMixin:
         cost_grid : np.ndarray
             Length N array. The least squares errors for every grid point.
         '''
+        if s1x_list.shape[1] != 3 or s2x_list.shape[1] != 3:
+            raise ValueError("Ensure s1x_list & s2x_list have 3 columns.")
+
         cost_grid = gridSearchTDOA_direct(s1x_list, s2x_list, tdoa_list, td_sigma_list, self.gridmat)
         return cost_grid
     

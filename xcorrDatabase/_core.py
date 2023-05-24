@@ -68,12 +68,12 @@ class XcorrDB(sew.Database):
     TYPE_2D = 2
 
     @staticmethod
-    def _xcorr_type0results_fmt(self):
+    def _xcorr_type0results_fmt():
         """
         Returns type 0 results table format;
         this table contains scalar peak values only.
         """
-        fmt = deepcopy(self.xcorr_results_fmt) # We don't want to modify the static formats
+        fmt = deepcopy(XcorrDB.xcorr_results_fmt) # We don't want to modify the static formats
         fmt['cols'].extend([
             ["qf2", "REAL"],
             ["td", "REAL"],
@@ -86,13 +86,13 @@ class XcorrDB(sew.Database):
         return fmt
     
     @staticmethod
-    def _xcorr_type1results_fmt(self):
+    def _xcorr_type1results_fmt():
         """
         Returns type 1 results table format;
         this table contains 1-D blob results, usually where the
         max value of the CAF has been selected for every time shift.
         """
-        fmt = deepcopy(self.xcorr_results_fmt) # We don't want to modify the static formats
+        fmt = deepcopy(XcorrDB.xcorr_results_fmt) # We don't want to modify the static formats
         fmt['cols'].extend([
             ["qf2", "BLOB"], # Recommended to be 64-bit floating
             ["freqIdx", "BLOB"], # Recommended to be 32-bit unsigned int
@@ -101,12 +101,12 @@ class XcorrDB(sew.Database):
         return fmt
     
     @staticmethod
-    def _xcorr_type2results_fmt(self):
+    def _xcorr_type2results_fmt():
         """
         Returns type 2 results table format;
         this table contains 2-D blob results, like a full CAF.
         """
-        fmt = deepcopy(self.xcorr_results_fmt) # We don't want to modify the static formats
+        fmt = deepcopy(XcorrDB.xcorr_results_fmt) # We don't want to modify the static formats
         fmt['cols'].extend([
             ["caf", "BLOB"]
         ])
@@ -188,11 +188,11 @@ class XcorrDB(sew.Database):
         """
         
         if xctype == 0:
-            fmt = XcorrDB._xcorr_type0results_fmt(self)
+            fmt = XcorrDB._xcorr_type0results_fmt()
         elif xctype == 1:
-            fmt = XcorrDB._xcorr_type1results_fmt(self)
+            fmt = XcorrDB._xcorr_type1results_fmt()
         elif xctype == 2:
-            fmt = XcorrDB._xcorr_type2results_fmt(self)
+            fmt = XcorrDB._xcorr_type2results_fmt()
         else:
             raise ValueError(f"xctype must be 0, 1, or 2, not {xctype}")
 

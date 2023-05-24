@@ -464,6 +464,47 @@ def plotAngles(angles: np.ndarray, colour: str='b', label: str=None, showCircle:
 
     return fig, ax
 
+def plotXcorrResults1D(
+    td_scan_range: np.ndarray,
+    qf2: np.ndarray,
+    freqinds: np.ndarray=None,
+    windowTitle: str=None,
+    maxIdx: int=None
+):
+    # Plot 2 rows if freqinds is specified
+    if freqinds is not None:
+        fig, ax = plt.subplots(2,1,num=windowTitle, sharex=True)
+        ax[0].plot(td_scan_range, qf2)
+        ax[1].plot(td_scan_range, freqinds)
+        ax[1].set_xlabel("TDOA (s)")
+        ax[0].set_ylabel("$QF^2$")
+        ax[1].set_ylabel("Max Freq. Index")
+
+        # Get the maximum and show it for convenience
+        if maxIdx is not None:
+            tdest = td_scan_range[maxIdx]
+            qf2est = qf2[maxIdx]
+            freqIdxest = freqinds[maxIdx]
+            ax[0].plot(tdest, qf2est, 'rx')
+            ax[1].plot(tdest, freqIdxest, 'rx')
+            ax[0].set_title("$TD_{est} = %g, QF^2 = %g, f_i = %d$" % (tdest, qf2est, freqIdxest))
+
+    # Otherwise just plot the qf2
+    else:
+        fig, ax = plt.subplots(2,1,num=windowTitle, sharex=True)
+        ax.plot(td_scan_range, qf2)
+        ax.set_xlabel("TDOA (s)")
+        ax.set_ylabel("$QF^2$")
+
+        # Get the maximum and show it for convenience
+        if maxIdx is not None:
+            tdest = td_scan_range[maxIdx]
+            qf2est = qf2[maxIdx]
+            ax.plot(tdest, qf2est, 'rx')
+            ax.set_title("$TD_{est} = %g, QF^2 = %g$" % (tdest, qf2est))
+
+    return fig, ax
+
 def mplBtnToggle(p, fig):
     '''
     Binds 'a' to reset and show all plots.

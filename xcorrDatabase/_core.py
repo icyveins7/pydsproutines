@@ -253,31 +253,14 @@ class XcorrResultsTableProxy(sew.DataTableProxy):
     def regenerate1Darray(self, qf2: bytes, dtype: type=np.float64):
         return np.frombuffer(qf2, dtype=dtype)
 
-    def plot1Dresult(self, row: sqlite3.Row, qf2type: type=np.float64, freqindtype: type=np.uint32):
+    def regenerate1Dresults(self, row: sqlite3.Row, qf2type: type=np.float64, freqindtype: type=np.uint32):
         tdrange = self.regenerateTDscanRange(
             row['td_scan_start'], 
             row['td_scan_numsteps'],
             row['td_scan_step'])
         qf2 = self.regenerate1Darray(row['qf2'], dtype=qf2type)
         freqinds = self.regenerate1Darray(row['freqIdx'], dtype=freqindtype)
-        fig, ax = plt.subplots(2,1,num="%s, %d" % (self._tbl, row['time_sec']), sharex=True)
-        ax[0].plot(tdrange, qf2)
-        ax[1].plot(tdrange, freqinds)
-        ax[1].set_xlabel("TDOA (s)")
-        ax[0].set_ylabel("$QF^2$")
-        ax[1].set_ylabel("Max Freq. Index")
-
-        # Get the maximum and show it for convenience
-        mi = np.argmax(qf2)
-        tdest = tdrange[mi]
-        qf2est = qf2[mi]
-        freqIdxest = freqinds[mi]
-        ax[0].plot(tdest, qf2est, 'rx')
-        ax[1].plot(tdest, freqIdxest, 'rx')
-        ax[0].set_title("$TD_{est} = %g, QF^2 = %g, f_i = %d$" % (tdest, qf2est, freqIdxest))
-
-        return fig, ax
-
+        return tdrange, qf2, freqinds
 
     
 #%% Run some unit tests?

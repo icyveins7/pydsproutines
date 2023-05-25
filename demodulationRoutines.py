@@ -380,6 +380,62 @@ class SimpleDemodulatorPSK:
         iSkip = np.argmax(utf8chars)
         
         return iSkip, utf8chars
+
+    @staticmethod
+    def detect_B_or_Q(reim: np.ndarray, threshold: float=0.5):
+        """
+        Detects if a complex array is BPSK or QPSK, by comparing
+        the eigenvalues of an SVD decomposition.
+
+        BPSK eigenvalues are likely to be very different, whereas
+        QPSK eigenvalues are likely to be roughly equal.
+        The ratio of the eigenvalues is compared to the threshold; 
+        QPSK is thus likely to be near 1.0 and BPSK is likely to be near 0.0.
+
+        Parameters
+        ----------
+        reim : np.ndarray
+            Input complex array(s) at baudrate. 
+            For 2-D arrays, each row is processed.
+
+            This is usually the output after 
+            eye opening detection. No phase rotation is necessary.
+
+        threshold : float, optional
+            Threshold for BPSK/QPSK detection. The default is 0.5.
+
+        Returns
+        -------
+        m : np.ndarray
+            2 if BPSK, 4 if QPSK, for each row of the input array.
+        """
+        # Check type
+        if reim.dtype != np.complex64 and reim.dtype!= np.complex128:
+            raise TypeError('Input array must be complex.')
+
+        # Check shape
+        if reim.ndim == 1:
+            reim = reim.reshape((1, -1)) # Reshape to 1xN
+
+        # Allocate output
+        m = np.zeros(reim.shape[0], dtype=np.uint8)
+
+        # Iterate over every row
+        for i, row in enumerate(reim):
+            # Collapse to Nx2 real
+            x = row.astype(np.complex128).view(np.float64).reshape((-1,2))
+
+            # Perform the svd on the self-dot-product
+            _, s, _ = np.linalg.svd(x.T @ x) # 2x2
+
+            # Determine if B or Q based on eigenvalues
+            y = s[1] / s[0]
+            if y < threshold:
+                m[i] = 2
+            else:
+                m[i] = 4
+        
+        return m
         
     
 ###############

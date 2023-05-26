@@ -17,7 +17,9 @@ numSamp = 1000000
 T = 1e-6
 v = 1000.0
 
-rx_x, rx_xdot = createLinearTrajectory(numSamp, np.array([10000e3, 0, 0]), np.array([1e18, 0, 0]), v, T)
+rx_x, rx_xdot = createLinearTrajectory(numSamp, np.array([10000e3, 0, 0]), np.array([0, 10000e3, 0]), v, T)
+print(rx_xdot[0])
+
 t = np.arange(rx_x.shape[0])*T
 rx = Receiver(rx_x, rx_xdot, t)
 
@@ -62,8 +64,25 @@ for i, tauhat in enumerate(tauhats):
     
     print("First", tauActual - tauhat, (tauActual-tauhat)/tauActual)
     print("Refined", tauActual - tauhatp, (tauActual-tauhatp)/tauActual)
+    print("%d steps" % (k))
     
     
     break
+
+#%% Test using velocity instead
+from numpy.polynomial import Polynomial
+
+v = rx_xdot[0]
+D = tx.x[0] - rx_x[0]
+
+p = Polynomial((np.linalg.norm(D)**2, -2*np.dot(v,D), (-lightspd**2 - np.linalg.norm(v)**2)))
+print(p.roots())
+print(tauActual)
+print(tauActual - p.roots())
+
+# Evaluate the delay from TX to RX at this tau, should be equal
+taucheck = np.linalg.norm(rx_x[0] + v * p.roots()[1] - tx.x[0]) / lightspd
+print(taucheck)
+print(taucheck - p.roots()[1])
 
 # plt.plot(tauhat)

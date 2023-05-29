@@ -729,7 +729,9 @@ class BurstDetector:
 
         counts, edges = cp.histogram(self.d_medfiltered, noiseLevels)
         counts = counts.get()
-        for i in range(counts.size - 1):
+
+        # We iterate from 1, because the 0 index shouldn't be compared to the end
+        for i in range(1, counts.size - 1):
             if counts[i] < counts[i-1] and counts[i] < counts[i+1]:
                 detectedThreshold = noiseLevels[i]
                 return detectedThreshold * multiplier

@@ -419,6 +419,7 @@ class SimpleDemodulatorPSK:
 
         # Allocate output
         m = np.zeros(reim.shape[0], dtype=np.uint8)
+        yl = np.zeros(reim.shape[0])
 
         # Iterate over every row
         for i, row in enumerate(reim):
@@ -430,12 +431,13 @@ class SimpleDemodulatorPSK:
 
             # Determine if B or Q based on eigenvalues
             y = s[1] / s[0]
+            yl[i] = y
             if y < threshold:
                 m[i] = 2
             else:
                 m[i] = 4
         
-        return m
+        return m, yl
         
     
 ###############
@@ -561,97 +563,26 @@ class SimpleDemodulator8PSK(SimpleDemodulatorPSK):
     
 try:
     import cupy as cp
+    import os
+    from cupyExtensions import cupyModuleToKernelsLoader, cupyRequireDtype
     
-    # Kernels
-    eye_opening_kernel = cp.RawKernel(r'''
-    #include <cupy/complex.cuh>
-    extern "C" __global__
-    void eye_opening_kernel(
-        const complex<float> *d_xbatch, 
-        const int numInBatch, // this is not needed?
-        const int xlen,    
-        const float *d_abs_xbatch, const int osr,
-        complex<float> *d_x_rsbatch
-    ){
-                                            
-        // allocate shared memory
-        extern __shared__ double s[];
-        
-        float *s_abs_x = (float*)s; // (blockDim.x * OSR) floats
-        float *s_abs_totals = (float*)&s_abs_x[blockDim.x * OSR]; // (OSR) floats
-        int *s_eo_i = (int*)&s_abs_totals[OSR]; // (1) int
-        
-        // Zero the shared mem
-        for (int i = 0; i < osr; i++){
-            s_abs_x[threadIdx.x * OSR + i] = 0; // each thread zeros its own row        
-        }
-        // no need to sync threads here, each thread will be writing to its own row at first
-        
-        // Each block processes one signal, each thread has (OSR) possible
-        // addresses to write to, depending on which index of the signal it just read
-        // Loop over the length of the signal, but add to the appropriate
-        // OSR index in shared memory for accumulation
-        
-        // Declare variables
-        complex<float> *d_x = &d_xbatch[blockIdx.x * xlen]; // beginning of this block's signal
-        complex<float> *d_abs_x = &d_abs_xbatch[blockIdx.x * xlen]; // beginning of this block's abs signal
-        int t; // used to denote time index
-        int rsi; // used to denote the resample index
-        
-        // Begin loop
-        for (int i = threadIdx.x; i < xlen; i = i + blockDim.x)
-        {
-            t = i / osr;
-            rsi = i % osr;
-            // Accumulate the global memory index into its appropriate resample index
-            s_abs_x[threadIdx.x * osr + rsi] += d_abs_xbatch[i];
-        }
-        
-        __syncthreads(); // Wait for entire signal to be done
-        
-        // Now use the front few threads to accumulate the total
-        
-        if (threadIdx.x < osr)
-        {
-            s_abs_totals[threadIdx.x] = 0; // zero first
-            for (int i = 0; i < blockDim.x; i++){ // sum down the rows
-                s_abs_totals[threadIdx.x] += s_abs_x[i * OSR + threadIdx.x];
-            }
-        }
-        
-        __syncthreads();
-        
-        // Then use the first thread to find the max
-        float curTotal;
-        if (threadIdx.x == 0)
-        {
-            curTotal = s_abs_totals[0];
-            s_eo_i = 0;
-            for (int i = 1; i < osr; i++)
-            {
-                if (s_abs_totals[i] > curTotal)
-                {
-                    curTotal = s_abs_total[i];
-                    s_eo_i = i;
-                }
-            }
-        }
-        
-        __syncthreads();
-        
-        // And finally use the entire block again to write the appropriate resample index out
-        int eo_i = s_eo_i; // every thread reads the index to use
-        int rslen = xlen / osr;
-        complex<float> *d_x_rs = &d_x_rsbatch[blockIdx.x * rslen];
-        for (int i = threadIdx.x; i < rslen; i = i + blockDim.x)
-        {
-            d_x_rs[i] = d_x[i * osr + eo_i];    
-        }
-        
-        
-    }
-    ''','eye_opening_kernel')
+    # Raw kernel to get many eye openings at once as a batch
+    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "eyeOpeningKernel.cu"), "r") as fid:    
+        eyeOpeningBatchKernel = cp.RawKernel(fid.read(), '''getEyeOpening_batch''')
     
+    (lockPhase_mapSyms_singleBlkKernel_qpsk,
+     demod_qpsk_kernel,
+     compareIntegerPreambles_kernel,
+     cutAndRotate_gray_kernel,
+     detectBPSKorQPSK_kernel) = cupyModuleToKernelsLoader(
+        "demodulation.cu",
+        [
+            "lockPhase_mapSyms_singleBlkKernel_qpsk",
+            "demod_qpsk",
+            "compareIntegerPreambles",
+            "cutAndRotatePSKSymbolsFromPossiblePreambles_Gray",
+            "detectBPSKorQPSK"
+        ])
     
     # Classes
     class CupyDemodulatorPSK:
@@ -667,6 +598,35 @@ try:
             self.angleCorrection = None # Angle correction used in phase lock
             self.syms = None # Output mapping to each symbol (0 to M-1)
             self.matches = None # Output from amble rotation search
+
+        @staticmethod
+        def _checkEigResults(d_x: cp.ndarray):
+            """
+            Just meant for debugging purposes for the inner device function.
+
+            Results per row are:
+            0-3 : 2x2 row-major matrix from inner product
+            4-5 : Bigger eigenvalue then smaller eigenvalue
+            6-9 : 2x2 row-major matrix of eigenvectors (6&8) is one column eigenvector, (7&9) is another column eigenvector
+            """
+            d_eigresults = cp.zeros((d_x.shape[0], 10), dtype=cp.float32)
+
+            THREADS_PER_BLOCK = 128
+            NUM_BLKS = d_x.shape[0]
+            smReq = THREADS_PER_BLOCK * 16 + d_x.shape[1] * 8
+
+            detectBPSKorQPSK_kernel(
+                (NUM_BLKS,), (THREADS_PER_BLOCK,),
+                (
+                    d_x,
+                    int(d_x.shape[1]),
+                    int(d_x.shape[0]),
+                    d_eigresults
+                ),
+                shared_mem = smReq
+            )
+
+            return d_eigresults
             
         def getEyeOpening(self, x: cp.ndarray, osr: int, abs_x: cp.ndarray=None):
             if abs_x is None:
@@ -681,42 +641,6 @@ try:
             
             pass
         
-    
-except:
-    print("Skipping cupy demodulator imports.")
-        
-      
-#%% Cupy version of simple demodulators
-try:
-    import cupy as cp
-    import os
-    from cupyExtensions import cupyModuleToKernelsLoader, cupyRequireDtype
-
-    
-    # Raw kernel to get many eye openings at once as a batch
-    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "eyeOpeningKernel.cu"), "r") as fid:    
-        eyeOpeningBatchKernel = cp.RawKernel(fid.read(), '''getEyeOpening_batch''')
-    
-    # Raw kernel to lock phase and map syms together
-    # NOTE: assuming the entire signal fits in shared memory
-    # with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "lockPhase_mapSyms_singleBlkKernel_qpsk.cu"), "r") as fid:
-    #     sourcecode = fid.read()
-    #     module = cp.RawModule(code=sourcecode)
-    #     lockPhase_mapSyms_singleBlkKernel_qpsk = module.get_function("lockPhase_mapSyms_singleBlkKernel_qpsk")
-    #     demod_qpsk_kernel = module.get_function("demod_qpsk")
-    #     compareIntegerPreambles_kernel = module.get_function("compareIntegerPreambles")
-
-    (lockPhase_mapSyms_singleBlkKernel_qpsk,
-     demod_qpsk_kernel,
-     compareIntegerPreambles_kernel,
-     cutAndRotate_gray_kernel) = cupyModuleToKernelsLoader(
-        "lockPhase_mapSyms_singleBlkKernel_qpsk.cu",
-        [
-            "lockPhase_mapSyms_singleBlkKernel_qpsk",
-            "demod_qpsk",
-            "compareIntegerPreambles",
-            "cutAndRotatePSKSymbolsFromPossiblePreambles_Gray"
-        ])
     
     class CupyDemodulatorQPSK:
         def __init__(self, batchLength: int, numBitsPerBurst: int, cluster_threshold: float=0.1, batch_size: int=4096):
@@ -1316,10 +1240,11 @@ def ML_demod_QPSK(y, h, up, numSyms):
 
 # Leaving this reference code here for 2x2 eigvalues, to be converted into cuda kernels
 # Useful shortcut: https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html
-def eig2x2(x):
+def eig2x2(x, normaliseDet=True):
     # For better numerical accuracy, ensure determinant is 1.0 by doing this
-    nf = np.linalg.det(x)**0.5
-    x = x / nf
+    if normaliseDet:
+        nf = np.linalg.det(x)**0.5
+        x = x / nf
     
     a = 1.0
     b = -x[0,0] - x[1,1]

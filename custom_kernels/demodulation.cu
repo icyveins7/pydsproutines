@@ -93,6 +93,129 @@ void cutAndRotatePSKSymbolsFromPossiblePreambles_Gray(
         d_count[blockIdx.x] = totalWrite;
 }
 
+/*
+Assumes shared memory is sufficiently allocated;
+The 2x2 result lies at the starting 4 elements.
+The 2 eigenvalues lie right after. Bigger one is first.
+The 2 eigenvectors are at the end.
+
+As this is a __device__ function, you should use this as a building block
+in a bigger kernel, bearing in mind the shared mem requirements.
+*/
+extern "C" __device__
+void eigDecomposeInSharedMem_2x2(
+    const complex<float> *s_x, // Shared memory, xlength * 8
+    float *s_ws, // blockDim x 4 floats, must be pre-zeroed
+    const int xlength,
+    const int factor // number of times to square the signal before eigendecomposition
+){
+    // loop over the signal
+    complex<float> x;
+    for (int i = threadIdx.x; i < xlength; i += blockDim.x)
+    {
+        // Extract from sharedmem
+        x = s_x[i];
+
+        // perform squaring as necessary
+        for (int f = 0; f < factor; f++)
+            x = x * x;
+
+        // Now calculate the different components
+        s_ws[threadIdx.x * 4 + 0] += x.real() * x.real();
+        s_ws[threadIdx.x * 4 + 1] += x.real() * x.imag();
+        s_ws[threadIdx.x * 4 + 2] += x.real() * x.imag();
+        s_ws[threadIdx.x * 4 + 3] += x.imag() * x.imag();
+    }   
+    __syncthreads();
+    
+    // gather into 2x2 at the front
+    if (threadIdx.x < 4)
+    {
+        // remember that we can skip the first 2x2 values
+        for (int i = threadIdx.x + 4; i < blockDim.x * 4; i += 4)
+        {
+            s_ws[threadIdx.x] += s_ws[i];
+        }
+    }
+    __syncthreads(); // we cannot place syncthreads in a conditional block!
+        
+    // hence split the conditional into this next section again
+    if (threadIdx.x < 4)
+    {
+        // perform the 2x2 eigen decomposition
+        float T = s_ws[0] + s_ws[3]; // trace
+        float D = s_ws[0] * s_ws[3] - s_ws[1] * s_ws[2]; // determinant
+        
+        float p1 = T/2.0;
+        float p2 = sqrtf(fmaf(p1, p1, -D));
+        
+        // 0 and 2 write the first eigenvector
+        if (threadIdx.x % 2 == 0)
+        {
+            // compute the eigenvalue
+            float l1 = p1 + p2;
+            
+            // 0 writes the eigenvalue
+            if (threadIdx.x == 0){s_ws[4] = l1;}
+            
+            // compute the eigenvector
+            s_ws[6+threadIdx.x] = (threadIdx.x == 0) ? (l1 - s_ws[3]) : s_ws[2];
+        }
+        else // 1 and 3 write the second eigenvector
+        {
+            // compute the eigenvalue
+            float l2 = p1 - p2;
+            
+            // 1 writes the eigenvalue
+            if (threadIdx.x == 1){s_ws[5] = l2;}
+            
+            // compute the eigenvector
+            s_ws[6+threadIdx.x] = (threadIdx.x == 1) ? (l2 - s_ws[3]) : s_ws[2];
+        }
+        
+    }
+    __syncthreads();
+}
+
+// This is a sample kernel to check the outputs of the above kernel.
+// Not meant for actual use.
+extern "C" __global__
+void detectBPSKorQPSK(
+    const complex<float> *d_x,
+    const int xlength,
+    const int numSignals,
+    float *d_eigresults // each block writes 10 values
+){
+    // Allocate shared memory to read in the signal (one row)
+    extern __shared__ double s[];
+
+    complex<float> *s_x = (complex<float>*)s; // (xlength) complex floats
+    float *s_ws = (float*)&s_x[xlength]; // (blockDim.x * 4) floats
+
+    // Read row for the block
+    for (int t = threadIdx.x; t < xlength; t += blockDim.x)
+        s_x[t] = d_x[blockIdx.x * xlength + t];
+
+    // Pre-zero workspace
+    for (int t = threadIdx.x; t < blockDim.x * 4; t += blockDim.x)
+        s_ws[t] = 0.0f;
+
+    __syncthreads(); // wait for shared mem to be loaded
+
+    // Call the device func
+    eigDecomposeInSharedMem_2x2(
+        s_x, // Shared memory, xlength * 8
+        s_ws, // blockDim x 4 floats
+        xlength,
+        0 // number of times to square the signal before eigendecomposition
+    );
+
+    // Write results
+    if (threadIdx.x < 10)
+    {
+        d_eigresults[blockIdx.x * 10 + threadIdx.x] = s_ws[threadIdx.x];
+    }
+}
 
 /*
 This kernel takes in a matrix of signals, with 1 signal in each row.

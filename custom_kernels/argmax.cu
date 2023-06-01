@@ -88,7 +88,8 @@ void multiArgmaxAbsRows_complex64(
     const complex<float> *d_x,
     const int numRows, // dimension 1 of d_x
     const int length,  // dimension 2 of d_x
-    unsigned int *d_argmax // output, has length numRows
+    unsigned int *d_argmax, // output, has length numRows
+    float *d_max // output, has length numRows (optional)
 ){
     // allocate shared memory
     extern __shared__ double s[];
@@ -130,5 +131,12 @@ void multiArgmaxAbsRows_complex64(
 
     // max argument is in the first workspace value now, write it to global output
     if (threadIdx.x == 0)
+    {
         d_argmax[blockIdx.x] = s_idx[0];
+        if (d_max != NULL)
+            d_max[blockIdx.x] = s_ws[0];
+    }
+        
+
+    
 }

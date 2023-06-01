@@ -16,12 +16,10 @@ from musicRoutines import MUSIC
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sqlite3 as sq
 import concurrent.futures
-from cupyExtensions import *
-
-
 
 try:
     import cupy as cp
+    from cupyExtensions import *
     
     def cp_fastXcorr(cutout, rx, freqsearch=True, outputCAF=False, shifts=None, absResult=True, BATCH=1024):
         """

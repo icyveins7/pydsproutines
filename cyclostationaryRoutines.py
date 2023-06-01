@@ -12,6 +12,41 @@ import scipy.signal as sps
 import cupy as cp
 from signalCreationRoutines import makeFreq
 
+#%%
+class PSKOrderDetector:
+    def estimateOrder(self, x: np.ndarray, fs: float):
+        """
+        Estimates the order of the PSK signal.
+        This is done by appropriate squaring of the signal and spectral
+        peak detection.
+        
+        Parameters
+        ----------
+        x : np.ndarray, N x L
+            The N PSK signal(s) of length L.
+            Each row is processed separately
+            i.e. treated as an individual signal.
+        fs : float
+            The sampling frequency of the signal.
+        
+        Returns
+        -------
+        order : np.ndarray
+            The order of the PSK signal(s).
+        
+        """
+
+        for i in range(3):
+            x = x * x
+            # Get the magnitude of spectrum
+            xf = np.abs(np.fft.fft(x))**2
+            # Take argmax along each row
+            mi = np.argmax(np.abs(xf)**2, axis=0)
+            pmi = xf[:, mi]
+
+        
+
+#%%
 def estimateBaud(x: np.ndarray, fs: float):
     '''
     Estimates baud rate of signal. (CM21)

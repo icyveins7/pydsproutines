@@ -42,6 +42,10 @@ def cupyCheckExceedsSharedMem(requestedBytes: int, maximumBytes: int=48000):
     if requestedBytes > maximumBytes:
         raise MemoryError("Shared memory requested %d bytes exceeds maximum %d bytes" % (requestedBytes, maximumBytes))
 
+def requireCupyArray(var: cp.ndarray):
+    if not isinstance(var, cp.ndarray):
+        raise TypeError("Must be cupy array.")
+
 
 #%% A block-group paired kernel copy
 copy_groups_kernel32fc = cp.RawKernel(r'''
@@ -172,12 +176,33 @@ def cupyArgmax3d_uint32(d_x: cp.ndarray, THREADS_PER_BLOCK: int=128, alsoReturnM
 
         return d_argmax
 
-def cupyArgmaxAbsRows_complex64(d_x: cp.ndarray, THREADS_PER_BLOCK: int=128):
+def cupyArgmaxAbsRows_complex64(
+    d_x: cp.ndarray,
+    d_argmax: cp.ndarray=None,
+    d_max: cp.ndarray=None,
+    returnMaxValues: bool=False,
+    THREADS_PER_BLOCK: int=128
+):
     cupyRequireDtype(cp.complex64, d_x)
 
     # Allocate output
     numRows, length = d_x.shape
-    d_argmax = cp.zeros(numRows, dtype=cp.uint32)
+    if d_argmax is None:
+        d_argmax = cp.zeros(numRows, dtype=cp.uint32)
+    else:
+        cupyRequireDtype(cp.uint32, d_argmax)
+        if d_argmax.shape != (numRows,):
+            raise ValueError("d_argmax shape must be 1D of length %d" % numRows)
+
+    if returnMaxValues:
+        if d_max is None:
+            d_max = cp.zeros(numRows, dtype=cp.float32)
+        else:
+            cupyRequireDtype(cp.float32, d_max)
+            if d_argmax.shape != (numRows,):
+                raise ValueError("d_max shape must be 1D of length %d" % numRows)
+    else:
+        d_max = 0
 
     # Shared mem req
     smReq = THREADS_PER_BLOCK * (4 + 4)
@@ -186,9 +211,13 @@ def cupyArgmaxAbsRows_complex64(d_x: cp.ndarray, THREADS_PER_BLOCK: int=128):
     NUM_BLKS = numRows
     _argmaxAbsRows_cplx64kernel(
         (NUM_BLKS,), (THREADS_PER_BLOCK,),
-        (d_x, numRows, length, d_argmax),
+        (d_x, numRows, length, d_argmax, d_max),
         shared_mem=smReq
     )
+
+    if returnMaxValues:
+        return d_argmax, d_max
+    
     return d_argmax
 
 #%% 

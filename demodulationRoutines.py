@@ -574,14 +574,16 @@ try:
      demod_qpsk_kernel,
      compareIntegerPreambles_kernel,
      cutAndRotate_gray_kernel,
-     detectBPSKorQPSK_kernel) = cupyModuleToKernelsLoader(
+     detectBPSKorQPSK_kernel,
+     demod_b_or_q_psk_kernel) = cupyModuleToKernelsLoader(
         "demodulation.cu",
         [
             "lockPhase_mapSyms_singleBlkKernel_qpsk",
             "demod_qpsk",
             "compareIntegerPreambles",
             "cutAndRotatePSKSymbolsFromPossiblePreambles_Gray",
-            "detectBPSKorQPSK"
+            "detectBPSKorQPSK",
+            "demod_b_or_q_psk"
         ])
     
     # Classes
@@ -598,6 +600,42 @@ try:
             self.angleCorrection = None # Angle correction used in phase lock
             self.syms = None # Output mapping to each symbol (0 to M-1)
             self.matches = None # Output from amble rotation search
+
+        @staticmethod
+        def demod_b_or_q_psk(d_xbatch: cp.ndarray, d_m: cp.ndarray, THREADS_PER_BLOCK: int=128):
+            # Turn into a 2-D if necessary
+            if d_xbatch.ndim == 1:
+                d_xbatch = d_xbatch.reshape((1, -1))
+
+            # Check dimensions match
+            if d_m.ndim != 1:
+                raise ValueError("d_m must be 1D.")
+            if d_xbatch.shape[0] != d_m.size:
+                raise ValueError("d_xbatch must have rows == d_m.size")
+
+            # Check types
+            cupyRequireDtype(cp.complex64, d_xbatch)
+            cupyRequireDtype(cp.uint8, d_m)
+
+            numSignals, xlength = d_xbatch.shape
+
+            NUM_BLKS = numSignals
+
+            # Allocate shared mem
+            smReq = xlength * 8 + THREADS_PER_BLOCK * 8
+            cupyCheckExceedsSharedMem(smReq)
+            
+            # Allocate output
+            d_syms = cp.zeros(d_xbatch.shape, dtype=cp.uint8)
+
+            # Invoke kernel
+            demod_b_or_q_psk_kernel(
+                (NUM_BLKS,),(THREADS_PER_BLOCK,),
+                (d_xbatch, xlength, numSignals, d_m, d_syms),
+                shared_mem=smReq
+            )
+
+            return d_syms
 
         @staticmethod
         def _checkEigResults(d_x: cp.ndarray):

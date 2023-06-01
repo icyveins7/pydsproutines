@@ -217,42 +217,67 @@ void detectBPSKorQPSK(
     }
 }
 
-/*
-This kernel takes in a matrix of signals, with 1 signal in each row.
-A block is assigned to each signal, which performs the phase-locking to the QPSK constellation,
-maps the values to {0,1,2,3} based on an anticlockwise direction and then writes the output back to global memory.
 
-NOTE: THIS MAPPING IS NOT THE GRAY CODING CONSTELLATION.
-
-Note: the memory block for the matrix inevitably has a fixed number of columns,
-but each signal may occupy less than the maximum number of columns.
-The remaining columns for the signal should be zero-ed out.
-*/
-extern "C" __global__
-void demod_qpsk(
-    const complex<float> *d_x, // Input matrix, dimensions of numSignals * xlength
-    const int xlength, // Number of columns in d_x (each signal may occupy less than this value, rest of the columns must be zero-ed out)
-    const int numSignals, // Number of signals i.e. rows in d_x
-    unsigned char *d_syms // Output matrix, dimensions also numSignals * xlength
+extern "C" __device__
+void demod_bpsk_in_shared(
+    complex<float> *s_x, // xlength
+    complex<float> *s_ws, // blockDim.x
+    const int xlength,
+    unsigned char *d_syms_exact // the exact starting pointer; if multiple rows output, point this to the exact row
 ){
-    // Exit if the block number is more than the number of signals
-    if (blockIdx.x >= numSignals)
-        return;
-
-    // Allocate shared memory to read in the signal (one row)
-    extern __shared__ double s[];
-
-    complex<float> *s_x = (complex<float>*)s; // (xlength) complex floats
-    complex<float> *s_ws = (complex<float>*)&s_x[xlength]; // (blockDim.x) complex floats
-
-    // Read the row assigned to the current block
-    int blkGlobalOffset = blockIdx.x * xlength;
+    // Take the power 2 of each sample, and sum over them for each thread
+    complex<float> t_xtotal = 0;
+    complex<float> t_x;
     for (int t = threadIdx.x; t < xlength; t += blockDim.x)
-        s_x[t] = d_x[blkGlobalOffset + t];
+    {
+        t_x = s_x[t] * s_x[t]; // square it
 
-    // Wait for signal to finish copying to shared memory
+        // sum for the current thread
+        t_xtotal += t_x;
+    }
+    // At the end, we write the thread's total to its spot in the shared mem workspace
+    s_ws[threadIdx.x] = t_xtotal;
+
+    // Wait for all threads to finish writing to workspace
     __syncthreads();
 
+    // Sum over the workspace & compute the angle correction
+    t_xtotal = 0;
+    for (int i = 0; i < blockDim.x; i++){
+        t_xtotal += s_ws[i]; // all threads read the same memory address from shared mem workspace
+    }
+    float angleCorrection = atan2f(t_xtotal.imag(), t_xtotal.real()) / 2; // we divide by 2 to counter the power of 2 we induced
+
+    // Generate the phase correction
+    float real, imag;
+    sincosf(-angleCorrection, &imag, &real); // we correct to 0
+    complex<float> e(real, imag);
+
+    // Apply the phase correction and map the symbol
+    int xsign;
+
+    for (int i = threadIdx.x; i < xlength; i += blockDim.x)
+    {
+        // Each thread reads its own value and stores in its own register (do not write back to shared mem! no point!)
+        t_x = s_x[i] * e;
+
+        // Map the symbol based on sign of real/imag
+        xsign = signbit(t_x.real()); // signbit returns positive->0, negative->1, which corresponds to the actual sign bit value
+
+        // We simply want to return the sign bit, since it fits our mapping
+
+        // Write to global mem
+        d_syms_exact[i] = (unsigned char)xsign;
+    }
+}
+
+extern "C" __device__
+void demod_qpsk_in_shared(
+    complex<float> *s_x, // xlength
+    complex<float> *s_ws, // blockDim.x
+    const int xlength,
+    unsigned char *d_syms_exact // the exact starting pointer; if multiple rows output, point this to the exact row
+){
     // Take the power 4 of each sample, and sum over them for each thread
     complex<float> t_xtotal = 0;
     complex<float> t_x;
@@ -304,9 +329,90 @@ void demod_qpsk(
         // See the const mapping array above to verify this is correct.
 
         // Write to global mem
-        d_syms[blkGlobalOffset + i] = mapping[xsign][ysign];
+        d_syms_exact[i] = mapping[xsign][ysign];
     }
+}
 
+/*
+This kernel takes in a matrix of signals, with 1 signal in each row.
+A block is assigned to each signal, which performs the phase-locking to the QPSK constellation,
+maps the values to {0,1,2,3} based on an anticlockwise direction and then writes the output back to global memory.
+
+NOTE: THIS MAPPING IS NOT THE GRAY CODING CONSTELLATION.
+
+Note: the memory block for the matrix inevitably has a fixed number of columns,
+but each signal may occupy less than the maximum number of columns.
+The remaining columns for the signal should be zero-ed out.
+*/
+extern "C" __global__
+void demod_qpsk(
+    const complex<float> *d_x, // Input matrix, dimensions of numSignals * xlength
+    const int xlength, // Number of columns in d_x (each signal may occupy less than this value, rest of the columns must be zero-ed out)
+    const int numSignals, // Number of signals i.e. rows in d_x
+    unsigned char *d_syms // Output matrix, dimensions also numSignals * xlength
+){
+    // Exit if the block number is more than the number of signals
+    if (blockIdx.x >= numSignals)
+        return;
+
+    // Allocate shared memory to read in the signal (one row)
+    extern __shared__ double s[];
+
+    complex<float> *s_x = (complex<float>*)s; // (xlength) complex floats
+    complex<float> *s_ws = (complex<float>*)&s_x[xlength]; // (blockDim.x) complex floats
+
+    // Read the row assigned to the current block
+    int blkGlobalOffset = blockIdx.x * xlength;
+    for (int t = threadIdx.x; t < xlength; t += blockDim.x)
+        s_x[t] = d_x[blkGlobalOffset + t];
+
+    // Wait for signal to finish copying to shared memory
+    __syncthreads();
+
+    // Call the device function
+    demod_qpsk_in_shared(s_x, s_ws, xlength, &d_syms[blkGlobalOffset]);
+}
+
+/*
+This is a more generalised form of the demodulation function,
+that takes in a secondary array that specifies the PSK order m of each row of the input.
+Currently, this only evaluates m=2 (BPSK) or m=4 (QPSK), and will call the appropriate
+demodulator device function.
+*/
+extern "C" __global__
+void demod_b_or_q_psk(
+    const complex<float> *d_x, // Input matrix, dimensions of numSignals * xlength
+    const int xlength, // Number of columns in d_x (each signal may occupy less than this value, rest of the columns must be zero-ed out)
+    const int numSignals, // Number of signals i.e. rows in d_x
+    const unsigned char *d_m, // PSK order matrix, m = 2 or 4, length numSignals
+    unsigned char *d_syms // Output matrix, dimensions also numSignals * xlength
+){
+    // Exit if the block number is more than the number of signals
+    if (blockIdx.x >= numSignals)
+        return;
+
+    // Allocate shared memory to read in the signal (one row)
+    extern __shared__ double s[];
+
+    complex<float> *s_x = (complex<float>*)s; // (xlength) complex floats
+    complex<float> *s_ws = (complex<float>*)&s_x[xlength]; // (blockDim.x) complex floats
+
+    // Read the row assigned to the current block
+    int blkGlobalOffset = blockIdx.x * xlength;
+    for (int t = threadIdx.x; t < xlength; t += blockDim.x)
+        s_x[t] = d_x[blkGlobalOffset + t];
+
+    // Wait for signal to finish copying to shared memory
+    __syncthreads();
+
+    // Read the m value for this row
+    unsigned char m = d_m[blockIdx.x];
+
+    // Call the appropriate device function
+    if (m == 2)
+        demod_bpsk_in_shared(s_x, s_ws, xlength, &d_syms[blkGlobalOffset]);
+    else if (m == 4)
+        demod_qpsk_in_shared(s_x, s_ws, xlength, &d_syms[blkGlobalOffset]);
 }
 
 

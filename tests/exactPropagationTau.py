@@ -11,78 +11,38 @@ closeAllFigs()
 
 import numpy as np
 
-lightspd = 299792458.0
+from scipy.constants import speed_of_light as lightspd
 
-numSamp = 1000000
-T = 1e-6
-v = 1000.0
+#%%
+traj = ConstantVelocityTrajectory(np.array([3e7,0,0]), np.array([300, 0, 0]))
 
-rx_x, rx_xdot = createLinearTrajectory(numSamp, np.array([10000e3, 0, 0]), np.array([0, 10000e3, 0]), v, T)
-print(rx_xdot[0])
+# Assume tx at origin
+tx_x = np.zeros(3)
 
-t = np.arange(rx_x.shape[0])*T
-rx = Receiver(rx_x, rx_xdot, t)
-
-tx = Transmitter.asStationary(np.zeros((numSamp,3)), t)
-
-tauhats = np.linalg.norm(rx.x - tx.x, axis=1) / lightspd
-
-def taucost(tx, rx, tau, t0):
-    # Assume 1D, only x is relevant, ignore y and z
-    if t0+tau > rx.t[-1]:
-        raise ValueError("Out of bounds")
+# First guess
+tauhat = np.linalg.norm(tx_x - traj.at(0)) / lightspd
+print("First guess tau = %.15g" % tauhat)
+# Check guess
+check = lightspd * tauhat - np.linalg.norm(tx_x - traj.at(tauhat))
+print("Minimized check = %.15g (metres)" % check)
+# Iterate
+for i in range(3):
+    tauhat = np.linalg.norm(tx_x - traj.at(tauhat)) / lightspd
+    print("tauhat = %.15g" % tauhat)
     
-    return lightspd * tau - np.abs(tx.x[0,0] - np.interp(t0+tau, rx.t, rx.x[:,0]))
-
-for i, tauhat in enumerate(tauhats):
-    tauActual = np.linalg.norm(rx.x[0]) / (lightspd - rx.xdot[0,0])
+check = lightspd * tauhat - np.linalg.norm(tx_x - traj.at(tauhat))
+print("Minimized check = %.15g (metres)" % check)
     
-    tc = taucost(tx, rx, tauhat, t[i])
-    tauhatp = tauhat
-    
-    k = 0
-    while np.abs(tc) > 1e-6:
-        
-        # if tc < 0:
-        tauhatp = np.linalg.norm(tx.x[0,0] - np.interp(t[i]+tauhatp, rx.t, rx.x[:,0])) / lightspd
-        # else:
-        #     tauhatp = np.linalg.norm(tx.x[0,0] - np.interp(t[i]-tauhatp, rx.t, rx.x[:,0])) / lightspd
-        
-        # if tc < 0:
-        #     tauhatp += 1e-9
-        # else:
-        #     tauhatp -= 1e-9
-        
-        newtc = taucost(tx, rx, tauhatp, t[i])
-        if k > 0 and np.sign(newtc) != np.sign(tc):
-            print("exit")
-            break
-        tc = newtc
-        k += 1
-        print(newtc, tauhatp)
-    
-    
-    print("First", tauActual - tauhat, (tauActual-tauhat)/tauActual)
-    print("Refined", tauActual - tauhatp, (tauActual-tauhatp)/tauActual)
-    print("%d steps" % (k))
-    
-    
-    break
-
 #%% Test using velocity instead
 from numpy.polynomial import Polynomial
 
-v = rx_xdot[0]
-D = tx.x[0] - rx_x[0]
+v = traj.v
+D = tx_x - traj.x0
 
 p = Polynomial((np.linalg.norm(D)**2, -2*np.dot(v,D), (-lightspd**2 - np.linalg.norm(v)**2)))
-print(p.roots())
-print(tauActual)
-print(tauActual - p.roots())
+# print(p.roots())
+tauhatpoly = p.roots()[1]
 
-# Evaluate the delay from TX to RX at this tau, should be equal
-taucheck = np.linalg.norm(rx_x[0] + v * p.roots()[1] - tx.x[0]) / lightspd
-print(taucheck)
-print(taucheck - p.roots()[1])
-
-# plt.plot(tauhat)
+print("Tau estimation using velocity = %.15g" % tauhatpoly)
+polycheck = lightspd * tauhatpoly - np.linalg.norm(tx_x - traj.at(tauhatpoly))
+print("Minimized check = %.15g (metres)" % polycheck)

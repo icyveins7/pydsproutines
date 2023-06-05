@@ -48,6 +48,63 @@ try:
 except:
     print("Skipping trajectoryRoutines cupy imports.")
 
+
+#%%
+class Trajectory:
+    def __init__(self, x0: np.ndarray):
+        """
+        Initialises a trajectory object.
+
+        Parameters
+        ----------
+        x0 : np.ndarray
+            Initial position vector. This is the position at t=0.
+        """
+        if x0.ndim != 1:
+            raise np.ValueError("x0 must be a 1D array.")
+        self._x0 = x0
+
+    @property
+    def x0(self):
+        "Initial position vector."
+        return self._x0
+
+    def at(self, t: np.ndarray):
+        raise NotImplementedError("This is only implemented for subclasses.")
+    
+class ConstantVelocityTrajectory(Trajectory):
+    def __init__(self, x0: np.ndarray, v: np.ndarray):
+        super().__init__(x0)
+        # Ensure same dimensions
+        if v.shape != self.x0.shape:
+            raise np.ValueError("v must be the same shape as x0.")
+        self._v = v
+
+    @property
+    def v(self):
+        "Velocity vector."
+        return self._v
+
+    def at(self, t: np.ndarray):
+        """
+        Calculates the position at time t.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Array of time values at which to calculate the position.
+            Must be a 1D array. A single value will be converted to a numpy array automatically.
+        """
+        if isinstance(t, float) or isinstance(t, int):
+            t = np.array([t], dtype=np.float64)
+        if not isinstance(t, np.ndarray):
+            raise TypeError("t must be a numpy array.")
+        if t.ndim != 1:
+            raise np.ValueError("t must be a 1D array.")
+        
+        return self._x0 + t.reshape((-1,1)) * self._v
+    
+#%%
 def createLinearTrajectory(totalSamples, pos1, pos2, speed, sampleTime, start_coeff=0):
     # Define connecting vector between two anchors
     dirVec = pos2 - pos1

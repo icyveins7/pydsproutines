@@ -448,7 +448,8 @@ class SimpleDemodulatorBPSK(SimpleDemodulatorPSK):
     def __init__(self, bitmap: np.ndarray=None, cluster_threshold: float=0.1):
         super().__init__(2, bitmap, cluster_threshold)
         
-    def mapSyms(self, reimc: np.ndarray):
+    @staticmethod
+    def mapSyms(reimc: np.ndarray):
         # Simply get the real
         re = np.real(reimc)
         
@@ -678,6 +679,22 @@ try:
         def getEyeOpeningBatch(self, xbatch: cp.ndarray, osr: int, abs_xbatch: cp.ndarray):
             
             pass
+
+        @staticmethod
+        def prepareIntPreambles(
+            integerPreamblesDict: dict
+        ):
+            ordering = []
+            lengths = []
+            amalg = []
+            for k, v in integerPreamblesDict.items():
+                ordering.append(k)
+                lengths.append(v.size)
+                amalg.append(v)
+            # Convert to gpu arrays
+            d_amalg = cp.asarray(np.hstack(amalg), dtype=cp.uint8)
+
+            return ordering, lengths, d_amalg
         
     
     class CupyDemodulatorQPSK:
@@ -790,21 +807,7 @@ try:
 
                 return d_out
 
-        @staticmethod
-        def prepareIntPreambles(
-            integerPreamblesDict: list
-        ):
-            ordering = []
-            lengths = []
-            amalg = []
-            for k, v in integerPreamblesDict.items():
-                ordering.append(k)
-                lengths.append(v.size)
-                amalg.append(v)
-            # Convert to gpu arrays
-            d_amalg = cp.asarray(np.hstack(amalg), dtype=cp.uint8)
-
-            return ordering, lengths, d_amalg
+        
 
         @staticmethod
         def compareIntPreambles(

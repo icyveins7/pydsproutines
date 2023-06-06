@@ -517,6 +517,11 @@ This is then output to global memory appropriately.
 Note that the size of the output 'matches' is determined by:
 (numSignals * numPreambles * m). As such, be aware that this may be excessively large
 if (numSignals) is large.
+
+An optional mask may be specified (opt_m_mask) which has a value of m for each row of d_syms
+i.e. each block reads 1 value. If the input 'm' value is not equal to the block's opt_m_mask value,
+the block returns without doing any work. This should allow you to only work on certain rows with certain
+preambles.
 */
 extern "C" __global__
 void compareIntegerPreambles(
@@ -529,10 +534,15 @@ void compareIntegerPreambles(
     const int numPreambles,
     const int *preambleLengths,
     const int m,
-    unsigned int *matches
+    unsigned int *matches,
+    unsigned char *opt_m_mask
 ){
     // Exit if the block number is more than the number of signals
     if (blockIdx.x >= numSignals)
+        return;
+
+    // If mask is specified, exit if the current block's mask value doesn't match
+    if (opt_m_mask != NULL && (int)opt_m_mask[blockIdx.x] != m)
         return;
 
     // Allocate shared memory to read in the signal (one row) and preambles
@@ -643,139 +653,139 @@ TODO: complete this.
 
 
 
-extern "C" __global__
-void compareIntegerPreambles_BQ(
-    const unsigned char *d_m,
-    const unsigned char *d_syms,
-    const int numSignals,
-    const int symsLength, 
-    const int searchStart,
-    const int searchEnd,
-    const unsigned char *d_preamblesB,
-    const int numPreamblesB,
-    const int *preambleLengthsB,
-    const unsigned char *d_preamblesQ,
-    const int numPreamblesQ,
-    const int *preambleLengthsQ,
-    unsigned int *matches
-){
-    // Exit if the block number is more than the number of signals
-    if (blockIdx.x >= numSignals)
-        return;
+// extern "C" __global__
+// void compareIntegerPreambles_BQ(
+//     const unsigned char *d_m,
+//     const unsigned char *d_syms,
+//     const int numSignals,
+//     const int symsLength, 
+//     const int searchStart,
+//     const int searchEnd,
+//     const unsigned char *d_preamblesB,
+//     const int numPreamblesB,
+//     const int *preambleLengthsB,
+//     const unsigned char *d_preamblesQ,
+//     const int numPreamblesQ,
+//     const int *preambleLengthsQ,
+//     unsigned int *matches
+// ){
+//     // Exit if the block number is more than the number of signals
+//     if (blockIdx.x >= numSignals)
+//         return;
 
-    // Read the modulation order for the row
-    int m = (int)d_m[blockIdx.x];
+//     // Read the modulation order for the row
+//     int m = (int)d_m[blockIdx.x];
 
-    // Create temporary pointers/values
-    const int numPreambles;
-    const int *preambleLengths;
-    const unsigned char *d_preambles;
-    if (m == 2)
-    {
-        numPreambles = numPreamblesB;
-        preambleLengths = preambleLengthsB;
-        d_preambles = d_preamblesB;
-    }
-    else if (m == 4)
-    {
-        numPreambles = numPreamblesQ;
-        preambleLengths = preambleLengthsQ;
-        d_preambles = d_preamblesQ;
-    }
+//     // Create temporary pointers/values
+//     const int numPreambles;
+//     const int *preambleLengths;
+//     const unsigned char *d_preambles;
+//     if (m == 2)
+//     {
+//         numPreambles = numPreamblesB;
+//         preambleLengths = preambleLengthsB;
+//         d_preambles = d_preamblesB;
+//     }
+//     else if (m == 4)
+//     {
+//         numPreambles = numPreamblesQ;
+//         preambleLengths = preambleLengthsQ;
+//         d_preambles = d_preamblesQ;
+//     }
 
-    // Allocate shared memory to read in the signal (one row) and preambles
-    extern __shared__ double s[];
-    int *s_preambleLengths = (int*)s; // (numPreambles) ints
+//     // Allocate shared memory to read in the signal (one row) and preambles
+//     extern __shared__ double s[];
+//     int *s_preambleLengths = (int*)s; // (numPreambles) ints
 
-    // Read in the preamble lengths first
-    for (int t = threadIdx.x; t < numPreambles; t += blockDim.x){
-        s_preambleLengths[t] = preambleLengths[t];
-    }
-    // Wait for the lengths to be read in
-    __syncthreads();
+//     // Read in the preamble lengths first
+//     for (int t = threadIdx.x; t < numPreambles; t += blockDim.x){
+//         s_preambleLengths[t] = preambleLengths[t];
+//     }
+//     // Wait for the lengths to be read in
+//     __syncthreads();
 
-    // Now check the total length required for all preambles
-    int totalPreambleLength = 0;
-    for (int i = 0; i < numPreambles; i++)
-        totalPreambleLength += s_preambleLengths[i];
+//     // Now check the total length required for all preambles
+//     int totalPreambleLength = 0;
+//     for (int i = 0; i < numPreambles; i++)
+//         totalPreambleLength += s_preambleLengths[i];
 
-    // And then we assign the space for the rest of shared memory
-    const int matchesSzPerPreamble = m * (searchEnd - searchStart);
-    const int matchesSzPerSignal = numPreambles * matchesSzPerPreamble;
-    const int outputBlkGlobalOffset = blockIdx.x * matchesSzPerSignal;
+//     // And then we assign the space for the rest of shared memory
+//     const int matchesSzPerPreamble = m * (searchEnd - searchStart);
+//     const int matchesSzPerSignal = numPreambles * matchesSzPerPreamble;
+//     const int outputBlkGlobalOffset = blockIdx.x * matchesSzPerSignal;
 
-    unsigned int *s_ws = (unsigned int*)&s_preambleLengths[numPreambles]; // (m * (searchEnd-searchStart)) unsigned ints, this is the 'matches' matrix
-    unsigned char *s_syms = (unsigned char*)&s_ws[matchesSzPerPreamble]; // (symsLength) unsigned chars
-    unsigned char *s_preambles = (unsigned char*)&s_syms[symsLength]; // (totalPreambleLength) unsigned chars
-    /* IMPORTANT:
-    We stack the shared memory in order of int32->uint32->uint8->uint8
-    because CUDA enforces all pointers of a type to be aligned to an address of that type's size.
-    If we moved the uint32 pointer to the last part of the shared memory,
-    the uint8s may lead to a non-32-bit aligned address as the start of the next memory section,
-    and this will cause a misaligned address error during execution 
-    (
-        NOTE: compilation will be successful,
-        and the kernel will actually run without error if you get lucky!)
-    */
+//     unsigned int *s_ws = (unsigned int*)&s_preambleLengths[numPreambles]; // (m * (searchEnd-searchStart)) unsigned ints, this is the 'matches' matrix
+//     unsigned char *s_syms = (unsigned char*)&s_ws[matchesSzPerPreamble]; // (symsLength) unsigned chars
+//     unsigned char *s_preambles = (unsigned char*)&s_syms[symsLength]; // (totalPreambleLength) unsigned chars
+//     /* IMPORTANT:
+//     We stack the shared memory in order of int32->uint32->uint8->uint8
+//     because CUDA enforces all pointers of a type to be aligned to an address of that type's size.
+//     If we moved the uint32 pointer to the last part of the shared memory,
+//     the uint8s may lead to a non-32-bit aligned address as the start of the next memory section,
+//     and this will cause a misaligned address error during execution 
+//     (
+//         NOTE: compilation will be successful,
+//         and the kernel will actually run without error if you get lucky!)
+//     */
 
 
-    // Copy these into shared memory
-    int blkGlobalOffset = blockIdx.x * symsLength;
-    for (int t = threadIdx.x; t < symsLength; t += blockDim.x)
-        s_syms[t] = d_syms[blkGlobalOffset + t]; // Copy only this row
+//     // Copy these into shared memory
+//     int blkGlobalOffset = blockIdx.x * symsLength;
+//     for (int t = threadIdx.x; t < symsLength; t += blockDim.x)
+//         s_syms[t] = d_syms[blkGlobalOffset + t]; // Copy only this row
 
-    for (int t = threadIdx.x; t < totalPreambleLength; t += blockDim.x)
-        s_preambles[t] = d_preambles[t]; // Copy the entire concatenated array of preambles
+//     for (int t = threadIdx.x; t < totalPreambleLength; t += blockDim.x)
+//         s_preambles[t] = d_preambles[t]; // Copy the entire concatenated array of preambles
     
-    // Wait for all shared mem copies to complete
-    __syncthreads();
+//     // Wait for all shared mem copies to complete
+//     __syncthreads();
     
-    // Now we process each preamble individually
-    unsigned char *s_preamble_test = s_preambles;
+//     // Now we process each preamble individually
+//     unsigned char *s_preamble_test = s_preambles;
     
-    unsigned char counterIdx;
-    for (int i = 0; i < numPreambles; i++)
-    {
-        if (i > 0) // Increment pointer to the next preamble
-            s_preamble_test = s_preamble_test + s_preambleLengths[i-1];
+//     unsigned char counterIdx;
+//     for (int i = 0; i < numPreambles; i++)
+//     {
+//         if (i > 0) // Increment pointer to the next preamble
+//             s_preamble_test = s_preamble_test + s_preambleLengths[i-1];
 
-        // Each thread tackles a search index, looping until all search indices are complete
-        for (int t = threadIdx.x; t < searchEnd - searchStart; t += blockDim.x)
-        {
-            int searchIdx = searchStart + t;
+//         // Each thread tackles a search index, looping until all search indices are complete
+//         for (int t = threadIdx.x; t < searchEnd - searchStart; t += blockDim.x)
+//         {
+//             int searchIdx = searchStart + t;
             
-            // Pre-zero our workspace
-            for (int j = 0; j < m; j++)
-            {
-                s_ws[t*m + j] = 0;
-            }
+//             // Pre-zero our workspace
+//             for (int j = 0; j < m; j++)
+//             {
+//                 s_ws[t*m + j] = 0;
+//             }
 
-            // Loop over the current preamble
-            for (int j = 0; j < s_preambleLengths[i]; j++)
-            {
-                // Calculate the proper rotation by adding m to the input signal
-                // Explicit upcasting
-                counterIdx = (s_preamble_test[j] + (unsigned char)m - s_syms[searchIdx+j]) % m;
-                s_ws[t * m + (int)counterIdx] += 1;
-            }
-        }
+//             // Loop over the current preamble
+//             for (int j = 0; j < s_preambleLengths[i]; j++)
+//             {
+//                 // Calculate the proper rotation by adding m to the input signal
+//                 // Explicit upcasting
+//                 counterIdx = (s_preamble_test[j] + (unsigned char)m - s_syms[searchIdx+j]) % m;
+//                 s_ws[t * m + (int)counterIdx] += 1;
+//             }
+//         }
 
-        // Wait for the workspace to be complete
-        __syncthreads();
+//         // Wait for the workspace to be complete
+//         __syncthreads();
 
-        // Write our workspace (which is the matches matrix for this preamble)
-        // back to global memory; make sure to skip 
-        for (int t = threadIdx.x; t < matchesSzPerPreamble; t += blockDim.x)
-        {
-            matches[outputBlkGlobalOffset + i * matchesSzPerPreamble + t] = s_ws[t];
-        }
+//         // Write our workspace (which is the matches matrix for this preamble)
+//         // back to global memory; make sure to skip 
+//         for (int t = threadIdx.x; t < matchesSzPerPreamble; t += blockDim.x)
+//         {
+//             matches[outputBlkGlobalOffset + i * matchesSzPerPreamble + t] = s_ws[t];
+//         }
 
-        // Before going to the next preamble, make sure everyone is done
-        __syncthreads();
+//         // Before going to the next preamble, make sure everyone is done
+//         __syncthreads();
 
-    }
+//     }
 
-}
+// }
 
 
 

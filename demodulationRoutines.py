@@ -695,46 +695,87 @@ try:
             d_amalg = cp.asarray(np.hstack(amalg), dtype=cp.uint8)
 
             return ordering, lengths, d_amalg
-        
-    
-    class CupyDemodulatorQPSK:
-        def __init__(self, batchLength: int, numBitsPerBurst: int, cluster_threshold: float=0.1, batch_size: int=4096):
-            self.m = 4
-            self.cluster_threshold = cluster_threshold
-            self.batch_size = batch_size
-            self.batchLength = batchLength
-            self.numBitsPerBurst = numBitsPerBurst # Note that this number is twice the number of symbols used, since QPSK
-            
-            # One-time pre-allocation
-            self.d_reim_batch = cp.zeros((batch_size, batchLength), dtype=cp.complex64)
-            self.d_reimc_batch = cp.zeros((batch_size, batchLength), dtype=cp.complex64)
-            self.d_syms_batch = cp.zeros((batch_size, batchLength), dtype=cp.uint32)
-            self.d_bestMatches = cp.zeros((batch_size), dtype=cp.int32)
-            self.d_bestRotations = cp.zeros((batch_size), dtype=cp.int32)
-            self.d_bestMatchIdx = cp.zeros((batch_size), dtype=cp.int32)
-            self.d_bits_batch = cp.zeros((batch_size, numBitsPerBurst), dtype=cp.uint8)
-            
-            # Counter for batching
-            # self.actr = 0 # Batching for eye-opening
-            self.bctr = 0 # Batching for demodulation
-            # Note that they should be the same at the end
-            
-            # # Interrim output
-            # self.xeo = None # Selected eye-opening resample points
-            # self.xeo_i = None # Index of eye-opening
-            # self.eo_metric = None # Metrics of eye-opening
-            # self.reimc = None # Phase-locked to constellation (complex array)
-            # self.svd_metric = None # SVD metric for phase lock
-            # self.angleCorrection = None # Angle correction used in phase lock
-            # self.syms = None # Output mapping to each symbol (0 to M-1)
-            # self.matches = None # Output from amble rotation search
-            
+
+        @staticmethod
+        def compareIntPreambles(
+            d_syms: cp.ndarray,
+            lengths: np.ndarray,
+            d_preamble_concat: cp.ndarray,
+            m: int,
+            psk_m: cp.ndarray=None,
+            searchStart: int=0,
+            searchEnd: int=128,
+            THREADS_PER_BLOCK: int=128
+        ):
+            # Ensure m is reasonable
+            if m not in [2,4,8]:
+                raise ValueError("m must be 2/4/8.")
+
+            # Check that the psk_m mask is reasonable if it is specified
+            if psk_m is not None:
+                cupyRequireDtype(cp.uint8, psk_m)
+                if psk_m.shape != (d_syms.shape[0],):
+                    raise ValueError("psk_m shape doesn't match d_syms rows.")
+            else:
+                psk_m = 0 # Set to null pointer
+
+            # Check types and lengths
+            symsLength = d_syms.shape[1]
+            numSignals = d_syms.shape[0]
+
+            if np.sum(lengths) != d_preamble_concat.size:
+                raise ValueError("Concatenated length is not equal to sum of lengths!")
+
+            if d_preamble_concat.dtype != cp.uint8:
+                raise TypeError("Concatenated preamble should be type uint8.")
+
+            if d_syms.dtype != cp.uint8:
+                raise TypeError("Symbols matrix should be type uint8.")
+
+            if searchEnd + np.max(lengths) >= symsLength:
+                raise ValueError("Search will extend past the syms length. Shorten the searchEnd.")
+
+            # Convert lengths to gpu array
+            d_lengths = cp.asarray(lengths, dtype=np.int32)
+
+            # Allocate output   
+            d_matches = cp.zeros(
+                numSignals * len(lengths) * (searchEnd-searchStart) * m,
+                dtype=np.uint32)
+
+            # Allocate shared memory
+            smReq = d_lengths.nbytes + symsLength * 1 + d_preamble_concat.nbytes + (searchEnd-searchStart) * m * 4
+
+            # Invoke kernel
+            NUM_BLKS = numSignals
+            compareIntegerPreambles_kernel(
+                (NUM_BLKS,),(THREADS_PER_BLOCK,),
+                (d_syms,
+                numSignals,
+                symsLength, 
+                searchStart,
+                searchEnd,
+                d_preamble_concat,
+                d_lengths.size,
+                d_lengths,
+                m,
+                d_matches,
+                psk_m),
+                shared_mem=smReq
+            )
+
+            # Reshape matches for viewability
+            d_matches = d_matches.reshape((numSignals, d_lengths.size, searchEnd-searchStart, m))
+
+            return d_matches
+
         @staticmethod
         def cutAndRotateFromPreambles(
             d_argmaxMatches: cp.ndarray,
             d_syms: cp.ndarray,
             d_preambleLengths: cp.ndarray,
             d_sampleStops: cp.ndarray,
+            m: int,
             outLength: int=None,
             THREADS_PER_BLK: int=128,
             alsoReturnWrittenCounts: bool=False
@@ -751,9 +792,6 @@ try:
                 raise ValueError("d_argmaxMatches must be %d x 3" % (numRows))
             if d_sampleStops.size != numRows:
                 raise ValueError("d_sampleStops must be length %d" % (numRows))
-            
-            # Define modulation order
-            m = 4
 
             # Allocate shared mem
             smReq = 3 * 4
@@ -808,67 +846,43 @@ try:
                 return d_out
 
         
+        
+    
+    class CupyDemodulatorQPSK:
+        def __init__(self, batchLength: int, numBitsPerBurst: int, cluster_threshold: float=0.1, batch_size: int=4096):
+            self.m = 4
+            self.cluster_threshold = cluster_threshold
+            self.batch_size = batch_size
+            self.batchLength = batchLength
+            self.numBitsPerBurst = numBitsPerBurst # Note that this number is twice the number of symbols used, since QPSK
+            
+            # One-time pre-allocation
+            self.d_reim_batch = cp.zeros((batch_size, batchLength), dtype=cp.complex64)
+            self.d_reimc_batch = cp.zeros((batch_size, batchLength), dtype=cp.complex64)
+            self.d_syms_batch = cp.zeros((batch_size, batchLength), dtype=cp.uint32)
+            self.d_bestMatches = cp.zeros((batch_size), dtype=cp.int32)
+            self.d_bestRotations = cp.zeros((batch_size), dtype=cp.int32)
+            self.d_bestMatchIdx = cp.zeros((batch_size), dtype=cp.int32)
+            self.d_bits_batch = cp.zeros((batch_size, numBitsPerBurst), dtype=cp.uint8)
+            
+            # Counter for batching
+            # self.actr = 0 # Batching for eye-opening
+            self.bctr = 0 # Batching for demodulation
+            # Note that they should be the same at the end
+            
+            # # Interrim output
+            # self.xeo = None # Selected eye-opening resample points
+            # self.xeo_i = None # Index of eye-opening
+            # self.eo_metric = None # Metrics of eye-opening
+            # self.reimc = None # Phase-locked to constellation (complex array)
+            # self.svd_metric = None # SVD metric for phase lock
+            # self.angleCorrection = None # Angle correction used in phase lock
+            # self.syms = None # Output mapping to each symbol (0 to M-1)
+            # self.matches = None # Output from amble rotation search
+            
+        
 
-        @staticmethod
-        def compareIntPreambles(
-            d_syms: cp.ndarray,
-            lengths: np.ndarray,
-            d_preamble_concat: cp.ndarray,
-            searchStart: int=0,
-            searchEnd: int=128,
-            THREADS_PER_BLOCK: int=128
-        ):
-            # Check types and lengths
-            symsLength = d_syms.shape[1]
-            numSignals = d_syms.shape[0]
-
-            if np.sum(lengths) != d_preamble_concat.size:
-                raise ValueError("Concatenated length is not equal to sum of lengths!")
-
-            if d_preamble_concat.dtype != cp.uint8:
-                raise TypeError("Concatenated preamble should be type uint8.")
-
-            if d_syms.dtype != cp.uint8:
-                raise TypeError("Symbols matrix should be type uint8.")
-
-            if searchEnd + np.max(lengths) >= symsLength:
-                raise ValueError("Search will extend past the syms length. Shorten the searchEnd.")
-
-            # Convert lengths to gpu array
-            d_lengths = cp.asarray(lengths, dtype=np.int32)
-
-            # Constant
-            m = 4
-
-            # Allocate output   
-            d_matches = cp.zeros(
-                numSignals * len(lengths) * (searchEnd-searchStart) * m,
-                dtype=np.uint32)
-
-            # Allocate shared memory
-            smReq = d_lengths.nbytes + symsLength * 1 + d_preamble_concat.nbytes + (searchEnd-searchStart) * m * 4
-
-            # Invoke kernel
-            NUM_BLKS = numSignals
-            compareIntegerPreambles_kernel(
-                (NUM_BLKS,),(THREADS_PER_BLOCK,),
-                (d_syms,
-                numSignals,
-                symsLength, 
-                searchStart,
-                searchEnd,
-                d_preamble_concat,
-                d_lengths.size,
-                d_lengths,
-                m,
-                d_matches),
-                shared_mem=smReq
-            )
-
-            # Reshape matches for viewability
-            d_matches = d_matches.reshape((numSignals, d_lengths.size, searchEnd-searchStart, m))
-
-            return d_matches
+        
 
 
         @staticmethod

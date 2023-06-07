@@ -776,10 +776,18 @@ try:
             d_preambleLengths: cp.ndarray,
             d_sampleStops: cp.ndarray,
             m: int,
+            d_psk_m: cp.ndarray=0,
             outLength: int=None,
+            d_out: cp.ndarray=None,
+            d_count: cp.ndarray=None,
             THREADS_PER_BLK: int=128,
             alsoReturnWrittenCounts: bool=False
         ):
+            if isinstance(d_psk_m, cp.ndarray):
+                cupyRequireDtype(cp.uint8, d_psk_m)
+                if d_psk_m.shape != (d_syms.shape[0],):
+                    raise ValueError("d_psk_m must match d_syms rows")
+
             # Performing checks
             cupyRequireDtype(cp.uint32, d_argmaxMatches)
             cupyRequireDtype(cp.uint32, d_preambleLengths)
@@ -799,12 +807,14 @@ try:
             # Allocate output
             if outLength is None:
                 outLength = symsLength
-            d_out = cp.zeros((numRows, outLength), dtype=cp.uint8)
+            if d_out is None:
+                d_out = cp.zeros((numRows, outLength), dtype=cp.uint8)
 
             # Invoke kernel
             NUM_BLKS = numRows
             if alsoReturnWrittenCounts:
-                d_count = cp.zeros(numRows, dtype=cp.uint32)
+                if d_count is None:
+                    d_count = cp.zeros(numRows, dtype=cp.uint32)
                 cutAndRotate_gray_kernel(
                     (NUM_BLKS,), (THREADS_PER_BLK,),
                     (
@@ -817,7 +827,8 @@ try:
                         np.uint8(m),
                         outLength,
                         d_out,
-                        d_count
+                        d_count,
+                        d_psk_m
                     ),
                     shared_mem = smReq
                 )
@@ -838,7 +849,8 @@ try:
                         np.uint8(m),
                         outLength,
                         d_out,
-                        0
+                        0,
+                        d_psk_m
                     ),
                     shared_mem = smReq
                 )

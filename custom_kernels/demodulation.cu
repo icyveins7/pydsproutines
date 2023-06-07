@@ -15,11 +15,18 @@ x[keyLengths[A] + B : N]
 where N is a desired stop sample, extracted from a separate array,
  specific to each block i.e. each signal.
 
-The output is gray-mapped in the following configuration:
+The output is gray-mapped in the following configuration (currently only supports BPSK/QPSK):
 
     1   |   0            1 (01)  |  3 (11)    
     ---------   ====>    -----------------
     2   |   3            0 (00)  |  2 (10)
+
+        |                   |
+    1 ------ 0  ====>   1 ------ 0
+        |                   |
+
+Additionally, an optional mask (d_psk_m) may be specified, which labels each row of d_syms.
+If this is specified, only blocks which match the specified value m will actually conduct computations.
 
 Original scenario:
     Given a number of preambles, test each signal against all preambles (compareIntPreambles kernel)
@@ -42,10 +49,15 @@ void cutAndRotatePSKSymbolsFromPossiblePreambles_Gray(
     const unsigned char m, // modulation order e.g. BPSK = 2, QPSK = 4, 8PSK = 8
     const int outLength,
     unsigned char * d_out, // numRows * outlength
-    unsigned int *d_count // numRows or NULL
+    unsigned int *d_count, // numRows or NULL
+    const unsigned char *d_psk_m // numRows or NULL
 ){
     // Exit if block index is more than the row number
     if (blockIdx.x >= numRows)
+        return;
+
+    // Exit if the label is specified and it does not match
+    if (d_psk_m != NULL && d_psk_m[blockIdx.x] != m)
         return;
 
     // Allocate shared memory to read in the index matrix row
@@ -75,7 +87,13 @@ void cutAndRotatePSKSymbolsFromPossiblePreambles_Gray(
     // Extract, rotate, and write
     unsigned char val;
     // Gray mapping
-    unsigned char gray[4] = {3,1,0,2};
+    unsigned char gray4[4] = {3,1,0,2};
+    unsigned char gray2[2] = {0,1};
+    unsigned char *gray;
+    if (m == 2)
+        gray = gray2;
+    else if (m == 4)
+        gray = gray4;
 
     for (int t = threadIdx.x; t < totalWrite; t += blockDim.x)
     {

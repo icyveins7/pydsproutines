@@ -51,6 +51,8 @@ print("Minimized check = %.15g (metres)" % polycheck)
 # Check using 1D radial assumption
 tauhat1d = np.linalg.norm(tx_x - traj.at(0))/(lightspd - np.linalg.norm(v))
 print("Tau estimation using 1D radial assumption = %.15g" % (tauhat1d))
+check1d = lightspd * tauhat1d - np.linalg.norm(tx_x - traj.at(tauhat1d))
+print("Minimized check = %.15g (metres)" % check1d)
 
 # Check using direct quadratic formula
 a = (np.linalg.norm(v)**2-lightspd**2)
@@ -58,3 +60,5 @@ b = -2*np.dot(v,D)
 c = np.linalg.norm(D)**2
 tauhatquad = (-b - np.sqrt(b**2 - 4*a*c))/(2*a)
 print("Tau estimation using direct quadratic formula = %.15g" % tauhatquad)
+checkquad = lightspd * tauhatquad - np.linalg.norm(tx_x - traj.at(tauhatquad))
+print("Minimized check = %.15g (metres)" % checkquad)

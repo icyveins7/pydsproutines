@@ -4,12 +4,15 @@ Created on Thu Apr 30 11:59:47 2020
 
 @author: Seo
 """
+from __future__ import annotations
 
 import time
 import numpy as np
 import pyqtgraph as pg
 from localizationRoutines import *
 from timingRoutines import Timer
+
+from scipy.constants import speed_of_light as lightspd
 
 try:
     import cupy as cp
@@ -70,7 +73,72 @@ class Trajectory:
         return self._x0
 
     def at(self, t: np.ndarray):
+        """
+        Method to return the position at given time(s).
+        """
         raise NotImplementedError("This is only implemented for subclasses.")
+    
+    def to(self, rx: Trajectory, t: np.ndarray):
+        """
+        Method to return the time taken by a photon to travel from the current trajectory
+        from time(s) 't' to when it hits the 'rx' trajectory.
+
+        In general, this is not just the time taken between the two trajectories at a given time point,
+        as that does not take into account the distance travelled by the 'rx' while the photon is in flight.
+        """
+        raise NotImplementedError("This is only implemented for subclasses.")
+    
+    def _scalarToArray(self, t: np.ndarray, dtype: np.dtype=np.float64):
+        """
+        Returns t as a numpy array if it is a single Pythonic scalar value,
+        otherwise just returns t.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            The time vector or time scalar.
+        dtype : np.dtype, optional
+            The data type of the returned array. This is only used if t is a scalar.
+            If it is already an array, it will be returned as-is.
+
+        Returns
+        -------
+        np.ndarray
+            The time vector.
+        """
+        if isinstance(t, float) or isinstance(t, int):
+            t = np.array([t], dtype=dtype)
+        return t
+    
+    def _quadraticVelocityMethod(self, rx: ConstantVelocityTrajectory, t: np.ndarray):
+        if isinstance(rx, ConstantVelocityTrajectory):
+            # Define the initial connecting vector
+            D = self.at(t) - rx.at(t)
+
+            # Define the quadratic coefficients
+            a = np.linalg.norm(rx.v, axis=1)**2 - lightspd**2
+            # b = -2 * np.einsum('ij,ij->i', v, D)
+            # TODO: complete
+        else:
+            raise TypeError("Quadratic velocity method for to() is only applicable to ConstantVelocityTrajectory.")
+
+
+    
+class StationaryTrajectory(Trajectory):
+    def at(self, t: np.ndarray):
+        """
+        Returns the constant position at all time points.
+
+        Parameters
+        ----------
+        t : np.ndarray
+            Array of time values at which to calculate the position.
+            Must be a 1D array. A single value will be converted to a numpy array automatically.
+        """
+        t = self._scalarToArray(t)
+        return self._x0 + np.zeros_like(t).reshape((-1,1))
+    
+
     
 class ConstantVelocityTrajectory(Trajectory):
     def __init__(self, x0: np.ndarray, v: np.ndarray):
@@ -87,7 +155,7 @@ class ConstantVelocityTrajectory(Trajectory):
 
     def at(self, t: np.ndarray):
         """
-        Calculates the position at time t.
+        Calculates the position at time t by multiplying the velocity vector.
 
         Parameters
         ----------
@@ -95,8 +163,7 @@ class ConstantVelocityTrajectory(Trajectory):
             Array of time values at which to calculate the position.
             Must be a 1D array. A single value will be converted to a numpy array automatically.
         """
-        if isinstance(t, float) or isinstance(t, int):
-            t = np.array([t], dtype=np.float64)
+        t = self._scalarToArray(t)
         if not isinstance(t, np.ndarray):
             raise TypeError("t must be a numpy array.")
         if t.ndim != 1:

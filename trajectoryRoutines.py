@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 import numpy as np
+from enum import IntEnum
 import pyqtgraph as pg
 from localizationRoutines import *
 from timingRoutines import Timer
@@ -54,6 +55,10 @@ except:
 
 #%%
 class Trajectory:
+    class TauMethod(IntEnum):
+        First_Order_Velocity_Approximation = 0
+        Position_Vector_Chasing_Iterator = 1
+
     def __init__(self, x0: np.ndarray):
         """
         Initialises a trajectory object.
@@ -69,7 +74,9 @@ class Trajectory:
 
     @property
     def x0(self):
-        "Initial position vector."
+        """
+        Initial position vector.
+        """
         return self._x0
 
     def at(self, t: np.ndarray):
@@ -78,15 +85,27 @@ class Trajectory:
         """
         raise NotImplementedError("This is only implemented for subclasses.")
     
-    def to(self, rx: Trajectory, t: np.ndarray):
+    def to(self, rx: Trajectory, t: np.ndarray, method: int=TauMethod.First_Order_Velocity_Approximation):
         """
         Method to return the time taken by a photon to travel from the current trajectory
         from time(s) 't' to when it hits the 'rx' trajectory.
 
+        In signal processing terms, 't' is the known transmit time.
+
         In general, this is not just the time taken between the two trajectories at a given time point,
         as that does not take into account the distance travelled by the 'rx' while the photon is in flight.
+
+        Work in progress.
         """
-        raise NotImplementedError("This is only implemented for subclasses.")
+        if isinstance(rx, StationaryTrajectory):
+            # Simply calculate the time directly
+            return np.linalg.norm(self.at(t) - rx.at(t), axis=1) / lightspd
+        elif method == Trajectory.TauMethod.First_Order_Velocity_Approximation:
+            tau = self._quadraticVelocityMethod(rx, t)
+            tau = np.max(tau, axis=1) # Take the larger one, which is generally the positive one
+
+            return tau
+        
     
     def _scalarToArray(self, t: np.ndarray, dtype: np.dtype=np.float64):
         """
@@ -110,20 +129,27 @@ class Trajectory:
             t = np.array([t], dtype=dtype)
         return t
     
+    # Tau approximation methods
     def _quadraticVelocityMethod(self, rx: ConstantVelocityTrajectory, t: np.ndarray):
         if isinstance(rx, ConstantVelocityTrajectory):
             # Define the initial connecting vector
             D = self.at(t) - rx.at(t)
 
             # Define the quadratic coefficients
-            a = np.linalg.norm(rx.v, axis=1)**2 - lightspd**2
-            # b = -2 * np.einsum('ij,ij->i', v, D)
-            # TODO: complete
+            a = np.linalg.norm(rx.v)**2 - lightspd**2
+            b = -2 * D @ rx.v.reshape((-1,1))
+            c = np.linalg.norm(D)**2
+            
+            # Solve the quadratic equation
+            disc = b**2 - 4 * a * c
+            tau = np.vstack((np.sqrt(disc), -np.sqrt(disc)))
+            tau = (-b + tau) / (2 * a)
+            tau = tau.T
+            
+            return tau
         else:
             raise TypeError("Quadratic velocity method for to() is only applicable to ConstantVelocityTrajectory.")
 
-
-    
 class StationaryTrajectory(Trajectory):
     def at(self, t: np.ndarray):
         """
@@ -138,8 +164,6 @@ class StationaryTrajectory(Trajectory):
         t = self._scalarToArray(t)
         return self._x0 + np.zeros_like(t).reshape((-1,1))
     
-
-    
 class ConstantVelocityTrajectory(Trajectory):
     def __init__(self, x0: np.ndarray, v: np.ndarray):
         super().__init__(x0)
@@ -150,7 +174,9 @@ class ConstantVelocityTrajectory(Trajectory):
 
     @property
     def v(self):
-        "Velocity vector."
+        """
+        Velocity vector.
+        """
         return self._v
 
     def at(self, t: np.ndarray):
@@ -170,6 +196,39 @@ class ConstantVelocityTrajectory(Trajectory):
             raise np.ValueError("t must be a 1D array.")
         
         return self._x0 + t.reshape((-1,1)) * self._v
+    
+class InterpolatedTrajectory(Trajectory):
+    def __init__(self, xp: np.ndarray, tp: np.ndarray):
+        # Transpose into 3xN so that interpolation is easier
+        self._xp = xp.T
+        self._tp = tp # This is a 1D array
+        # Check if t=0 is defined
+        if 0.0 >= self._tp[0] and 0.0 <= self._tp[-1]:
+            # Derive the value at t=0
+            x0 = np.vstack(
+                (np.interp(0.0, self._tp, self._xp[0,:]), 
+                 np.interp(0.0, self._tp, self._xp[1,:]),
+                 np.interp(0.0, self._tp, self._xp[2,:]))
+            )
+            x0 = x0.reshape(-1)
+        else:
+            x0 = None
+
+        super().__init__(x0)
+
+    @property
+    def xp(self):
+        """
+        Defined position vectors.
+        """
+        return self._xp
+    
+    @property
+    def tp(self):
+        """
+        Defined time points.
+        """
+        return self._tp
     
 #%%
 def createLinearTrajectory(totalSamples, pos1, pos2, speed, sampleTime, start_coeff=0):

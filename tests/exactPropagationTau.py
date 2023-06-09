@@ -62,3 +62,13 @@ tauhatquad = (-b - np.sqrt(b**2 - 4*a*c))/(2*a)
 print("Tau estimation using direct quadratic formula = %.15g" % tauhatquad)
 checkquad = lightspd * tauhatquad - np.linalg.norm(tx_x - traj.at(tauhatquad))
 print("Minimized check = %.15g (metres)" % checkquad)
+
+
+# Try using new trajectory classes
+txtraj = StationaryTrajectory(np.zeros(3))
+rxtraj = ConstantVelocityTrajectory(np.array([3e7,0,0]), np.array([300, 0, 0]))
+
+tau = txtraj.to(rxtraj, 0)
+print("Tau from classed methods = %.15g" % (tau[0]))
+checktraj = lightspd * tau[0] - np.linalg.norm(txtraj.at(0) - rxtraj.at(tau[0]))
+print("Minimized check = %.15g (metres)" % checktraj)

@@ -628,6 +628,8 @@ class BurstDetector:
         self.d_medfiltered = None
         self.threshold = None
         self.codebook = None
+        self.counts = None # Used in auto threshold detection
+        self.edges = None # Used in auto threshold detection
         
     def medfilt(self, x: cp.ndarray):
         '''
@@ -727,8 +729,8 @@ class BurstDetector:
             later on, like the signal length limits.
         '''
 
-        counts, edges = cp.histogram(self.d_medfiltered, noiseLevels)
-        counts = counts.get()
+        self.counts, self.edges = cp.histogram(self.d_medfiltered, noiseLevels)
+        counts = self.counts.get()
 
         # We iterate from 1, because the 0 index shouldn't be compared to the end
         for i in range(1, counts.size - 1):
@@ -820,6 +822,11 @@ class BurstDetector:
             rax.addItem(pg.InfiniteLine(self.codebook[0], angle=0, movable=False, label='Noise Cluster'))
             rax.addItem(pg.InfiniteLine(self.codebook[1], angle=0, movable=False, label='Signal Cluster'))
         return rwin, rax
+
+    def plotAutoThreshold(self):
+        fig, ax = plt.subplots(1,1)
+        ax.plot(self.edges[:-1].get(), np.log10(self.counts.get()))
+        return fig, ax
 
 def energyDetection(ampSq, medfiltlen, snrReqLinear=4.0, noiseIndices=None, splitSignalIndices=True):
     '''

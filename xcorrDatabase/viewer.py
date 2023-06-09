@@ -3,6 +3,7 @@ from ._core import *
 import dearpygui.dearpygui as dpg
 import os
 import time
+import numpy as np
 
 #%% Boilerplate
 dpg.create_context()
@@ -97,7 +98,7 @@ def setupDbWindow(dbpath):
                     # Add the button
                     dpg.add_button(label="Load", callback=setupDataWindow, user_data={
                         "dbpath": dbpath,
-                        "table": row['data_tblname']
+                        "table": row['data_tblname'],
                     })
                     
 #%% Function to setup a database data window
@@ -106,13 +107,19 @@ def setupDataWindow(sender, app_data, user_data):
     db = xdb[dbpath]
     tablename = user_data['table']
     table = db[tablename]
+    xctype = table.xctype
+    xctypestrdict = {
+        XcorrDB.TYPE_PEAKVALUES: "Scalar Peak Value",
+        XcorrDB.TYPE_1D: "1D",
+        XcorrDB.TYPE_2D: "2D"
+    }
 
     table.select("*")
     results = db.fetchall()
 
     # Create the window
     with dpg.window(
-        label="%s -> %s" % (dbpath, tablename),
+        label="%s -> %s (%s Results)" % (dbpath, tablename, xctypestrdict[xctype]),
         pos=(300, 300),
         width=500, height=400,
         # parent="window_%s" % (dbpath) # This doesn't work?
@@ -130,8 +137,12 @@ def setupDataWindow(sender, app_data, user_data):
             else:
                 raise ValueError("Undefined type %d" % xctype)
             
+            # Add columns for all the schema
             for col in fmt['cols']:
                 dpg.add_table_column(label=col[0])
+            # Add an extra column for the button if 1D or 2D
+            if xctype != XcorrDB.TYPE_PEAKVALUES:
+                dpg.add_table_column()
             
             # Add the rows
             for row in results:
@@ -143,6 +154,33 @@ def setupDataWindow(sender, app_data, user_data):
                             else:
                                 dpg.add_text(str(i))
 
+                    # Add the button if 1D or 2D at the end
+                    if xctype != XcorrDB.TYPE_PEAKVALUES:
+                        dpg.add_button(
+                            label="Plot", 
+                            callback=plotDataWindow, 
+                            user_data={
+                                "row": row, # Send the row
+                                "table": table # And the table object
+                            }
+                        )
+
+#%% Callback for 1D/2D Plotter
+def plotDataWindow(sender, app_data, user_data):
+    row = user_data['row']
+    table = user_data['table']
+
+    if table.xctype == XcorrDB.TYPE_1D:
+        tdrange, qf2, freqinds = table.regenerate1Dresults(row)
+
+        # Create the plot window
+        with dpg.window(label="1D QF2 Result"):
+            with dpg.plot(label="QF2 vs TD", height=300, width=300):
+                dpg.add_plot_axis(dpg.mvXAxis, label="TD")
+                dpg.add_plot_axis(dpg.mvYAxis, label="QF2", tag="y_axis")
+
+                dpg.add_line_series(tdrange, qf2, parent="y_axis")
+                # TODO: window fails after 2nd open
     
 
     

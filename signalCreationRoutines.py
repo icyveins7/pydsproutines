@@ -20,7 +20,19 @@ def randBits(length, m):
     return np.random.randint(0,m,length,dtype=np.uint8)
 
 def symsFromBits(bits, m, dtype=np.complex128):
-    return np.exp(1j*2*np.pi*bits/m).astype(dtype)
+    d = {
+        2: np.array([1, -1], dtype=dtype),
+        4: np.array([1, 1j, -1, -1j], dtype=dtype),
+        8: np.array(
+            [1, (1+1j)/np.sqrt(2),
+            1j, (-1+1j)/np.sqrt(2),
+            -1, (-1-1j)/np.sqrt(2),
+            -1j, (1-1j)/np.sqrt(2)
+        ], dtype=dtype)
+    }
+    return d[m][bits]
+
+    # return np.exp(1j*2*np.pi*bits/m).astype(dtype)
     
 def randPSKsyms(length: int, m: int, dtype=np.complex128):
     '''

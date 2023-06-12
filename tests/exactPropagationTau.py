@@ -72,3 +72,12 @@ tau = txtraj.to(rxtraj, 0)
 print("Tau from classed methods = %.15g" % (tau[0]))
 checktraj = lightspd * tau[0] - np.linalg.norm(txtraj.at(0) - rxtraj.at(tau[0]))
 print("Minimized check = %.15g (metres)" % checktraj)
+
+#%% Try using new trajectory classes for moving tx but stationary rx 
+txtraj = ConstantVelocityTrajectory(np.array([3e7,0,0]), np.array([300, 0, 0]))
+rxtraj = StationaryTrajectory(np.zeros(3))
+
+tau = rxtraj.frm(txtraj, 0)
+print("Tau from classed methods = %.15g" % (tau[0]))
+checktraj = lightspd * tau[0] - np.linalg.norm(txtraj.at(-tau[0]) - rxtraj.at(0))
+print("Minimized check = %.15g (metres)" % checktraj)

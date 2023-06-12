@@ -106,6 +106,26 @@ class Trajectory:
 
             return tau
         
+    def frm(self, tx: Trajectory, t: np.ndarray, method: int=TauMethod.First_Order_Velocity_Approximation):
+        """
+        Method to return the time taken by a photon to travel to the current trajectory
+        at time(s) 't' from when it begins from the 'tx' trajectory.
+
+        In signal processing terms, 't' is the known receive time.
+
+        In general, this is not just the time taken between the two trajectories at a given time point,
+        as that does not take into account the distance travelled by the 'tx' while the photon is in flight.
+        """
+
+        if isinstance(tx, StationaryTrajectory):
+            # Simply calculate the time directly
+            return np.linalg.norm(self.at(t) - tx.at(t), axis=1) / lightspd
+        elif method == Trajectory.TauMethod.First_Order_Velocity_Approximation:
+            tau = self._quadraticVelocityMethod(tx, t)
+            tau = -np.min(tau, axis=1) # Take the smaller one, which is generally the negative one
+
+            return tau
+        
     
     def _scalarToArray(self, t: np.ndarray, dtype: np.dtype=np.float64):
         """

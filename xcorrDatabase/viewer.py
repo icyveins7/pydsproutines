@@ -87,7 +87,7 @@ def setupDbWindow(dbpath):
         with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp):
             for col in XcorrDB.xcorr_metadata_fmt['cols']:
                 dpg.add_table_column(label=col[0])
-            dpg.add_table_column() # One more column to store the button for opening
+            dpg.add_table_column(label="View", width_fixed=True, init_width_or_weight=40.0) # One more column to store the button for opening
 
             # Add the rows extracted
             for row in metadata:
@@ -128,42 +128,59 @@ def setupDataWindow(sender, app_data, user_data):
         xctype = table.xctype
 
         with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp):
+            # Different xctypes have different displays
             if xctype == 0:
                 fmt = XcorrDB._xcorr_type0results_fmt()
+                # Add columns as-is
+                for col in fmt['cols']:
+                    dpg.add_table_column(label=col[0])
+                
+                # Add the rows
+                for row in results:
+                    with dpg.table_row():
+                        for i in row:
+                            with dpg.table_cell(): # In case we need more things per cell
+                                if isinstance(i, bytes):
+                                    dpg.add_text("BLOB")
+                                else:
+                                    dpg.add_text(str(i))
+
             elif xctype == 1:
                 fmt = XcorrDB._xcorr_type1results_fmt()
+                ignoredColumns = ["qf2", "freqIdx", "rfdIdx", "View"] # The view column holds the button
+                # Add columns as-is, but ignore the result blobs
+                for col in fmt['cols']:
+                    if col[0] not in ignoredColumns:
+                        dpg.add_table_column(label=col[0])
+                
+                # Add plot button column
+                dpg.add_table_column(label="View", width_fixed=True, init_width_or_weight=40.0) # We want the button to show up fully
+                
+                # Add the rows
+                for row in results:
+                    with dpg.table_row():
+                        for idx, col in enumerate(row):
+                            if fmt['cols'][idx][0] not in ignoredColumns:
+                                with dpg.table_cell(): # In case we need more things per cell
+                                    if isinstance(col, bytes):
+                                        dpg.add_text("BLOB")
+                                    else:
+                                        dpg.add_text(str(col))
+                        with dpg.table_cell():
+                            dpg.add_button(
+                                label="Plot", 
+                                callback=plotDataWindow, 
+                                user_data={
+                                    "row": row, # Send the row
+                                    "table": table # And the table object
+                                }
+                            )
+
             elif xctype == 2:
-                fmt = XcorrDB._xcorr_type2results_fmt()
+                raise NotImplementedError("TODO: handle type2")
+                # fmt = XcorrDB._xcorr_type2results_fmt()
             else:
                 raise ValueError("Undefined type %d" % xctype)
-            
-            # Add columns for all the schema
-            for col in fmt['cols']:
-                dpg.add_table_column(label=col[0])
-            # Add an extra column for the button if 1D or 2D
-            if xctype != XcorrDB.TYPE_PEAKVALUES:
-                dpg.add_table_column()
-            
-            # Add the rows
-            for row in results:
-                with dpg.table_row():
-                    for i in row:
-                        with dpg.table_cell(): # In case we need more things per cell
-                            if isinstance(i, bytes):
-                                dpg.add_text("BLOB")
-                            else:
-                                dpg.add_text(str(i))
-
-                    # Add the button if 1D or 2D at the end
-                    if xctype != XcorrDB.TYPE_PEAKVALUES:
-                        dpg.add_button(
-                            label="Plot", 
-                            callback=plotDataWindow, 
-                            user_data={
-                                "row": row, # Send the row
-                                "table": table # And the table object
-                            }
-                        )
 
 #%% Callback for 1D/2D Plotter
 def plotDataWindow(sender, app_data, user_data):
@@ -175,15 +192,12 @@ def plotDataWindow(sender, app_data, user_data):
 
         # Create the plot window
         with dpg.window(label="1D QF2 Result"):
-            with dpg.plot(label="QF2 vs TD", height=300, width=300):
+            with dpg.plot(label="QF2 vs TD", height=600, width=600):
                 dpg.add_plot_axis(dpg.mvXAxis, label="TD")
-                dpg.add_plot_axis(dpg.mvYAxis, label="QF2", tag="y_axis")
-
-                dpg.add_line_series(tdrange, qf2, parent="y_axis")
-                # TODO: window fails after 2nd open
+                yaxis = dpg.add_plot_axis(dpg.mvYAxis, label="QF2")
+                dpg.add_line_series(tdrange, qf2, parent=yaxis) # Dynamically point to the parent
     
 
-    
 #%% Boilerplate
 dpg.show_viewport()
 dpg.start_dearpygui()

@@ -182,6 +182,19 @@ def setupDataWindow(sender, app_data, user_data):
             else:
                 raise ValueError("Undefined type %d" % xctype)
 
+            # #  TODO: use table alignment instead of child window for this
+            # with dpg.child_window(width=100):
+            #     dpg.add_input_text(
+            #         multiline=True, 
+            #         default_value="Nothing to show here.", 
+            #         height=300, 
+            #         #callback=_log, s
+            #         #tab_input=True,
+            #         readonly=True)
+
+            
+        
+
 #%% Callback for 1D/2D Plotter
 def plotDataWindow(sender, app_data, user_data):
     row = user_data['row']

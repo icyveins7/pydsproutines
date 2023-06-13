@@ -127,70 +127,79 @@ def setupDataWindow(sender, app_data, user_data):
         # Get the table type
         xctype = table.xctype
 
-        with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp):
-            # Different xctypes have different displays
-            if xctype == 0:
-                fmt = XcorrDB._xcorr_type0results_fmt()
-                # Add columns as-is
-                for col in fmt['cols']:
-                    dpg.add_table_column(label=col[0])
-                
-                # Add the rows
-                for row in results:
-                    with dpg.table_row():
-                        for i in row:
-                            with dpg.table_cell(): # In case we need more things per cell
-                                if isinstance(i, bytes):
-                                    dpg.add_text("BLOB")
-                                else:
-                                    dpg.add_text(str(i))
+        with dpg.table(header_row=False):
+            dpg.add_table_column()
+            dpg.add_table_column(width_fixed=True, init_width_or_weight=200)
+            with dpg.table_row():
+                # Left layout: 
+                with dpg.table_cell():
+                    # Table for the data
+                    with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp):
+                        # Different xctypes have different displays
+                        if xctype == 0:
+                            fmt = XcorrDB._xcorr_type0results_fmt()
+                            # Add columns as-is
+                            for col in fmt['cols']:
+                                dpg.add_table_column(label=col[0])
+                            
+                            # Add the rows
+                            for row in results:
+                                with dpg.table_row():
+                                    for i in row:
+                                        with dpg.table_cell(): # In case we need more things per cell
+                                            if isinstance(i, bytes):
+                                                dpg.add_text("BLOB")
+                                            else:
+                                                dpg.add_text(str(i))
 
-            elif xctype == 1:
-                fmt = XcorrDB._xcorr_type1results_fmt()
-                ignoredColumns = ["qf2", "freqIdx", "rfdIdx", "View"] # The view column holds the button
-                # Add columns as-is, but ignore the result blobs
-                for col in fmt['cols']:
-                    if col[0] not in ignoredColumns:
-                        dpg.add_table_column(label=col[0])
-                
-                # Add plot button column
-                dpg.add_table_column(label="View", width_fixed=True, init_width_or_weight=40.0) # We want the button to show up fully
-                
-                # Add the rows
-                for row in results:
-                    with dpg.table_row():
-                        for idx, col in enumerate(row):
-                            if fmt['cols'][idx][0] not in ignoredColumns:
-                                with dpg.table_cell(): # In case we need more things per cell
-                                    if isinstance(col, bytes):
-                                        dpg.add_text("BLOB")
-                                    else:
-                                        dpg.add_text(str(col))
-                        with dpg.table_cell():
-                            dpg.add_button(
-                                label="Plot", 
-                                callback=plotDataWindow, 
-                                user_data={
-                                    "row": row, # Send the row
-                                    "table": table # And the table object
-                                }
-                            )
+                        elif xctype == 1:
+                            fmt = XcorrDB._xcorr_type1results_fmt()
+                            ignoredColumns = ["qf2", "freqIdx", "rfdIdx", "View"] # The view column holds the button
+                            # Add columns as-is, but ignore the result blobs
+                            for col in fmt['cols']:
+                                if col[0] not in ignoredColumns:
+                                    dpg.add_table_column(label=col[0])
+                            
+                            # Add plot button column
+                            dpg.add_table_column(label="View", width_fixed=True, init_width_or_weight=40.0) # We want the button to show up fully
+                            
+                            # Add the rows
+                            for row in results:
+                                with dpg.table_row():
+                                    for idx, col in enumerate(row):
+                                        if fmt['cols'][idx][0] not in ignoredColumns:
+                                            with dpg.table_cell(): # In case we need more things per cell
+                                                if isinstance(col, bytes):
+                                                    dpg.add_text("BLOB")
+                                                else:
+                                                    dpg.add_text(str(col))
+                                    with dpg.table_cell():
+                                        dpg.add_button(
+                                            label="Plot", 
+                                            callback=plotDataWindow, 
+                                            user_data={
+                                                "row": row, # Send the row
+                                                "table": table # And the table object
+                                            }
+                                        )
 
-            elif xctype == 2:
-                raise NotImplementedError("TODO: handle type2")
-                # fmt = XcorrDB._xcorr_type2results_fmt()
-            else:
-                raise ValueError("Undefined type %d" % xctype)
+                        elif xctype == 2:
+                            raise NotImplementedError("TODO: handle type2")
+                            # fmt = XcorrDB._xcorr_type2results_fmt()
+                        else:
+                            raise ValueError("Undefined type %d" % xctype)
 
-            # #  TODO: use table alignment instead of child window for this
-            # with dpg.child_window(width=100):
-            #     dpg.add_input_text(
-            #         multiline=True, 
-            #         default_value="Nothing to show here.", 
-            #         height=300, 
-            #         #callback=_log, s
-            #         #tab_input=True,
-            #         readonly=True)
+                # Right layout: 
+                with dpg.table_cell():
+                    # Text viewer
+                    dpg.add_input_text(
+                        multiline=True, 
+                        default_value="Nothing to show here.", 
+                        width=200,
+                        height=300, 
+                        #callback=_log, s
+                        #tab_input=True,
+                        readonly=True)
 
             
         
@@ -202,13 +211,29 @@ def plotDataWindow(sender, app_data, user_data):
 
     if table.xctype == XcorrDB.TYPE_1D:
         tdrange, qf2, freqinds = table.regenerate1Dresults(row)
+        mi = np.argmax(qf2)
 
         # Create the plot window
         with dpg.window(label="1D QF2 Result"):
-            with dpg.plot(label="QF2 vs TD", height=600, width=600):
-                dpg.add_plot_axis(dpg.mvXAxis, label="TD")
-                yaxis = dpg.add_plot_axis(dpg.mvYAxis, label="QF2")
-                dpg.add_line_series(tdrange, qf2, parent=yaxis) # Dynamically point to the parent
+            with dpg.subplots(2, 1, link_all_x=True, height=600, width=600):
+                with dpg.plot(label="QF2 vs TD"):
+                    tdqf2axis = dpg.add_plot_axis(dpg.mvXAxis, label="TD")
+                    qf2axis = dpg.add_plot_axis(dpg.mvYAxis, label="QF2")
+                    dpg.add_line_series(tdrange, qf2, parent=qf2axis) # Dynamically point to the parent
+                    dpg.fit_axis_data(qf2axis)
+                    dpg.fit_axis_data(tdqf2axis)
+
+                with dpg.plot(label="Frequency vs TD"):
+                    tdfreqaxis = dpg.add_plot_axis(dpg.mvXAxis, label="TD")
+                    freqaxis = dpg.add_plot_axis(dpg.mvYAxis, label="Frequency")
+                    dpg.add_line_series(tdrange, freqinds.astype(np.float64), parent=freqaxis)
+                    dpg.fit_axis_data(qf2axis)
+                    dpg.fit_axis_data(tdfreqaxis)
+
+            
+            dpg.add_text("Peak QF2: %.6g" % (qf2[mi]))
+            dpg.add_text("Freq. Index at Peak: %d" % (freqinds[mi]))
+            dpg.add_text("TDOA at Peak: %.6g" % (tdrange[mi]))
     
 
 #%% Boilerplate

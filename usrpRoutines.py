@@ -603,6 +603,16 @@ class GroupDatabase:
         
 #%% This is meant to only read one second at a time
 class LiveReader(FolderReader):
+    """
+    This is a reader that is meant for live, 1-second at a time, recordings.
+    The best way to use this is to place this in a while loop,
+    and call getNext() repeatedly, which returns None objects when the next file is absent.
+    The user can then 'continue' the loop or perform some other operations.
+
+    This reader will automatically search for the next earliest file in the folder if
+    it has timed-out (which occurs a configurable number of seconds after the last successful read).
+
+    """
     def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64):
         super().__init__(folderpath, numSampsPerFile, extension, in_dtype, out_dtype)
         # Track by the current filetime
@@ -625,6 +635,9 @@ class LiveReader(FolderReader):
         
     def setExhaustFolder(self, path):
         self.exhaustFolderpath = path
+
+    def setExpectedFileSize(self, expectedFileSizeBytes: int):
+        self.expectedFileSize = expectedFileSizeBytes
         
     def getNext(self):
         fp = os.path.join(self.folderpath, "%d%s" % (self.ftnow,self.extension))
@@ -640,7 +653,7 @@ class LiveReader(FolderReader):
             # Move out if needed
             if self.exhaustFolderpath is not None:
                 exhaustpath = os.path.join(self.exhaustFolderpath, "%d%s" % (self.ftnow,self.extension))
-                shutil.move(fps[i],exhaustpaths[i])
+                shutil.move(fp,exhaustpath)
                 
             # Delete if set
             if self.deleteAfter:

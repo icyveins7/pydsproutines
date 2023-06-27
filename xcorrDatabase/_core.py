@@ -37,6 +37,9 @@ class XcorrDB(sew.Database):
         ],
         'conds': [
             "UNIQUE(data_tblname)"
+        ],
+        'foreign_keys': [
+
         ]
     }
 
@@ -59,6 +62,9 @@ class XcorrDB(sew.Database):
         ],
         'conds': [
             "UNIQUE(time_sec, tidx, cutoutlen, td_scan_start, td_scan_numsteps, td_scan_step, fd_scan_start, fd_scan_numsteps, fd_scan_step, rfd_scan_start, rfd_scan_numsteps, rfd_scan_step, desc)"
+        ],
+        'foreign_keys': [
+            
         ]
     }
 

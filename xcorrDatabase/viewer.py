@@ -66,6 +66,7 @@ def clear_db_window(sender, app_data, user_data):
     dpg.delete_item("window_%s" % user_data)
     # Delete the text in opener
     dpg.delete_item("opened_text_%s" % user_data)
+                          
 
 #%% Function to setup a database metadata window
 def setupDbWindow(dbpath):
@@ -101,6 +102,16 @@ def setupDbWindow(dbpath):
                         "table": row['data_tblname'],
                     })
                     
+#%% Function for setting up column display checkboxes for the tables in the database
+def setupColumnToggles(column_names: list, column_toggles_tag: str="column_toggles"):
+    with dpg.child_window(
+        tag=column_toggles_tag,
+        width=150
+    ):
+        for column in column_names:
+            selectable = dpg.add_selectable(label=column)
+            dpg.set_value(selectable, True) # Start by default with all enabled
+
 #%% Function to setup a database data window
 def setupDataWindow(sender, app_data, user_data):
     dbpath = user_data['dbpath']
@@ -127,17 +138,37 @@ def setupDataWindow(sender, app_data, user_data):
         # Get the table type
         xctype = table.xctype
 
-        with dpg.table(header_row=False):
+        # Define the format based on type
+        if xctype == 0:
+            fmt = XcorrDB._xcorr_type0results_fmt()
+        elif xctype == 1:
+            fmt = XcorrDB._xcorr_type1results_fmt()
+        elif xctype == 2:
+            raise NotImplementedError("2D not implemented yet")        
+        else:
+            raise ValueError("Undefined type %d" % xctype)
+
+        
+        # We use table for horizontal layout
+        with dpg.table(header_row=False, borders_innerV=True):
+            # Column for the toggles
+            dpg.add_table_column(width_fixed=True, init_width_or_weight=150)
+            # Column for the actual table
             dpg.add_table_column()
+            # Column for the blob display
             dpg.add_table_column(width_fixed=True, init_width_or_weight=200)
             with dpg.table_row():
-                # Left layout: 
+                # Left layout for the toggles
+                with dpg.table_cell():
+                    setupColumnToggles([i[0] for i in fmt['cols']])
+
+
+                # Middle layout: 
                 with dpg.table_cell():
                     # Table for the data
                     with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp):
                         # Different xctypes have different displays
                         if xctype == 0:
-                            fmt = XcorrDB._xcorr_type0results_fmt()
                             # Add columns as-is
                             for col in fmt['cols']:
                                 dpg.add_table_column(label=col[0])
@@ -153,7 +184,6 @@ def setupDataWindow(sender, app_data, user_data):
                                                 dpg.add_text(str(i))
 
                         elif xctype == 1:
-                            fmt = XcorrDB._xcorr_type1results_fmt()
                             ignoredColumns = ["qf2", "freqIdx", "rfdIdx", "View"] # The view column holds the button
                             # Add columns as-is, but ignore the result blobs
                             for col in fmt['cols']:
@@ -182,13 +212,6 @@ def setupDataWindow(sender, app_data, user_data):
                                                 "table": table # And the table object
                                             }
                                         )
-
-                        elif xctype == 2:
-                            raise NotImplementedError("TODO: handle type2")
-                            # fmt = XcorrDB._xcorr_type2results_fmt()
-                        else:
-                            raise ValueError("Undefined type %d" % xctype)
-
                 # Right layout: 
                 with dpg.table_cell():
                     # Text viewer

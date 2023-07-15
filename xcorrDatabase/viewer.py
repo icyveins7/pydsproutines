@@ -102,8 +102,28 @@ def setupDbWindow(dbpath):
                         "table": row['data_tblname'],
                     })
                     
+
+#%%
+def handleColumnToggle(sender, app_data, user_data):
+    # Get the target tag string (tablename)
+    targetTag = user_data['targetTag']
+    # Get the column name string
+    column = user_data['column']
+    # Get the current state of the checkbox
+    state = dpg.get_value(sender)
+    # Get the table widget?
+    table = dpg.get_value(targetTag + "_table") # This is the format of the table tag
+
+    print("Editing table %s, column %s" % (targetTag, column))
+    print(state)
+    print(table) # Not useful
+
+
 #%% Function for setting up column display checkboxes for the tables in the database
-def setupColumnToggles(column_names: list, column_toggles_tag: str="column_toggles"):
+def setupColumnToggles(tablename: str, column_names: list, column_toggles_tag: str=None):
+    if column_toggles_tag is None:
+        column_toggles_tag = "column_toggles_%s" % (tablename)
+
     with dpg.child_window(
         tag=column_toggles_tag,
         width=150
@@ -111,6 +131,14 @@ def setupColumnToggles(column_names: list, column_toggles_tag: str="column_toggl
         for column in column_names:
             selectable = dpg.add_selectable(label=column)
             dpg.set_value(selectable, True) # Start by default with all enabled
+            dpg.configure_item(selectable,
+                               callback=handleColumnToggle,
+                               user_data={
+                                   "targetTag": tablename,
+                                   "column": column
+                               })
+            
+    # TODO: rework, we can just use the dpg table hideable property
 
 #%% Function to setup a database data window
 def setupDataWindow(sender, app_data, user_data):
@@ -160,18 +188,18 @@ def setupDataWindow(sender, app_data, user_data):
             with dpg.table_row():
                 # Left layout for the toggles
                 with dpg.table_cell():
-                    setupColumnToggles([i[0] for i in fmt['cols']])
-
+                    setupColumnToggles(tablename, [i[0] for i in fmt['cols']])
 
                 # Middle layout: 
                 with dpg.table_cell():
                     # Table for the data
-                    with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp):
+                    with dpg.table(header_row=True, resizable=True, policy=dpg.mvTable_SizingStretchProp, tag="%s_table" % tablename):
                         # Different xctypes have different displays
                         if xctype == 0:
                             # Add columns as-is
                             for col in fmt['cols']:
-                                dpg.add_table_column(label=col[0])
+                                dpg.add_table_column(label=col[0],
+                                                     tag="%s_%s" % (tablename, col[0]))
                             
                             # Add the rows
                             for row in results:
@@ -188,7 +216,8 @@ def setupDataWindow(sender, app_data, user_data):
                             # Add columns as-is, but ignore the result blobs
                             for col in fmt['cols']:
                                 if col[0] not in ignoredColumns:
-                                    dpg.add_table_column(label=col[0])
+                                    dpg.add_table_column(label=col[0],
+                                                         tag="%s_%s" % (tablename, col[0]))
                             
                             # Add plot button column
                             dpg.add_table_column(label="View", width_fixed=True, init_width_or_weight=40.0) # We want the button to show up fully

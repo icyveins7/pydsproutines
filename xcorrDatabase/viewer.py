@@ -200,6 +200,13 @@ def setupDataWindow(sender, app_data, user_data):
                                         if fmt['cols'][idx][0] not in ignoredColumns:
                                             with dpg.table_cell(): # In case we need more things per cell
                                                 if isinstance(col, bytes):
+                                                    dpg.add_button(
+                                                        label="BLOB",
+                                                        callback=renderBlobText,
+                                                        user_data={
+                                                            "blob": col
+                                                        }
+                                                    )
                                                     dpg.add_text("BLOB")
                                                 else:
                                                     dpg.add_text(str(col))
@@ -222,9 +229,19 @@ def setupDataWindow(sender, app_data, user_data):
                         height=300, 
                         #callback=_log, s
                         #tab_input=True,
-                        readonly=True)
+                        readonly=True,
+                        tag="textviewer")
 
-            
+#%% Callback for blob renderer
+def renderBlobText(sender, app_data, user_data):
+    blob = user_data['blob']
+    x = np.frombuffer(blob, np.uint8)
+    s = " ".join(["%02X" % i for i in x])
+    print(s)
+
+    dpg.set_value("textviewer", s)
+
+
         
 
 #%% Callback for 1D/2D Plotter

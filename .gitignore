@@ -19,3 +19,5 @@ __pycache__/
 *.idea/
 *.ncu-rep
 *.db
+*.sqlite
+*.nsys-rep

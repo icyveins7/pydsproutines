@@ -106,9 +106,9 @@ def cupyCopyGroups32fc(x: cp.ndarray, y: cp.ndarray,
     copy_groups_kernel32fc((NUM_BLOCKS,), (threads_per_blk,),
                            (x, y, xStarts, lengths, yStarts))
 
-_copySlicesToMatrix_32fckernel, = cupyModuleToKernelsLoader(
+_copySlicesToMatrix_32fckernel, _copyEqualSlicesToMatrix_32fckernel = cupyModuleToKernelsLoader(
     "copying.cu", 
-    "copySlicesToMatrix_32fc")
+    ["copySlicesToMatrix_32fc", "copyEqualSlicesToMatrix_32fc"])
 
 def cupyCopySlicesToMatrix_32fc(
     d_x: cp.ndarray,
@@ -133,6 +133,34 @@ def cupyCopySlicesToMatrix_32fc(
         (d_x, d_x.size, d_sliceBounds,
         numSlices, rowLength, d_out)
     )
+    return d_out
+
+def cupyCopyEqualSlicesToMatrix_32fc(
+    d_x: cp.ndarray,
+    d_xStartIdxs: cp.ndarray,
+    rowLength: int,
+    d_out: cp.ndarray=None
+):
+    # Checks
+    cupyRequireDtype(cp.complex64, d_x)
+    cupyRequireDtype(cp.int32, d_xStartIdxs)
+
+    # Allocate output if not specified
+    if d_out is None:
+        d_out = cp.zeros((d_xStartIdxs.size, rowLength), dtype=cp.complex64)
+    else:
+        # Check it
+        cupyRequireDtype(cp.complex64, d_out)
+        if (d_out.shape != (d_xStartIdxs.size, rowLength)):
+            raise ValueError("d_out must have the shape %d, %d" % (d_xStartIdxs.size, rowLength))
+
+    # Execute
+    NUM_BLKS = d_out.size // 128 + 1
+    _copyEqualSlicesToMatrix_32fckernel(
+        (NUM_BLKS,),(128,),
+        (d_x, d_x.size, d_xStartIdxs, d_xStartIdxs.size, rowLength, d_out)
+    )
+
     return d_out
 
 #%%

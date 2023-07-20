@@ -84,26 +84,14 @@ try:
                     # Slice shifts for the batch
                     xStarts = cp.asarray(shifts[i*BATCH : i*BATCH+TOTAL_THIS_BATCH], dtype=cp.int32)
                     # Copy groups
-                    cupyCopyGroups32fc(d_rx, d_pdt_batch, xStarts, yStarts[:TOTAL_THIS_BATCH], lengths[:TOTAL_THIS_BATCH])
+                    # cupyCopyGroups32fc(d_rx, d_pdt_batch, xStarts, yStarts[:TOTAL_THIS_BATCH], lengths[:TOTAL_THIS_BATCH])
+                    cupyCopyEqualSlicesToMatrix_32fc(d_rx, xStarts, len(cutout), d_pdt_batch)
                     # Calculate norms
                     d_rxNormPartSq_batch = cp.linalg.norm(d_pdt_batch, axis=1)**2
                     # Perform the multiply
                     cp.multiply(d_pdt_batch, d_cutout_conj, out=d_pdt_batch)
                     # Then the ffts
                     d_pdtfft_batch = cp.abs(cp.fft.fft(d_pdt_batch))**2 # already row-wise by default
-                    
-                    
-                    # # Old code, DEPRECATED
-                    # for k in range(TOTAL_THIS_BATCH):
-                        # s = shifts[i*BATCH + k]
-                        
-                        # d_pdt_batch[k] = d_rx[s:s+len(cutout)] * d_cutout_conj
-                        
-                        # d_rxNormPartSq_batch[k] = cp.linalg.norm(d_rx[s:s+len(cutout)])**2.0
-                        
-                    # # perform the fft (row-wise is done automatically)
-                    # d_pdtfft_batch = cp.fft.fft(d_pdt_batch)
-                    # d_pdtfft_batch = cp.abs(d_pdtfft_batch**2.0) # is now abs(pdtfftsq)
                     
                     imax = cp.argmax(d_pdtfft_batch, axis=-1) # take the arg max for each row
                     

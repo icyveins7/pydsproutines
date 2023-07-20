@@ -85,7 +85,7 @@ try:
                     xStarts = cp.asarray(shifts[i*BATCH : i*BATCH+TOTAL_THIS_BATCH], dtype=cp.int32)
                     # Copy groups
                     # cupyCopyGroups32fc(d_rx, d_pdt_batch, xStarts, yStarts[:TOTAL_THIS_BATCH], lengths[:TOTAL_THIS_BATCH])
-                    cupyCopyEqualSlicesToMatrix_32fc(d_rx, xStarts, len(cutout), d_pdt_batch)
+                    cupyCopyEqualSlicesToMatrix_32fc(d_rx, xStarts, len(cutout), d_pdt_batch[:TOTAL_THIS_BATCH,:])
                     # Calculate norms
                     d_rxNormPartSq_batch = cp.linalg.norm(d_pdt_batch, axis=1)**2
                     # Perform the multiply

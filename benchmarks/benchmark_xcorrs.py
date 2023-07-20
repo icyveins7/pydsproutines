@@ -5,7 +5,7 @@ from verifyRoutines import compareValues
 
 import numpy as np
 
-def benchmark(cutoutlen=1000):
+def benchmark(cutoutlen=1000, cupybatchsize=1):
     # Generate some data
     datalen = 100000000
     x = np.random.randn(datalen) + 1j*np.random.randn(datalen)
@@ -44,10 +44,10 @@ def benchmark(cutoutlen=1000):
     d_cutout = cp.asarray(cutout)
     d_x = cp.asarray(x)
     # Need a warmup for gpu
-    cpout = cp_fastXcorr(d_cutout, d_x, freqsearch=True, shifts=shifts, BATCH=1)
+    cpout = cp_fastXcorr(d_cutout, d_x, freqsearch=True, shifts=shifts, BATCH=cupybatchsize)
     timer.start()
     for i in range(loops):
-        cpout = cp_fastXcorr(d_cutout, d_x, freqsearch=True, shifts=shifts, BATCH=1)
+        cpout = cp_fastXcorr(d_cutout, d_x, freqsearch=True, shifts=shifts, BATCH=cupybatchsize)
         timer.evt("cupy %d" % i)
     timer.end()
 
@@ -61,7 +61,9 @@ def benchmark(cutoutlen=1000):
 #%%
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) > 1:
+    if len(sys.argv) == 2:
         benchmark(int(sys.argv[1]))
+    elif len(sys.argv) == 3:
+        benchmark(int(sys.argv[1]), int(sys.argv[2]))
     else:
         benchmark()

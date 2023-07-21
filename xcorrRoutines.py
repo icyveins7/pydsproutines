@@ -90,21 +90,26 @@ try:
                     d_rxNormPartSq_batch = cp.linalg.norm(d_pdt_batch, axis=1)**2
                     # Perform the multiply
                     cp.multiply(d_pdt_batch, d_cutout_conj, out=d_pdt_batch)
+
                     # Then the ffts
-                    d_pdtfft_batch = cp.abs(cp.fft.fft(d_pdt_batch))**2 # already row-wise by default
+                    # d_pdtfft_batch = cp.abs(cp.fft.fft(d_pdt_batch))**2 # already row-wise by default
                     
-                    imax = cp.argmax(d_pdtfft_batch, axis=-1) # take the arg max for each row
+                    # imax = cp.argmax(d_pdtfft_batch, axis=-1) # take the arg max for each row
+                    imax, d_max = cupyArgmaxAbsRows_complex64(
+                        cp.fft.fft(d_pdt_batch),
+                        returnMaxValues=True,
+                        THREADS_PER_BLOCK=1024
+                    )
                     
                     # assign to d_freqlist output by slice
                     d_freqlist[i*BATCH : i*BATCH + TOTAL_THIS_BATCH] = imax[:TOTAL_THIS_BATCH]
                     
-                    
                     # assign to d_result
-                    for k in range(TOTAL_THIS_BATCH):    
-                        d_result[i*BATCH + k] = d_pdtfft_batch[k, imax[k]] / d_rxNormPartSq_batch[k] / cutoutNormSq
+                    # for k in range(TOTAL_THIS_BATCH):    
+                        # d_result[i*BATCH + k] = d_pdtfft_batch[k, imax[k]] / d_rxNormPartSq_batch[k] / cutoutNormSq
+                    d_result[i*BATCH : i*BATCH + TOTAL_THIS_BATCH] = d_max[:TOTAL_THIS_BATCH]**2 / d_rxNormPartSq_batch[:TOTAL_THIS_BATCH] / cutoutNormSq
                         
-                
-                
+
                 # copy all results back
                 h_result = cp.asnumpy(d_result)
                 h_freqlist = cp.asnumpy(d_freqlist)

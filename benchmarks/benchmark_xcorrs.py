@@ -5,7 +5,7 @@ from verifyRoutines import compareValues
 
 import numpy as np
 
-def benchmark(cutoutlen=1000, cupybatchsize=1):
+def benchmark(cutoutlen=1000, cupybatchsize=1, numShifts=128):
     # Generate some data
     datalen = 100000000
     x = np.random.randn(datalen) + 1j*np.random.randn(datalen)
@@ -16,11 +16,11 @@ def benchmark(cutoutlen=1000, cupybatchsize=1):
     cutout = x[start:start+cutoutlen]
 
     timer = Timer()
-    loops = 5
+    loops = 1 # No need to repeat honestly..
 
     # Run CPU xcorr
     startIdx = 0
-    endIdx = 128
+    endIdx = numShifts
     idxStep = 1
     shifts = np.arange(startIdx, endIdx, idxStep)
     timer.start()
@@ -65,5 +65,7 @@ if __name__ == "__main__":
         benchmark(int(sys.argv[1]))
     elif len(sys.argv) == 3:
         benchmark(int(sys.argv[1]), int(sys.argv[2]))
+    elif len(sys.argv) == 4:
+        benchmark(int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]))
     else:
         benchmark()

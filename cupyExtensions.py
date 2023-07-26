@@ -106,9 +106,10 @@ def cupyCopyGroups32fc(x: cp.ndarray, y: cp.ndarray,
     copy_groups_kernel32fc((NUM_BLOCKS,), (threads_per_blk,),
                            (x, y, xStarts, lengths, yStarts))
 
-_copySlicesToMatrix_32fckernel, _copyEqualSlicesToMatrix_32fckernel = cupyModuleToKernelsLoader(
+_copySlicesToMatrix_32fckernel, _copyEqualSlicesToMatrix_32fckernel, \
+    _copyIncrementalEqualSlicesToMatrix_32fckernel = cupyModuleToKernelsLoader(
     "copying.cu", 
-    ["copySlicesToMatrix_32fc", "copyEqualSlicesToMatrix_32fc"])
+    ["copySlicesToMatrix_32fc", "copyEqualSlicesToMatrix_32fc", "copyIncrementalEqualSlicesToMatrix_32fc"])
 
 def cupyCopySlicesToMatrix_32fc(
     d_x: cp.ndarray,
@@ -162,6 +163,54 @@ def cupyCopyEqualSlicesToMatrix_32fc(
     )
 
     return d_out
+
+def cupyCopyIncrementalEqualSlicesToMatrix_32fc(
+    d_x: cp.ndarray,
+    startIdx: int,
+    increment: int,
+    rowLength: int,
+    numRows: int,
+    d_out: cp.ndarray=None
+):
+    # Checks
+    cupyRequireDtype(cp.complex64, d_x)
+
+    # Define the rectangle each block operates on
+    blockRows = 16 if numRows >= 16 else numRows
+    blockCols = 256 # Constant for now
+
+    # Allocate output if not specified
+    if d_out is None:
+        d_out = cp.zeros((numRows, rowLength), dtype=cp.complex64)
+    else:
+        # Check it
+        cupyRequireDtype(cp.complex64, d_out)
+        if (d_out.shape!= (numRows, rowLength)):
+            raise ValueError("d_out must have the shape %d, %d" % (numRows, rowLength))
+        
+    # Shared mem requirements
+    smReq = blockRows * blockCols * 8
+    cupyCheckExceedsSharedMem(smReq)
+
+    # Execute
+    NUM_BLKS_X = rowLength // blockCols
+    if rowLength % blockCols > 0:
+        NUM_BLKS_X += 1
+    NUM_BLKS_Y = numRows // blockRows
+    if numRows % blockRows > 0:
+        NUM_BLKS_Y += 1
+
+    _copyIncrementalEqualSlicesToMatrix_32fckernel(
+        (NUM_BLKS_X, NUM_BLKS_Y),
+        (256,),
+        (d_x, d_x.size, startIdx, increment, numRows, rowLength, blockRows, blockCols, d_out),
+        shared_mem=smReq
+    )
+
+    return d_out
+
+
+    
 
 #%%
 _argmax3d_uint32kernel, _argmaxAbsRows_cplx64kernel = cupyModuleToKernelsLoader(

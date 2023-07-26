@@ -85,7 +85,13 @@ try:
                     xStarts = cp.asarray(shifts[i*BATCH : i*BATCH+TOTAL_THIS_BATCH], dtype=cp.int32)
                     # Copy groups
                     # cupyCopyGroups32fc(d_rx, d_pdt_batch, xStarts, yStarts[:TOTAL_THIS_BATCH], lengths[:TOTAL_THIS_BATCH])
-                    cupyCopyEqualSlicesToMatrix_32fc(d_rx, xStarts, len(cutout), d_pdt_batch[:TOTAL_THIS_BATCH,:])
+                    # cupyCopyEqualSlicesToMatrix_32fc(d_rx, xStarts, len(cutout), d_pdt_batch[:TOTAL_THIS_BATCH,:])
+                    cupyCopyIncrementalEqualSlicesToMatrix_32fc(d_rx, 
+                                                                shifts[i*BATCH], 
+                                                                shifts[i*BATCH+1]-shifts[i*BATCH],
+                                                                len(cutout),
+                                                                TOTAL_THIS_BATCH,
+                                                                d_pdt_batch[:TOTAL_THIS_BATCH,:]) # very minimal improvement of ~10%
                     # Calculate norms
                     d_rxNormPartSq_batch = cp.linalg.norm(d_pdt_batch, axis=1)**2
                     # Perform the multiply
@@ -97,12 +103,13 @@ try:
                     # imax = cp.argmax(d_pdtfft_batch, axis=-1) # take the arg max for each row
                     imax, d_max = cupyArgmaxAbsRows_complex64(
                         cp.fft.fft(d_pdt_batch),
+                        d_argmax=d_freqlist[i*BATCH : i*BATCH+TOTAL_THIS_BATCH],
                         returnMaxValues=True,
                         THREADS_PER_BLOCK=1024
                     )
                     
                     # assign to d_freqlist output by slice
-                    d_freqlist[i*BATCH : i*BATCH + TOTAL_THIS_BATCH] = imax[:TOTAL_THIS_BATCH]
+                    # d_freqlist[i*BATCH : i*BATCH + TOTAL_THIS_BATCH] = imax[:TOTAL_THIS_BATCH]
                     
                     # assign to d_result
                     # for k in range(TOTAL_THIS_BATCH):    

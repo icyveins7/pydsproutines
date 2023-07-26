@@ -64,3 +64,75 @@ void copyEqualSlicesToMatrix_32fc(
         }
     }
 }
+
+/*
+For sliding windows, each row in the output is simply a fixed index offset from the previous row, e.g.
+i  , i+1, i+2, ...
+i+2, i+3, i+4, ...
+i+4, i+5, i+6, ...
+...
+
+In cases like this, we can reduce global reads by accessing a square block;
+this requires a single global coalesced read into shared memory, and then multiple global coalesced writes from shared memory.
+
+Common configurations for shared mem dimensions would be:
+32(rows) * 128(columns) => 32768 bytes, use 128 threads per block
+16(rows) * 256(columns) => 32768 bytes, use 256 threads per block
+
+Note that the shared memory will very likely not be fully used,
+unless the increment is equal to the number of columns. 
+But overallocating this makes it simpler to deal with, and gives us a way to track the output rectangle.
+*/
+extern "C" __global__
+void copyIncrementalEqualSlicesToMatrix_32fc(
+    const complex<float> *d_x,
+    const int xlength, // length of the input, for error checking
+    const int startIdx, // this is the input starting index for the first row
+    const int increment, // this is the jump from one row to the next
+    const int outRows,
+    const int outLength,
+    const int blockRows, const int blockCols, // we need this so that our block can find which portion to copy
+    complex<float> *d_out // outRows * outLength
+){
+    // Allocate shared memory
+    extern __shared__ double s[];
+
+    complex<float> *s_ws = (complex<float> *)s; // (blockRows * blockCols)
+
+    // Define the first output row for this block
+    int firstOutputRow = blockRows * blockIdx.y;
+    // Define the first output column for this block
+    int firstOutputCol = blockCols * blockIdx.x;
+    // Define the first input index for this block
+    int firstInputIndex = firstOutputRow * increment + startIdx + firstOutputCol;
+    // Define the last input index for this block (not inclusive)
+    int lastInputIndex = firstInputIndex + (blockRows-1) * increment + blockCols;
+
+    // Copy into shared memory
+    for (int i = threadIdx.x; i < lastInputIndex-firstInputIndex; i += blockDim.x)
+    {
+        if (firstInputIndex + i < xlength) // dont read out of bounds
+            s_ws[i] = d_x[firstInputIndex + i];
+        else
+            s_ws[i] = 0;
+    }
+    __syncthreads();
+
+    // Now we read from shared memory and just write to global
+    for (int i = 0; i < blockRows; i++)
+    {
+        int row = firstOutputRow + i;
+        // Ensure writes are in bounds
+        if (row < outRows)
+        {
+            for (int t = threadIdx.x; t < blockCols; t += blockDim.x)
+            {
+                int col = firstOutputCol + t;
+                if (col < outLength) // Ensure writes are in bounds
+                    d_out[row*outLength + firstOutputCol + t] = s_ws[t + i*increment];
+            }
+        }
+        
+    }
+    
+}

@@ -51,7 +51,7 @@ with dpg.file_dialog(
 #%% Starting window, to open databases
 with dpg.window(label="Open an XcorrDB", no_close=True, width=500, height=200, tag="opener_window"):
     with dpg.group(horizontal=True):
-        dpg.add_input_text(label="DB path", default_value="xcorrs.db", tag="dbpathinput")
+        dpg.add_input_text(label="DB path", default_value="xcorrs.db", tag="dbpathinput", callback=open_db, on_enter=True)
         dpg.add_button(label="Browse", callback=lambda: dpg.show_item("file_dialog_id"))
 
     dpg.add_button(label="Open", callback=open_db)
@@ -119,6 +119,16 @@ def handleColumnToggle(sender, app_data, user_data):
     print(table) # Not useful
 
 
+#%% Holder for toggling the current textviewer type
+textviewerType = dict() # tag->bool (isHex)
+
+#%%
+def clearDataWindow(sender, app_data, user_data):
+    # Clear things with custom tags
+    dpg.delete_item(user_data['textviewertag'])
+    textviewerType.pop(user_data['textviewertag'])
+
+
 #%% Function to setup a database data window
 def setupDataWindow(sender, app_data, user_data):
     dbpath = user_data['dbpath']
@@ -139,8 +149,12 @@ def setupDataWindow(sender, app_data, user_data):
     with dpg.window(
         label="%s -> %s (%s Results)" % (dbpath, tablename, xctypestrdict[xctype]),
         pos=(300, 300),
-        width=500, height=400,
+        width=700, height=400,
         # parent="window_%s" % (dbpath) # This doesn't work?
+        on_close=clearDataWindow,
+        user_data={
+            'textviewertag': "textviewer%s,%s" % (dbpath,tablename)
+        }
     ):
         # Get the table type
         xctype = table.xctype
@@ -157,6 +171,8 @@ def setupDataWindow(sender, app_data, user_data):
 
         
         # We use table for horizontal layout
+        tbl_cols = list()
+
         with dpg.table(header_row=False, borders_innerV=True):
             # Column for the actual table
             dpg.add_table_column()
@@ -188,12 +204,13 @@ def setupDataWindow(sender, app_data, user_data):
                             # Add columns as-is, but ignore the result blobs
                             for col in fmt['cols']:
                                 if col[0] not in ignoredColumns:
-                                    dpg.add_table_column(label=col[0])
+                                    tbl_cols.append(dpg.add_table_column(label=col[0]))
                             
                             # Add plot button column
                             dpg.add_table_column(label="View", width_fixed=True, init_width_or_weight=40.0) # We want the button to show up fully
                             
                             # Add the rows
+                            hideRfdCols = True
                             for row in results:
                                 with dpg.table_row():
                                     for idx, col in enumerate(row):
@@ -204,10 +221,11 @@ def setupDataWindow(sender, app_data, user_data):
                                                         label="BLOB",
                                                         callback=renderBlobText,
                                                         user_data={
-                                                            "blob": col
+                                                            "blob": col,
+                                                            "textviewertag": "textviewer%s,%s" % (dbpath,tablename)
                                                         }
                                                     )
-                                                    dpg.add_text("BLOB")
+                                                    
                                                 else:
                                                     dpg.add_text(str(col))
                                     with dpg.table_cell():
@@ -219,9 +237,23 @@ def setupDataWindow(sender, app_data, user_data):
                                                 "table": table # And the table object
                                             }
                                         )
+                                # Check if all of rfd is None
+                                if row['rfd_scan_start'] is not None or row['rfd_scan_numsteps'] is not None or row['rfd_scan_step'] is not None:
+                                    hideRfdCols = False
+
+                                if hideRfdCols:
+                                    # TODO: have modal to tell user that we hid these
+                                    dpg.disable_item(tbl_cols[-4])
+                                    dpg.show_item(tbl_cols[-4]) # Need this as well?
+                                    dpg.disable_item(tbl_cols[-3])
+                                    dpg.show_item(tbl_cols[-3])
+                                    dpg.disable_item(tbl_cols[-2])
+                                    dpg.show_item(tbl_cols[-2])
+                                
                 # Right layout: 
-                with dpg.table_cell():
+                with dpg.table_cell() as righttblpanel:
                     # Text viewer
+                    textviewerTag = "textviewer%s,%s" % (dbpath,tablename)
                     dpg.add_input_text(
                         multiline=True, 
                         default_value="Nothing to show here.", 
@@ -230,18 +262,40 @@ def setupDataWindow(sender, app_data, user_data):
                         #callback=_log, s
                         #tab_input=True,
                         readonly=True,
-                        tag="textviewer")
+                        parent=righttblpanel,
+                        tag=textviewerTag)
+
+                    with dpg.group(horizontal=True):
+                        dpg.add_button(
+                            label="Toggle Hex/uint8s", 
+                            callback=toggleTextViewerOutput,
+                            user_data={
+                                'textviewertag': textviewerTag
+                            })
 
 #%% Callback for blob renderer
 def renderBlobText(sender, app_data, user_data):
     blob = user_data['blob']
     x = np.frombuffer(blob, np.uint8)
     s = " ".join(["%02X" % i for i in x])
-    print(s)
 
-    dpg.set_value("textviewer", s)
+    dpg.set_value(user_data['textviewertag'], s)
+    textviewerType[user_data['textviewertag']] = True # Default isHex = True
 
+#%% Callback to toggle text viewer output
+def toggleTextViewerOutput(sender, app_data, user_data):
+    current = dpg.get_value(user_data['textviewertag'])
+    if textviewerType[user_data['textviewertag']]: # Then it is hex
+        u8rep = np.frombuffer(bytes.fromhex(current), np.uint8)
+        s = " ".join(["%3d" % i for i in u8rep])
 
+    else:
+        hexrep = np.array([int(i) for i in current.split()], np.uint8)
+        s = " ".join(["%02X" % i for i in hexrep])
+
+    # Set the new representation
+    dpg.set_value(user_data['textviewertag'], s)
+    textviewerType[user_data['textviewertag']] = not textviewerType[user_data['textviewertag']] # Don't forget to invert the bool
         
 
 #%% Callback for 1D/2D Plotter

@@ -119,10 +119,14 @@ def handleColumnToggle(sender, app_data, user_data):
     print(table) # Not useful
 
 
+#%% Holder for toggling the current textviewer type
+textviewerType = dict() # tag->bool (isHex)
+
 #%%
 def clearDataWindow(sender, app_data, user_data):
     # Clear things with custom tags
     dpg.delete_item(user_data['textviewertag'])
+    textviewerType.pop(user_data['textviewertag'])
 
 
 #%% Function to setup a database data window
@@ -249,6 +253,7 @@ def setupDataWindow(sender, app_data, user_data):
                 # Right layout: 
                 with dpg.table_cell() as righttblpanel:
                     # Text viewer
+                    textviewerTag = "textviewer%s,%s" % (dbpath,tablename)
                     dpg.add_input_text(
                         multiline=True, 
                         default_value="Nothing to show here.", 
@@ -258,14 +263,14 @@ def setupDataWindow(sender, app_data, user_data):
                         #tab_input=True,
                         readonly=True,
                         parent=righttblpanel,
-                        tag="textviewer%s,%s" % (dbpath,tablename))
+                        tag=textviewerTag)
 
                     with dpg.group(horizontal=True):
                         dpg.add_button(
                             label="Toggle Hex/uint8s", 
                             callback=toggleTextViewerOutput,
                             user_data={
-                                'textviewertag': "textviewer%s,%s" % (dbpath,tablename)
+                                'textviewertag': textviewerTag
                             })
 
 #%% Callback for blob renderer
@@ -273,13 +278,24 @@ def renderBlobText(sender, app_data, user_data):
     blob = user_data['blob']
     x = np.frombuffer(blob, np.uint8)
     s = " ".join(["%02X" % i for i in x])
-    print(s)
 
     dpg.set_value(user_data['textviewertag'], s)
+    textviewerType[user_data['textviewertag']] = True # Default isHex = True
 
 #%% Callback to toggle text viewer output
 def toggleTextViewerOutput(sender, app_data, user_data):
-    print("TODO: toggleTextViewerOutput")
+    current = dpg.get_value(user_data['textviewertag'])
+    if textviewerType[user_data['textviewertag']]: # Then it is hex
+        u8rep = np.frombuffer(bytes.fromhex(current), np.uint8)
+        s = " ".join(["%3d" % i for i in u8rep])
+
+    else:
+        hexrep = np.array([int(i) for i in current.split()], np.uint8)
+        s = " ".join(["%02X" % i for i in hexrep])
+
+    # Set the new representation
+    dpg.set_value(user_data['textviewertag'], s)
+    textviewerType[user_data['textviewertag']] = not textviewerType[user_data['textviewertag']] # Don't forget to invert the bool
         
 
 #%% Callback for 1D/2D Plotter

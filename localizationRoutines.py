@@ -50,7 +50,7 @@ def ecef2geodeticLLA(x: np.ndarray):
         lle_list = np.zeros(x.shape)
         for i, row in enumerate(x):
             pos = ITRSPosition(Distance(m=row))
-            latlonele = wgs84.subpoint_of(pos)
+            latlonele = wgs84.subpoint(pos.at(now))
             lle_list[i,:] = latlonele.latitude.degrees, latlonele.longitude.degrees, latlonele.elevation.m
 
         return lle_list

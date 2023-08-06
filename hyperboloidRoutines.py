@@ -221,40 +221,41 @@ class Hyperboloid:
         mctr = 0
         pctr = 0
         for i in np.arange(tc.shape[1]):
-            roots = np.roots(tc[::-1,i].astype(np.complex128))
-        
-            ## DEPRECATED
-            # thetas[i,:] = np.arctan(roots) * 2
-        
-            # for theta in thetas[i,:]:
-            #     if np.imag(theta) == 0:
-            #         thetareal = np.real(theta)
-            #         if thetareal > 0:
-            #             thetareals[1,pctr] = thetareal
-            #             ve[1,pctr] = v[i]
-            #             pctr += 1
-            #         else:
-            #             thetareals[0,-1-mctr] = thetareal
-            #             ve[0,-1-mctr] = v[i]
-            #             mctr += 1
-                        
-                        
-            ## Instead of checking sign, sort them (this accounts for two negative or two positive roots, which is possible)
-            thetas = np.arctan(roots) * 2
-            thetas = np.real(thetas[np.imag(thetas) == 0]) # Extract only real roots
-            thetas = np.sort(thetas) # sort them
+            coeffs = tc[::-1, i] # In descending polynomial order
             
-            # Make the assumption that there are only up to 2 roots (which there should only be)
-            if thetas.size >= 1:
-                # Simply append to the negatives
-                thetareals[0,-1-mctr] = thetas[0]
-                ve[0, -1-mctr] = v[i]
-                mctr += 1
-            if thetas.size == 2:
-                # If more than one, we push the second one to the positives, since it's sorted already
-                thetareals[1,pctr] = thetas[1]
-                ve[1,pctr] = v[i]
-                pctr += 1
+            # Descartes rule of signs
+            # We have 4 roots, and only real coefficients, so any complex roots come in pairs
+            # Hence there's either 2 real roots (or repeated real roots) and 2 complex roots,
+            # or just 4 complex roots (invalid answer for us)
+            # As such we can determine the number of roots before we even decide to perform the root finder,
+            # which is expensive
+            # We do this by checking the sign changes are an odd number, which would suggest at least 1 positive root.
+            # There is a slim chance that there are 2 positive roots, or 2 negative roots, which would be ignored under this scheme,
+            # but that is very unlikely given the geometry of the problem
+            descartes = False
+            signchanges = np.diff(np.sign(coeffs))
+            if np.argwhere(np.diff(np.sign(coeffs))).size % 2 != 0:
+                descartes = True
+                # print("descartes + coeffs suggest at least 1 real root")
+            
+                roots = np.roots(coeffs.astype(np.complex128)) 
+                            
+                ## Instead of checking sign, sort them (this accounts for two negative or two positive roots, which is possible)
+                thetas = np.arctan(roots) * 2
+                thetas = np.real(thetas[np.imag(thetas) == 0]) # Extract only real roots
+                thetas = np.sort(thetas) # sort them
+                
+                # Make the assumption that there are only up to 2 roots (which there should only be)
+                if thetas.size >= 1:
+                    # Simply append to the negatives
+                    thetareals[0,-1-mctr] = thetas[0]
+                    ve[0, -1-mctr] = v[i]
+                    mctr += 1
+                if thetas.size == 2:
+                    # If more than one, we push the second one to the positives, since it's sorted already
+                    thetareals[1,pctr] = thetas[1]
+                    ve[1,pctr] = v[i]
+                    pctr += 1
                     
         # Cut it
         thetareals = thetareals.flatten()[tc.shape[1]-mctr : tc.shape[1]+pctr]

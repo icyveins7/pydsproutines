@@ -42,6 +42,34 @@ def next_fast_len(length: int, maxPrime: int=7):
         return length
 
 #%%
+def prev_fast_len(length: int, maxPrime: int=7) -> int:
+    """
+    Like scipy's next_fast_len, but with a configurable max prime value,
+    and producing a smaller length rather than a bigger one.
+    This is useful since scipy allows up to primes of 11, but CUDA prefers
+    a max prime of 7.
+
+    Parameters
+    ----------
+    length : int
+        Length of fft.
+    maxPrime : int, optional
+        Maximum prime number factor, by default 7
+    """
+    primes = sympy.primefactors(length)
+    if np.max(primes) <= maxPrime:
+        return length
+    else:
+        foundGoodPrimes = False
+        while not foundGoodPrimes:
+            length -= 1
+            if np.max(sympy.primefactors(length)) <= maxPrime:
+                foundGoodPrimes = True
+                break
+
+        return length
+
+#%%
 def czt(x, f1, f2, binWidth, fs):
     '''
     n = (f2-f1)/binWidth + 1

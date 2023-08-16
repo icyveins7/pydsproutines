@@ -88,7 +88,7 @@ try:
                     # cupyCopyEqualSlicesToMatrix_32fc(d_rx, xStarts, len(cutout), d_pdt_batch[:TOTAL_THIS_BATCH,:])
                     cupyCopyIncrementalEqualSlicesToMatrix_32fc(d_rx, 
                                                                 shifts[i*BATCH], 
-                                                                shifts[i*BATCH+1]-shifts[i*BATCH],
+                                                                shifts[1] - shifts[0], # assume constant increment # shifts[i*BATCH+1]-shifts[i*BATCH],
                                                                 len(cutout),
                                                                 TOTAL_THIS_BATCH,
                                                                 d_pdt_batch[:TOTAL_THIS_BATCH,:]) # very minimal improvement of ~10%
@@ -102,7 +102,7 @@ try:
                     
                     # imax = cp.argmax(d_pdtfft_batch, axis=-1) # take the arg max for each row
                     imax, d_max = cupyArgmaxAbsRows_complex64(
-                        cp.fft.fft(d_pdt_batch),
+                        cp.fft.fft(d_pdt_batch[:TOTAL_THIS_BATCH,:]),
                         d_argmax=d_freqlist[i*BATCH : i*BATCH+TOTAL_THIS_BATCH],
                         returnMaxValues=True,
                         THREADS_PER_BLOCK=1024

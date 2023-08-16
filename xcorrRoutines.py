@@ -16,6 +16,7 @@ from musicRoutines import MUSIC
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sqlite3 as sq
 import concurrent.futures
+from tqdm import tqdm
 
 try:
     import cupy as cp
@@ -72,7 +73,7 @@ try:
                 
                 # now iterate over the number of iterations required
                 # print("Starting cupy loop")
-                for i in range(numIter):
+                for i in tqdm(range(numIter)):
                     if i == numIter-1: # on the last iteration, may have to clip
                         # print("FINAL BATCH")
                         TOTAL_THIS_BATCH = len(shifts) - BATCH * (numIter-1)

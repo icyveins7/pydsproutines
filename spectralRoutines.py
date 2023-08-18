@@ -240,6 +240,7 @@ class CZTCached:
         self.ww = np.exp(-1j * 2 * np.pi * (f2-f1+binWidth)/(self.k*fs) * kk2)
         chirpfilter = 1 / self.ww[:self.k-1+self.m]
         self.fv = np.fft.fft( chirpfilter, self.nfft )
+        # print(self.nfft, chirpfilter.size, self.ww.size, self.k+self.m)
         
         nn = np.arange(self.m)
         self.aa = np.exp(1j * 2 * np.pi * f1/fs * -nn) * self.ww[self.m+nn-1]

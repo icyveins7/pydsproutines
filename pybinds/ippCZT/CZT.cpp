@@ -23,14 +23,22 @@ void IppCZT32fc::prepare()
     // resize m_ww appropriately
     m_ww.resize(kk2.size());
     Ipp32f f = -(m_f2-m_f1+m_fstep) / ((Ipp32f)m_k * m_fs) * 6.283185307179586;
-    Ipp32fc fi = {0, f};
-    // ippe::math::MulC_I(fi, kk2.data(), kk2.size());
-    ippe::math::Exp<
-
+    ippe::math::MulC_I(f, kk2.data(), kk2.size());
+    ippe::vector<Ipp32f> ones(kk2.size(), 1.0f);
+    ippe::convert::PolarToCart(
+        ones.data(), kk2.data(),
+        m_ww.data(), m_ww.size()
+    );
 
     // chirpfilter = 1 / self.ww[:self.k-1+self.m]
     // self.fv = np.fft.fft( chirpfilter, self.nfft )
-    
+    ippe::vector<Ipp32f> zeros(m_ww.size(), 0.0f);
+    ippe::vector<Ipp32fc> ones32fc(m_ww.size());
+    ippe::convert::RealToCplx()
+
+    ippe::vector<Ipp32fc> chirpfilter(m_nfft);
+    ippe::math::Div
+
     // nn = np.arange(self.m)
     // self.aa = np.exp(1j * 2 * np.pi * f1/fs * -nn) * self.ww[self.m+nn-1]
 }

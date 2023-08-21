@@ -112,10 +112,9 @@ def czt_scipy(x, f1, f2, binWidth, fs):
     4.7ms vs 3.7ms (start at non 0 e.g. -X to X Hz)
     '''
     
-    # TODO: this conversion is still wrong!!
     length = int((f2-f1)/binWidth + 1)
     a = np.exp(1j*2*np.pi*f1/fs) # not sure why this is positive, not negative
-    cc = sps.czt(x, length, np.exp(-1j*2*np.pi*binWidth/length), a)
+    cc = sps.czt(x, length, np.exp(-1j*2*np.pi*binWidth), a)
     
     return cc
 

@@ -228,13 +228,14 @@ class CZTCached:
     
         self.k = int((f2-f1)/binWidth + 1)
         self.m = xlength
-        self.nfft = self.m + self.k
+        self.nfft = self.m + self.k - 1
         foundGoodPrimes = False
         while not foundGoodPrimes:
-            self.nfft = self.nfft + 1
             if np.max(sympy.primefactors(self.nfft)) <= 7: # change depending on highest tolerable radix
                 foundGoodPrimes = True
-        
+                break
+            self.nfft = self.nfft + 1
+
         kk = np.arange(-self.m+1,np.max([self.k-1,self.m-1])+1)
         kk2 = kk**2.0 / 2.0
         self.ww = np.exp(-1j * 2 * np.pi * (f2-f1+binWidth)/(self.k*fs) * kk2)

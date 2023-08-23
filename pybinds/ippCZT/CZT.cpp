@@ -54,7 +54,6 @@ void IppCZT32fc::prepare()
     // Compute the W coefficients for the entire length, we will extract what we need later
     m_ww.resize(kk2.size());
     Ipp32f f = -6.283185307179586 * m_fstep / m_fs;
-    // Ipp32f f = -(m_f2-m_f1+m_fstep) / ((Ipp32f)m_k * m_fs) * 6.283185307179586;
     ippe::math::MulC_I(f, kk2.data(), kk2.size());
     ippe::vector<Ipp32f> ones(kk2.size(), 1.0f);
     ippe::convert::PolarToCart(
@@ -70,9 +69,7 @@ void IppCZT32fc::prepare()
     Ipp32fc zero32fc = { 0.0f, 0.0f };
     ippe::vector<Ipp32fc> chirpfilter(m_nfft, zero32fc);
     // Extract the negative powered chirpfilter V(n) by doing division, and extracting the first N+K-1, leaving the rest to be 0
-    ippe::math::Div(ones32fc.data(), m_ww.data(), chirpfilter.data(), m_N + m_k - 1);
-    for (int i = 0; i < chirpfilter.size(); i++)
-        printf("chirpfilter[%d] = %f %f\n", i, chirpfilter[i].re, chirpfilter[i].im);
+    ippe::math::Div(m_ww.data(), ones32fc.data(), chirpfilter.data(), m_N + m_k - 1); // this is the ordering for 1/ww; ones32fc is the SECOND arg
 
     // Perform the FFT on the chirpfilter and store it
     m_fv.resize(m_nfft);

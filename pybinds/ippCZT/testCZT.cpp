@@ -17,29 +17,33 @@ int main()
     }
     ippe::vector<Ipp32fc> out(czt.m_k);
     printf("output length = %zd\n", out.size());
-    printf("m_nfft = %d\n", czt.m_nfft);
+    printf("m_nfft = %zd\n", czt.m_dft.getLength());
 
-    for (int i = 0; i < czt.m_ww.size(); i++)
-    {
-        printf("ww[%d] = %f, %f\n", i, czt.m_ww[i].re, czt.m_ww[i].im);
-    }
-    printf("\n\n");
+    // validated.
+    // for (int i = 0; i < czt.m_ww.size(); i++)
+    // {
+    //     printf("ww[%d] = %f, %f\n", i, czt.m_ww[i].re, czt.m_ww[i].im);
+    // }
+    // printf("\n\n");
 
-    for (int i = 0; i < czt.m_aa.size(); i++)
-    {
-        printf("aa[%d] = %f, %f\n", i, czt.m_aa[i].re, czt.m_aa[i].im);
-    }
-    printf("\n\n");
+    // validated.
+    // for (int i = 0; i < czt.m_aa.size(); i++)
+    // {
+    //     printf("aa[%d] = %f, %f\n", i, czt.m_aa[i].re, czt.m_aa[i].im);
+    // }
+    // printf("\n\n");
 
-    for (int i = 0; i < czt.m_fv.size(); i++)
-    {
-        printf("fv[%d] = %f, %f\n", i, czt.m_fv[i].re, czt.m_fv[i].im);
-    }
-    printf("\n\n");
+    // validated.
+    // for (int i = 0; i < czt.m_fv.size(); i++)
+    // {
+    //     printf("fv[%d] = %f, %f\n", i, czt.m_fv[i].re, czt.m_fv[i].im);
+    // }
+    // printf("\n\n");
 
 
     czt.run(in.data(), out.data());
 
+    // all correct!
     for (int i = 0; i < out.size(); i++)
     {
         printf("out[%d]= %f, %f\n", i, out.at(i).re, out.at(i).im);

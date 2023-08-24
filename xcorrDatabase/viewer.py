@@ -277,10 +277,17 @@ def setupDataWindow(sender, app_data, user_data):
 def renderBlobText(sender, app_data, user_data):
     blob = user_data['blob']
     x = np.frombuffer(blob, np.uint8)
-    s = " ".join(["%02X" % i for i in x])
+    # Is this the first time we render?
+    if user_data['textviewertag'] not in textviewerType:
+        textviewerType[user_data['textviewertag']] = True # Default isHex = True
+    
+    if textviewerType[user_data['textviewertag']]: # if True, use hex
+        s = " ".join(["%02X" % i for i in x])
+    else:
+        s = " ".join(["%3d" % i for i in x])
 
     dpg.set_value(user_data['textviewertag'], s)
-    textviewerType[user_data['textviewertag']] = True # Default isHex = True
+
 
 #%% Callback to toggle text viewer output
 def toggleTextViewerOutput(sender, app_data, user_data):

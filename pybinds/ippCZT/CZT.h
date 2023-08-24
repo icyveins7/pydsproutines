@@ -2,6 +2,15 @@
 
 #include "../../ipp_ext/include/ipp_ext.h"
 #include <cmath>
+#include <complex>
+
+// =====================================
+// #include <pybind11/numpy.h>
+// #include <pybind11/complex.h>
+// #include <pybind11/pybind11.h>
+
+// namespace py = pybind11;
+// =====================================
 
 // Helper functions
 int next_fast_len(int len);
@@ -27,7 +36,10 @@ struct IppCZT32fc
 
     //
     void prepare();
-    void run(const Ipp32fc* in, Ipp32fc* out);
+    void runRaw(const Ipp32fc* in, Ipp32fc* out);
+    // py::array_t<std::complex<float>, py::array::c_style> run(
+    //     const py::array_t<std::complex<float>, py::array::c_style> &in
+    // );
 
 
     //----------------------------------------------------------------

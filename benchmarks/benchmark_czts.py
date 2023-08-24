@@ -10,8 +10,10 @@ if __name__ == "__main__":
     from signalCreationRoutines import *
     from verifyRoutines import *
     from timingRoutines import Timer
-    
-    
+
+    import os
+    os.add_dll_directory(os.path.join(os.environ['IPPROOT'], "redist", "intel64"))
+    from pbIppCZT32fc import pbIppCZT32fc
     
     timer = Timer()
     
@@ -65,6 +67,19 @@ if __name__ == "__main__":
     cztobj = CZTCached(length, f1, f2, fstep, fs, True)
     out = cztobj.runMany(x)
     timer.evt("czt cpu batch")
+
+    #%% CPU based pre-compiled IPP CZT object
+    pbczt = pbIppCZT32fc(length, f1, f2, fstep, float(length))
+    # pbczt = pbIppCZT32fc(length, -0.1, 0.1, 0.01, 1.0)
+    print("pbCzt ok")
+    for i in range(x.shape[0]):
+        xc = np.array(x[i,:], dtype=np.complex64)
+        print(xc)
+        print(xc.dtype)
+        print(xc.size)
+        print(pbczt.m_N)
+        pbout = pbczt.run(xc)
+        print("pbCZT %d" % i)
 
     #%%
     timer.end()

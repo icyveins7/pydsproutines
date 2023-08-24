@@ -33,6 +33,8 @@ int next_fast_len(int len)
 // ----------------------------------------------------------------
 void IppCZT32fc::prepare()
 {
+    // NOTE: we must compute all the required arrays in 64f/64fc and then convert down
+    // otherwise the accuracy is very bad.. TODO: rewrite the below as 64f then convert at end
     try{
         // Start off by defining the array of k values, which spans [-N+1, max(N,K)-1], since we don't know if N or K is larger
         int kk_start = -m_N + 1;
@@ -143,25 +145,27 @@ void IppCZT32fc::runRaw(const Ipp32fc* in, Ipp32fc* out)
     
 }
 
-// py::array_t<std::complex<float>, py::array::c_style> IppCZT32fc::run(
-//     const py::array_t<std::complex<float>, py::array::c_style> &in
-// ){
-//     // make the output
-//     py::array_t<std::complex<float>, py::array::c_style> out({m_k});
+#ifdef COMPILE_FOR_PYBIND
+py::array_t<std::complex<float>, py::array::c_style> IppCZT32fc::run(
+    const py::array_t<std::complex<float>, py::array::c_style> &in
+){
+    // make the output
+    py::array_t<std::complex<float>, py::array::c_style> out({m_k});
 
-//     try{
-//         const Ipp32fc* iptr = reinterpret_cast<const Ipp32fc*>(in.request().ptr);
+    try{
+        const Ipp32fc* iptr = reinterpret_cast<const Ipp32fc*>(in.request().ptr);
         
-//         // Call the raw method
-//         runRaw(iptr,
-//             reinterpret_cast<Ipp32fc*>(out.request().ptr)  
-//         );
-//     }
-//     catch(...)
-//     {
-//         printf("Caught error?\n");
-//     }
+        // Call the raw method
+        runRaw(iptr,
+            reinterpret_cast<Ipp32fc*>(out.request().ptr)  
+        );
+    }
+    catch(...)
+    {
+        printf("Caught error?\n");
+    }
     
 
-//     return out;
-// }
+    return out;
+}
+#endif

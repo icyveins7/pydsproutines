@@ -6,7 +6,9 @@ ext_modules = [
         "pbIppCZT32fc",
         ["CZT.cpp", "pbCZT.cpp"],
         include_dirs=["../../ipp_ext/include"],
-        libraries=["ippcore", "ipps"]
+        libraries=["ippcore", "ipps"],
+        # Define COMPILE_FOR_PYBIND
+        extra_compile_args=["-DCOMPILE_FOR_PYBIND"]
     ),
 ]
 

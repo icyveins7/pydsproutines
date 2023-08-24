@@ -47,12 +47,12 @@ int main()
     }
     printf("\n\n");
 
-    // validated.
-    for (int i = 0; i < czt.m_fv.size(); i++)
-    {
-        printf("fv[%d] = %f, %f\n", i, czt.m_fv[i].re, czt.m_fv[i].im);
-    }
-    printf("\n\n");
+    // // validated.
+    // for (int i = 0; i < czt.m_fv.size(); i++)
+    // {
+    //     printf("fv[%d] = %f, %f\n", i, czt.m_fv[i].re, czt.m_fv[i].im);
+    // }
+    // printf("\n\n");
 
     try{
         czt.runRaw(in.data(), out.data());
@@ -63,11 +63,11 @@ int main()
     }
     
 
-    // all correct!
-    for (int i = 0; i < out.size(); i++)
-    {
-        printf("out[%d]= %f, %f\n", i, out.at(i).re, out.at(i).im);
-    }
+    // // all correct!
+    // for (int i = 0; i < out.size(); i++)
+    // {
+    //     printf("out[%d]= %f, %f\n", i, out.at(i).re, out.at(i).im);
+    // }
 
     return 0;
 }

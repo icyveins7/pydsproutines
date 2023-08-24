@@ -5,11 +5,13 @@
 #include <complex>
 
 // =====================================
-// #include <pybind11/numpy.h>
-// #include <pybind11/complex.h>
-// #include <pybind11/pybind11.h>
+#ifdef COMPILE_FOR_PYBIND
+#include <pybind11/numpy.h>
+#include <pybind11/complex.h>
+#include <pybind11/pybind11.h>
 
-// namespace py = pybind11;
+namespace py = pybind11;
+#endif
 // =====================================
 
 // Helper functions
@@ -37,9 +39,12 @@ struct IppCZT32fc
     //
     void prepare();
     void runRaw(const Ipp32fc* in, Ipp32fc* out);
-    // py::array_t<std::complex<float>, py::array::c_style> run(
-    //     const py::array_t<std::complex<float>, py::array::c_style> &in
-    // );
+
+    #ifdef COMPILE_FOR_PYBIND
+    py::array_t<std::complex<float>, py::array::c_style> run(
+        const py::array_t<std::complex<float>, py::array::c_style> &in
+    );
+    #endif
 
 
     //----------------------------------------------------------------

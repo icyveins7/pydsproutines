@@ -20,7 +20,7 @@ int next_fast_len(int len);
 struct IppCZT32fc
 {
     IppCZT32fc() {}
-    IppCZT32fc(int len, Ipp32f f1, Ipp32f f2, Ipp32f fstep, Ipp32f fs)
+    IppCZT32fc(int len, double f1, double f2, double fstep, double fs)
         : m_N{len},
         m_k{static_cast<int>((f2-f1)/fstep + 1)},
         m_nfft{next_fast_len(len + m_k - 1)}, // important for nfft to be after len and k
@@ -44,6 +44,9 @@ struct IppCZT32fc
     py::array_t<std::complex<float>, py::array::c_style> run(
         const py::array_t<std::complex<float>, py::array::c_style> &in
     );
+    py::array_t<std::complex<float>, py::array::c_style> runMany(
+        const py::array_t<std::complex<float>, py::array::c_style> &in
+    );
     #endif
 
 
@@ -53,10 +56,10 @@ struct IppCZT32fc
     int m_k;
     int m_nfft;
 
-    Ipp32f m_f1;
-    Ipp32f m_f2;
-    Ipp32f m_fstep;
-    Ipp32f m_fs;
+    double m_f1;
+    double m_f2;
+    double m_fstep;
+    double m_fs;
     ippe::vector<Ipp32fc> m_ww;
     ippe::vector<Ipp32fc> m_fv;
     ippe::vector<Ipp32fc> m_aa;

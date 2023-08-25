@@ -39,69 +39,93 @@ void IppCZT32fc::prepare()
         // Start off by defining the array of k values, which spans [-N+1, max(N,K)-1], since we don't know if N or K is larger
         int kk_start = -m_N + 1;
         int kk_end = std::max(m_k, m_N) - 1; // inclusive
-        ippe::vector<Ipp32f> kk(kk_end - kk_start + 1);
-        ippe::generator::Slope<Ipp32f, Ipp32f>(
+        ippe::vector<Ipp64f> kk(kk_end - kk_start + 1);
+        ippe::generator::Slope<Ipp64f, Ipp64f>(
             kk.data(), 
             kk_end-kk_start+1, 
-            (Ipp32f)kk_start, 
+            (Ipp64f)kk_start, 
             1.0f);
 
         // Square the k values
-        ippe::vector<Ipp32f> kk2(kk.size());
+        ippe::vector<Ipp64f> kk2(kk.size());
         ippe::math::Mul(
             kk.data(), kk.data(), kk2.data(), kk2.size()
         );
         // Then halve it
-        ippe::math::MulC_I(0.5f, kk2.data(), kk2.size());
+        ippe::math::MulC_I(0.5, kk2.data(), kk2.size());
 
         // Compute the W coefficients for the entire length, we will extract what we need later
-        m_ww.resize(kk2.size());
-        Ipp32f f = -6.283185307179586 * m_fstep / m_fs;
+        m_ww.resize(kk2.size()); // resize the actual, but we don't write to it
+        ippe::vector<Ipp64fc> ww(m_ww.size()); // write to this temporary instead first
+
+        Ipp64f f = -IPP_2PI * m_fstep / m_fs;
         ippe::math::MulC_I(f, kk2.data(), kk2.size());
-        ippe::vector<Ipp32f> ones(kk2.size(), 1.0f);
+        ippe::vector<Ipp64f> ones(kk2.size(), 1.0f);
         ippe::convert::PolarToCart(
             ones.data(), kk2.data(),
-            m_ww.data(), m_ww.size()
-        ); // m_ww is now filled completely and contains values from W^[-N+1, max(N,K)-1]^2/2
-
-        ippe::vector<Ipp32fc> ones32fc(m_ww.size());
-        ippe::convert::RealToCplx(
-            ones.data(), static_cast<Ipp32f*>(nullptr), ones32fc.data(), ones32fc.size()
+            ww.data(), ww.size()
+        ); // ww is now filled completely and contains values from W^[-N+1, max(N,K)-1]^2/2
+        // Convert to 32fc to save internally
+        ippe::convert::Convert(
+            reinterpret_cast<const Ipp64f*>(ww.data()), 
+            reinterpret_cast<Ipp32f*>(m_ww.data()), \
+            m_ww.size() * 2 // *2 for complex data
         );
 
-        Ipp32fc zero32fc = { 0.0f, 0.0f };
-        ippe::vector<Ipp32fc> chirpfilter(m_nfft, zero32fc);
+        ippe::vector<Ipp64fc> ones64fc(m_ww.size());
+        ippe::convert::RealToCplx(
+            ones.data(), static_cast<Ipp64f*>(nullptr), ones64fc.data(), ones64fc.size()
+        );
+
+        Ipp64fc zero64fc = { 0.0, 0.0 };
+        ippe::vector<Ipp64fc> chirpfilter(m_nfft, zero64fc);
         // Extract the negative powered chirpfilter V(n) by doing division, and extracting the first N+K-1, leaving the rest to be 0
-        ippe::math::Div(m_ww.data(), ones32fc.data(), chirpfilter.data(), m_N + m_k - 1); // this is the ordering for 1/ww; ones32fc is the SECOND arg
+        ippe::math::Div(ww.data(), ones64fc.data(), chirpfilter.data(), m_N + m_k - 1); // this is the ordering for 1/ww; ones32fc is the SECOND arg
 
         // Perform the FFT on the chirpfilter and store it
-        m_fv.resize(m_nfft);
-        m_dft.fwd(chirpfilter.data(), m_fv.data()); // m_fv now contains the FFT of V(n)
+        m_fv.resize(m_nfft); // resize actual, but don't write to it
+        ippe::vector<Ipp64fc> fv(m_nfft); // write to this temporary instead first
+        ippe::DFTCToC<Ipp64fc> dft(m_nfft); // create a 64fc DFT object temporarily
+        dft.fwd(chirpfilter.data(), fv.data()); // fv now contains the FFT of V(n)
+        // Convert to 32fc to save internally
+        ippe::convert::Convert(
+            reinterpret_cast<const Ipp64f*>(fv.data()), 
+            reinterpret_cast<Ipp32f*>(m_fv.data()), \
+            m_fv.size() * 2 // *2 for complex data
+        );
 
         // Now we need to calculate the coefficients to multiply with every new input array
-        ippe::vector<Ipp32f> nn(m_N); // same length as input
-        ippe::generator::Slope<Ipp32f, Ipp32f>(
+        ippe::vector<Ipp64f> nn(m_N); // same length as input
+        ippe::generator::Slope<Ipp64f, Ipp64f>(
             nn.data(), 
             nn.size(), 
-            0.0f, 
-            1.0f
+            0.0, 
+            1.0
         );
         // resizes
-        m_aa.resize(nn.size()); // resize the actual output member var
-        ones.resize(nn.size(), 1.0f); // resize ones to fit the correct length
-        kk2.resize(nn.size(), 0.0f); // resize kk2 and reuse it to store the phase for this
+        m_aa.resize(nn.size()); // resize the actual output member var, but don't write to it
+        ippe::vector<Ipp64fc> aa(m_aa.size()); // write to this temporary instead first
+        ones.resize(nn.size(), 1.0); // resize ones to fit the correct length
+        kk2.resize(nn.size(), 0.0); // resize kk2 and reuse it to store the phase for this
         // calculate the phase
         ippe::math::MulC(
-            nn.data(), static_cast<Ipp32f>(-6.283185307179586 * (m_f1 / m_fs)), 
+            nn.data(), static_cast<Ipp64f>(-IPP_2PI * (m_f1 / m_fs)), 
             kk2.data(), kk2.size()
         );
         // exponentiate to complex
         ippe::convert::PolarToCart(
-            ones.data(), kk2.data(), m_aa.data(), m_aa.size()
+            ones.data(), kk2.data(), aa.data(), aa.size()
         );
         // final multiply
         ippe::math::Mul_I(
-            &m_ww.at(m_N-1), m_aa.data(), m_aa.size()
+            &ww.at(m_N-1), // use the 64f temporary which is more accurate
+            aa.data(), aa.size()
+        );
+        // Convert to 32fc to save internally
+        ippe::convert::Convert(
+            reinterpret_cast<const Ipp64f*>(aa.data()), 
+            reinterpret_cast<Ipp32f*>(m_aa.data()), \
+            m_aa.size() * 2 // *2 for complex data
         );
     }
     catch(std::exception &e){
@@ -149,16 +173,55 @@ void IppCZT32fc::runRaw(const Ipp32fc* in, Ipp32fc* out)
 py::array_t<std::complex<float>, py::array::c_style> IppCZT32fc::run(
     const py::array_t<std::complex<float>, py::array::c_style> &in
 ){
+    // make sure it's 1D and correct length
+    auto buffer_info = in.request();
+    if (buffer_info.shape.size() != 1 || buffer_info.shape[0] != m_N)
+        throw std::range_error("Input must be 1D and length " + std::to_string(m_N) + "!");
+
     // make the output
     py::array_t<std::complex<float>, py::array::c_style> out({m_k});
-
+    
     try{
-        const Ipp32fc* iptr = reinterpret_cast<const Ipp32fc*>(in.request().ptr);
+        const Ipp32fc* iptr = reinterpret_cast<const Ipp32fc*>(buffer_info.ptr);
         
         // Call the raw method
         runRaw(iptr,
             reinterpret_cast<Ipp32fc*>(out.request().ptr)  
         );
+    }
+    catch(...)
+    {
+        printf("Caught error?\n");
+    }
+    
+
+    return out;
+}
+
+py::array_t<std::complex<float>, py::array::c_style> IppCZT32fc::runMany(
+    const py::array_t<std::complex<float>, py::array::c_style> &in
+){
+    // make sure it's 2D and correct columns
+    auto buffer_info = in.request();
+    if (buffer_info.shape.size() != 2 || buffer_info.shape[1] != m_N)
+        throw std::range_error("Input must be 2D and columns = " + std::to_string(m_N) + "!");
+
+    // make the output
+    py::array_t<std::complex<float>, py::array::c_style> out({(int)buffer_info.shape[0], m_k});
+    
+
+    try{
+        const Ipp32fc* iptr = reinterpret_cast<const Ipp32fc*>(buffer_info.ptr);
+        Ipp32fc* optr = reinterpret_cast<Ipp32fc*>(out.request().ptr);
+
+        // Call the raw method over every row
+        for (int i = 0; i < buffer_info.shape[0]; i++)
+        {
+            runRaw(&iptr[i * m_N],
+                reinterpret_cast<Ipp32fc*>(&optr[i*m_k])  
+            );
+        }
+        
     }
     catch(...)
     {

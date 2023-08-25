@@ -7,7 +7,15 @@ namespace py = pybind11;
 PYBIND11_MODULE(pbIppCZT32fc, m) {
     py::class_<IppCZT32fc>(m, "pbIppCZT32fc")
         .def(py::init<int, Ipp32f, Ipp32f, Ipp32f, Ipp32f>())
-        .def("run", &IppCZT32fc::run)
+        .def("run", &IppCZT32fc::run,
+            "Examples:\n"
+            ".run(x) # x is a 1d numpy array\n"
+            ".run(x[i,:]) # x is a 2d numpy array, operating on 1 row (see runMany)"
+        )
+        .def("runMany", &IppCZT32fc::runMany,
+            "Example:\n"
+            ".runMany(x) # x is a 2d numpy array, operating on every row\n"
+        )
         .def_readonly("m_k", &IppCZT32fc::m_k)
         .def_readonly("m_N", &IppCZT32fc::m_N)
         // .def_readonly("m_ww", &IppCZT32fc::m_ww)

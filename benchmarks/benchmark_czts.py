@@ -65,24 +65,30 @@ if __name__ == "__main__":
     
     #%% CPU based CZT object
     cztobj = CZTCached(length, f1, f2, fstep, fs, True)
+
+    timer.evt("IGNORE")
     out = cztobj.runMany(x)
     timer.evt("czt cpu batch")
 
     #%% CPU based pre-compiled IPP CZT object
     pbczt = pbIppCZT32fc(length, f1, f2, fstep, float(length))
     # pbczt = pbIppCZT32fc(length, -0.1, 0.1, 0.01, 1.0)
-    print("pbCzt ok")
+    timer.evt("IGNORE")
     for i in range(x.shape[0]):
-        xc = np.array(x[i,:], dtype=np.complex64)
-        print(xc)
-        print(xc.dtype)
-        print(xc.size)
-        print(pbczt.m_N)
-        pbout = pbczt.run(xc)
-        print("pbCZT %d" % i)
+        pbout = pbczt.run(x[i,:])
+
+    timer.evt("czt pybind ipp with pythonic loop")
+
+    pboutl = pbczt.runMany(x)
+    timer.evt("czt pybind ipp with pybind loop")
+
+
 
     #%%
     timer.end()
+
+    #%%
+    # rawChg, fracChg = compareValues()
 
     #%%
     # rawChg, fracChg = compareValues(d_out.get().flatten(), out.flatten())

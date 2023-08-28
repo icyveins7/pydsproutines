@@ -6,11 +6,14 @@ void GroupXcorrCZT::addGroup(int start, int length, Ipp32fc *group, bool autoCon
         throw std::range_error("Length of group exceeds maximum length");
     m_groupStarts.push_back(start);
     m_groupLengths.push_back(length);
+
     ippe::vector<Ipp32fc> groupVector(length);
-    ippe::Copy(group, groupVector.data(), length);
     // Conjugate if needed
     if (autoConj)
-        ippe::Conjugate(groupVector.data(), length);
+        ippe::convert::Conj(group, groupVector.data(), length);
+    else
+        ippe::Copy(group, groupVector.data(), length);
+
     m_groups.push_back(std::move(groupVector)); // TODO: check if move works
 }
 
@@ -21,9 +24,13 @@ void GroupXcorrCZT::resetGroups()
     m_groups.clear();
 }
 
-void GroupXcorrCZT::xcorr(Ipp32fc *x, int shiftStart, int shiftStep, int numShifts)
+void GroupXcorrCZT::xcorr(Ipp32fc *x, int shiftStart, int shiftStep, int numShifts, Ipp32fc *output)
 {
     int shift;
+    ippe::vector<Ipp32fc> pdt(m_czt.m_N);
+    ippe::vector<Ipp32fc> result(m_czt.m_k);
+    // Output is assumed to be of size numShifts * m_czt.m_k
+
     // Loop over the group
     for (int i = 0; i < m_groupStarts.size(); i++)
     {
@@ -32,7 +39,29 @@ void GroupXcorrCZT::xcorr(Ipp32fc *x, int shiftStart, int shiftStep, int numShif
         {
             shift = shiftStart + j * shiftStep;
 
+            // TODO: calculate norms from x as necessary
+
+            // Multiply by the group
+            pdt.zero();
+            ippe::math::Mul(
+                m_groups.at(i).data(),
+                &x[shift],
+                pdt.data(),
+                m_groupLengths.at(i)
+            );
+
+            // Run the CZT
+            m_czt.runRaw(pdt.data(), result.data()); // TODO: make CZT not copy this
+
+            // Multiply in the correction for this group
+            ippe::math::Mul_I(
+                m_groupPhaseCorrections.at(i).data(),
+                result.data(),
+                (int)result.size()
+            );
         }
+
+        // 
     }
 }
 

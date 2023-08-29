@@ -664,10 +664,11 @@ class GroupXcorrCZT:
             rxgroupNormSqCollect = np.zeros(self.numGroups)
             
             for g in np.arange(self.numGroups):
-                ygroup = self.ystack[g,:]
+                ygroup = self.ystack[g,:self.lengths[g]]
                 rxgroup = rx[shift+self.starts[g] : shift+self.starts[g]+self.lengths[g]]
                 rxgroupNormSqCollect[g] = np.linalg.norm(rxgroup)**2
-                pdt = ygroup * rxgroup
+                pdt = np.zeros(self.maxLength, dtype=rxgroup.dtype)
+                pdt[:ygroup.size] = ygroup * rxgroup
                 # # Run the czt on the pdt now
                 # pdtczt = czt(pdt, self.f1, self.f2+self.binWidth/2, self.binWidth, self.fs)
                 # Use the cached CZT object

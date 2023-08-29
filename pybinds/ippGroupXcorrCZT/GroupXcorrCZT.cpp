@@ -65,21 +65,21 @@ void GroupXcorrCZT::xcorr(
     ippe::stats::Sum(
         m_groupEnergies.data(), (int)m_groupEnergies.size(), &totalGroupEnergy
     );
-    printf("totalGroupEnergy = %.8f\n", totalGroupEnergy);
+    // printf("totalGroupEnergy = %.8f\n", totalGroupEnergy);
 
     // Compute all the group phase corrections
     computeGroupPhaseCorrections();
-    printf("Completed computing group phase corrections\n");
-    for (int i = 0; i < m_groupPhaseCorrections.size(); ++i)
-    {
-        printf("Group %d corrections\n", i);
-        for (int j = 0; j < m_groupPhaseCorrections[i].size(); ++j)
-        {
-            printf("%g %g\n",
-                m_groupPhaseCorrections[i][j].re, m_groupPhaseCorrections[i][j].im
-            );
-        }
-    }
+    // printf("Completed computing group phase corrections\n");
+    // for (int i = 0; i < m_groupPhaseCorrections.size(); ++i)
+    // {
+    //     printf("Group %d corrections\n", i);
+    //     for (int j = 0; j < m_groupPhaseCorrections[i].size(); ++j)
+    //     {
+    //         printf("%g %g\n",
+    //             m_groupPhaseCorrections[i][j].re, m_groupPhaseCorrections[i][j].im
+    //         );
+    //     }
+    // }
 
     // Loop over the groups
     for (int i = 0; i < m_groupStarts.size(); i++)
@@ -88,10 +88,10 @@ void GroupXcorrCZT::xcorr(
         for (int j = 0; j < numShifts; j++)
         {
             shift = shiftStart + j * shiftStep;
-            printf("Group %d(length %zd), shift[%d] = %d\n", 
-                i, m_groups.at(i).size(), j, shift);
+            // printf("Group %d(length %zd), shift[%d] = %d\n", 
+                // i, m_groups.at(i).size(), j, shift);
             int xi = shift + m_groupStarts.at(i);
-            printf("xi = %d\n", xi);
+            // printf("xi = %d\n", xi);
             
             // Calculate the energy for this slice of x
             Ipp64f energy;
@@ -100,10 +100,10 @@ void GroupXcorrCZT::xcorr(
                 (int)m_groups.at(i).size(),
                 &energy
             );
-            printf("Energy for this slice of x = %f\n", energy);
+            // printf("Energy for this slice of x = %f\n", energy);
             // Accumulate energy for this shift
             xEnergies.at(j) += energy*energy; // remember to square to get energy
-            printf("xEnergies[%d] = %f\n", j, xEnergies.at(j));
+            // printf("xEnergies[%d] = %f\n", j, xEnergies.at(j));
 
             // Multiply by the group
             pdt.zero(); // we must zero since the pdt may be longer than the current group length
@@ -123,10 +123,10 @@ void GroupXcorrCZT::xcorr(
                 result.data(),
                 (int)result.size()
             );
-            // DEBUG
-            for (int j = 0; j < m_czt.m_k; j++){
-                printf("%.6g,%.6g \n", result[j].re, accumulator[j].im);
-            }
+            // // DEBUG
+            // for (int j = 0; j < m_czt.m_k; j++){
+            //     printf("%.6g,%.6g \n", result[j].re, accumulator[j].im);
+            // }
 
             // Accumulate into the output
             ippe::math::Add_I(
@@ -137,13 +137,13 @@ void GroupXcorrCZT::xcorr(
         }
     }
 
-    // DEBUG
-    for (int i = 0; i < numShifts; i++){
-        for (int j = 0; j < m_czt.m_k; j++){
-            printf("%.6g,%.6g  ", accumulator[i*m_czt.m_k + j].re, accumulator[i*m_czt.m_k + j].im);
-        }
-        printf("\n");
-    }
+    // // DEBUG
+    // for (int i = 0; i < numShifts; i++){
+    //     for (int j = 0; j < m_czt.m_k; j++){
+    //         printf("%.6g,%.6g  ", accumulator[i*m_czt.m_k + j].re, accumulator[i*m_czt.m_k + j].im);
+    //     }
+    //     printf("\n");
+    // }
 
     // Take the abs sq of the output
     ippe::convert::PowerSpectr(
@@ -152,13 +152,13 @@ void GroupXcorrCZT::xcorr(
         (int)accumulator.size()
     );
 
-    // DEBUG
-    for (int i = 0; i < numShifts; i++){
-        for (int j = 0; j < m_czt.m_k; j++){
-            printf("%.6g  ", out[i*m_czt.m_k + j]);
-        }
-        printf("\n");
-    }
+    // // DEBUG
+    // for (int i = 0; i < numShifts; i++){
+    //     for (int j = 0; j < m_czt.m_k; j++){
+    //         printf("%.6g  ", out[i*m_czt.m_k + j]);
+    //     }
+    //     printf("\n");
+    // }
 
     
 
@@ -166,15 +166,7 @@ void GroupXcorrCZT::xcorr(
     for (int j = 0; j < numShifts; j++)
     {
         Ipp64f normalisation = 1.0/(xEnergies.at(j) * totalGroupEnergy);
-        printf("Normalisation for shift %d is %g\n", j, normalisation);
-
-        // Ipp32fc normalisation_c = {
-        //     static_cast<Ipp32f>(normalisation),
-        //     0.0f
-        // };
-        // printf("Normalisation for shift %d is %g,%g\n", j,
-        //     normalisation_c.re, normalisation_c.im
-        // );
+        // printf("Normalisation for shift %d is %g\n", j, normalisation);
 
         // Normalise by multiplying 1 / normalisation, using a complex value
         ippe::math::MulC_I(
@@ -183,8 +175,6 @@ void GroupXcorrCZT::xcorr(
             (int)m_czt.m_k
         );
     }
-
-
 }
 
 ////////////////////////////////////////////////////////////////////////

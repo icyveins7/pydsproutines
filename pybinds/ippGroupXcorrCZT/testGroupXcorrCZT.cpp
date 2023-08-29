@@ -11,12 +11,10 @@ int main(int argc, char *argv[])
         0.0f,
         1.0f
     );
-    for (int i = 0; i < data.size(); i++)
-        printf("%f %f\n", data[i].re, data[i].im);
 
     // Instantiate the xcorr obj
     GroupXcorrCZT gxc(
-        12, -50.0, 50.0, 50.0, 1000.0
+        12, -0.1, 0.1, 0.1, 100.0
     );
     int outCols = gxc.getCZTdimensions();
     printf("outCols = %d\n", outCols);

@@ -20,7 +20,7 @@ print(np.abs(np.vdot(data[10:20], data[10:20]) + np.vdot(data[70:82], data[70:82
 
 gxc = GroupXcorrCZT(
     data, np.array([10, 70]), np.array([10, 12]), 
-    -50.0, 50.0, 50.0, 1000
+    -0.1, 0.1, 0.1, 100
 )
 
 print(gxc.ystack)

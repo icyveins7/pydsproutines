@@ -15,13 +15,15 @@ public:
     void addGroup(int start, int length, Ipp32fc *group, bool autoConj=true);
     void resetGroups();
 
-    void xcorr(Ipp32fc *x, int shiftStart, int shiftStep, int numShifts);
+    void xcorr(Ipp32fc *x, int shiftStart, int shiftStep, int numShifts, Ipp32fc *output);
 
 private:
     std::vector<int> m_groupStarts;
     std::vector<int> m_groupLengths;
     std::vector<ippe::vector<Ipp32fc>> m_groups;
+    ippe::vector<Ipp64f> m_groupEnergies;
     std::vector<ippe::vector<Ipp32fc>> m_groupPhaseCorrections;
+    ippe::vector<Ipp64f> m_xEnergies;
 
     IppCZT32fc m_czt;
 

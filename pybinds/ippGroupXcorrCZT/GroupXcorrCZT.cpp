@@ -49,26 +49,38 @@ void GroupXcorrCZT::resetGroups()
 }
 
 void GroupXcorrCZT::xcorr(
-    Ipp32fc *x, int shiftStart, int shiftStep, int numShifts, Ipp32f *out
+    Ipp32fc *x, int shiftStart, int shiftStep, int numShifts, Ipp32f *out,
+    int NUM_THREADS
 ){
-    int shift;
-    ippe::vector<Ipp32fc> pdt(m_czt.m_N);
-    ippe::vector<Ipp32fc> result(m_czt.m_k);
-    // m_xEnergies.resize(numShifts, 0.0);
-    ippe::vector<Ipp64f> xEnergies(numShifts, 0.0);
-    ippe::vector<Ipp32fc> accumulator(numShifts * m_czt.m_k, {0.0f, 0.0f});
-    // Output is assumed to be of size numShifts * m_czt.m_k
-    // It is also assumed to be zeroed already!
+    // Create our thread storage if necessary
+    if (NUM_THREADS > 1)
+        m_threads.resize(NUM_THREADS);
 
     // Calculate the total energy of all the groups
-    Ipp64f totalGroupEnergy;
+    Ipp64f totalGroupEnergy; // this can be done in main thread as it's pretty cheap
     ippe::stats::Sum(
         m_groupEnergies.data(), (int)m_groupEnergies.size(), &totalGroupEnergy
     );
     // printf("totalGroupEnergy = %.8f\n", totalGroupEnergy);
 
     // Compute all the group phase corrections
-    computeGroupPhaseCorrections();
+    m_groupPhaseCorrections.clear();
+    m_groupPhaseCorrections.resize(m_groupStarts.size());
+    if (NUM_THREADS > 1){
+        for (int t = 0; t < m_threads.size(); t++){
+            m_threads[t] = std::thread(
+                &GroupXcorrCZT::computeGroupPhaseCorrections,
+                this,
+                t,
+                NUM_THREADS
+            );
+        }
+        for (int t = 0; t < m_threads.size(); t++){
+            m_threads[t].join();
+        }       
+    }
+    else // single-threaded
+        computeGroupPhaseCorrections();
     // printf("Completed computing group phase corrections\n");
     // for (int i = 0; i < m_groupPhaseCorrections.size(); ++i)
     // {
@@ -81,10 +93,79 @@ void GroupXcorrCZT::xcorr(
     //     }
     // }
 
+    ippe::vector<Ipp32fc> accumulator(numShifts * m_czt.m_k, {0.0f, 0.0f});
+    // invoke the main loops
+    correlateGroups(
+        x,
+        shiftStart,
+        shiftStep,
+        numShifts,
+        out,
+        accumulator.data(),
+        NUM_THREADS
+    );
+
+    // // DEBUG
+    // for (int i = 0; i < numShifts; i++){
+    //     for (int j = 0; j < m_czt.m_k; j++){
+    //         printf("%.6g,%.6g  ", accumulator[i*m_czt.m_k + j].re, accumulator[i*m_czt.m_k + j].im);
+    //     }
+    //     printf("\n");
+    // }
+
+    // Take the abs sq of the output
+    ippe::convert::PowerSpectr(
+        accumulator.data(),
+        out,
+        (int)accumulator.size()
+    );
+
+    // // DEBUG
+    // for (int i = 0; i < numShifts; i++){
+    //     for (int j = 0; j < m_czt.m_k; j++){
+    //         printf("%.6g  ", out[i*m_czt.m_k + j]);
+    //     }
+    //     printf("\n");
+    // }
+    
+
+    // After the 2 loops, we perform normalisation of the output
+    for (int j = 0; j < numShifts; j++)
+    {
+        Ipp64f normalisation = 1.0/(xEnergies.at(j) * totalGroupEnergy);
+        // printf("Normalisation for shift %d is %g\n", j, normalisation);
+
+        // Normalise by multiplying 1 / normalisation, using a complex value
+        ippe::math::MulC_I(
+            static_cast<Ipp32f>(normalisation),
+            &out[j * m_czt.m_k],
+            (int)m_czt.m_k
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////
+void GroupXcorrCZT::correlateGroups(
+    Ipp32fc *x, 
+    int shiftStart, int shiftStep, int numShifts, 
+    Ipp32f *out,
+    Ipp64f totalGroupEnergy,
+    int t, int NUM_THREADS
+){
+    // Allocate workspace for the thread
+    int shift;
+    ippe::vector<Ipp32fc> pdt(m_czt.m_N);
+    ippe::vector<Ipp32fc> result(m_czt.m_k);
+    ippe::vector<Ipp64f> xEnergies(numShifts, 0.0);
+    // Output is assumed to be of size numShifts * m_czt.m_k
+    // It is also assumed to be zeroed already!
+
     // Loop over the groups
     for (int i = 0; i < m_groupStarts.size(); i++)
     {
-        // Loop over the shifts
+        // Loop over the shifts 
+        // here is where we split the work over threads
+        // as this allows us to avoid race conditions on the accumulator
         for (int j = 0; j < numShifts; j++)
         {
             shift = shiftStart + j * shiftStep;
@@ -137,57 +218,17 @@ void GroupXcorrCZT::xcorr(
         }
     }
 
-    // // DEBUG
-    // for (int i = 0; i < numShifts; i++){
-    //     for (int j = 0; j < m_czt.m_k; j++){
-    //         printf("%.6g,%.6g  ", accumulator[i*m_czt.m_k + j].re, accumulator[i*m_czt.m_k + j].im);
-    //     }
-    //     printf("\n");
-    // }
-
-    // Take the abs sq of the output
-    ippe::convert::PowerSpectr(
-        accumulator.data(),
-        out,
-        (int)accumulator.size()
-    );
-
-    // // DEBUG
-    // for (int i = 0; i < numShifts; i++){
-    //     for (int j = 0; j < m_czt.m_k; j++){
-    //         printf("%.6g  ", out[i*m_czt.m_k + j]);
-    //     }
-    //     printf("\n");
-    // }
-
-    
-
-    // After the 2 loops, we perform normalisation of the output
-    for (int j = 0; j < numShifts; j++)
-    {
-        Ipp64f normalisation = 1.0/(xEnergies.at(j) * totalGroupEnergy);
-        // printf("Normalisation for shift %d is %g\n", j, normalisation);
-
-        // Normalise by multiplying 1 / normalisation, using a complex value
-        ippe::math::MulC_I(
-            static_cast<Ipp32f>(normalisation),
-            &out[j * m_czt.m_k],
-            (int)m_czt.m_k
-        );
-    }
 }
 
-////////////////////////////////////////////////////////////////////////
-void GroupXcorrCZT::computeGroupPhaseCorrections()
+void GroupXcorrCZT::computeGroupPhaseCorrections(int t, int NUM_THREADS)
 {
-    m_groupPhaseCorrections.clear();
-    m_groupPhaseCorrections.resize(m_groupStarts.size());
-
     // Phase correction for each frequency of CZT
     ippe::vector<Ipp64f> phase(m_czt.m_k);
     ippe::vector<Ipp64fc> correction(phase.size()); // temporary 64-bit vector
     ippe::vector<Ipp64f> ones(phase.size(), 1.0);
-    for (int i = 0; i < m_groupStarts.size(); i++)
+
+    // Each thread works on a group
+    for (int i = t; i < m_groupStarts.size(); i+=NUM_THREADS)
     {
         // Set the frequency slope of the CZT in the phase
         ippe::generator::Slope(

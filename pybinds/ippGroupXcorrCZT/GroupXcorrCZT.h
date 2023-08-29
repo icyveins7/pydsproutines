@@ -4,6 +4,7 @@
 #include "../../ipp_ext/include/ipp_ext.h"
 #include <vector>
 #include <iostream>
+#include <thread>
 
 // This class works specifically on 32fc inputs.
 class GroupXcorrCZT
@@ -17,7 +18,12 @@ public:
     void addGroup(int start, int length, Ipp32fc *group, bool autoConj=true);
     void resetGroups();
 
-    void xcorr(Ipp32fc *x, int shiftStart, int shiftStep, int numShifts, Ipp32f *output);
+    void xcorr(
+        Ipp32fc *x, 
+        int shiftStart, int shiftStep, int numShifts, 
+        Ipp32f *out,
+        int NUM_THREADS=1
+    );
 
     int getCZTdimensions(){ return m_czt.m_k; }
 
@@ -37,7 +43,19 @@ private:
     ippe::vector<Ipp64f> m_groupEnergies;
     std::vector<ippe::vector<Ipp32fc>> m_groupPhaseCorrections;
 
+    std::vector<std::thread> m_threads;
+
     IppCZT32fc m_czt;
 
-    void computeGroupPhaseCorrections();
+    // This is the main runtime method that is called by xcorr()
+    void correlateGroups(
+        Ipp32fc *x, 
+        int shiftStart, int shiftStep, int numShifts,
+        Ipp32f* out, 
+        Ipp64f totalGroupEnergy,
+        int t=0, int NUM_THREADS=1
+    );
+
+    void computeGroupPhaseCorrections(int t=0, int NUM_THREADS=1);
+    
 };

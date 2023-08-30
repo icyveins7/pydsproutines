@@ -81,6 +81,21 @@ int main(int argc, char *argv[])
         printf("\n");
     }
 
+    // Try to xcorr with threads instead
+    GroupXcorrCZT gxc4(
+        12, -0.1, 0.1, 0.1, 100.0, 4
+    );
+    gxc4.xcorr(
+        data.data(), shiftStart, shiftStep, numShifts, out.data()
+    );
+    // Display output again
+    for (int i = 0; i < numShifts; i++){
+        for (int j = 0; j < outCols; j++){
+            printf("%.6g  ", out.at(i*outCols + j));
+        }
+        printf("\n");
+    }
+
 
     printf("COMPLETE\n");
     return 0;

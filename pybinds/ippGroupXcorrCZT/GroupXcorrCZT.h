@@ -11,9 +11,13 @@ class GroupXcorrCZT
 {
 public:
     GroupXcorrCZT(){}
-    GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs)
-        : m_czt{maxlen, f1, f2, fstep, fs}
-    {}
+    GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs, size_t NUM_THREADS=1)
+        : m_threads{NUM_THREADS}, m_czts{NUM_THREADS}
+    {
+        if (NUM_THREADS < 1) throw std::invalid_argument("Number of threads must be greater than 0");
+        for (auto czt : m_czts)
+            czt = IppCZT32fc(maxlen, f1, f2, fstep, fs); // instantiate the vector of CZTs
+    }
 
     void addGroup(int start, int length, Ipp32fc *group, bool autoConj=true);
     void resetGroups();
@@ -21,11 +25,10 @@ public:
     void xcorr(
         Ipp32fc *x, 
         int shiftStart, int shiftStep, int numShifts, 
-        Ipp32f *out,
-        int NUM_THREADS=1
+        Ipp32f *out
     );
 
-    int getCZTdimensions(){ return m_czt.m_k; }
+    int getCZTdimensions(){ return m_czts.at(0).m_k; }
 
     // Debugging?
     void printGroups(){
@@ -45,17 +48,16 @@ private:
 
     std::vector<std::thread> m_threads;
 
-    IppCZT32fc m_czt;
+    std::vector<IppCZT32fc> m_czts;
 
-    // This is the main runtime method that is called by xcorr()
+    // These are the main runtime methods invoked by xcorr(), in order
+    void computeGroupPhaseCorrections(int t=0, int NUM_THREADS=1);
     void correlateGroups(
         Ipp32fc *x, 
         int shiftStart, int shiftStep, int numShifts,
-        Ipp32f* out, 
         Ipp64f totalGroupEnergy,
+        Ipp32f *out,
         int t=0, int NUM_THREADS=1
     );
-
-    void computeGroupPhaseCorrections(int t=0, int NUM_THREADS=1);
     
 };

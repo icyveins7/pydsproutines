@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
     int shiftStep = 1;
     ippe::vector<Ipp32f> out(numShifts*outCols, 0.0f);
     // Run the xcorr
-    gxc.xcorr(
+    gxc.xcorrRaw(
         data.data(), shiftStart, shiftStep, numShifts, out.data()
     );
 
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
     );
     printf("Instantiated\n");
     try{
-        gxc4.xcorr(
+        gxc4.xcorrRaw(
             data.data(), shiftStart, shiftStep, numShifts, out.data()
         );
     }
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
         true
     );
     try{
-        gxc4.xcorr(
+        gxc4.xcorrRaw(
             data.data(), shiftStart, shiftStep, numShifts, out.data()
         );
     }

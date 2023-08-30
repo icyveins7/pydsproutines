@@ -6,6 +6,16 @@
 #include <iostream>
 #include <thread>
 
+// =====================================
+#ifdef COMPILE_FOR_PYBIND
+#include <pybind11/numpy.h>
+#include <pybind11/complex.h>
+#include <pybind11/pybind11.h>
+
+namespace py = pybind11;
+#endif
+// =====================================
+
 // This class works specifically on 32fc inputs.
 class GroupXcorrCZT
 {
@@ -28,7 +38,7 @@ public:
 
     void resetGroups();
 
-    void xcorr(
+    void xcorrRaw(
         Ipp32fc *x, 
         int shiftStart, int shiftStep, int numShifts, 
         Ipp32f *out
@@ -45,6 +55,15 @@ public:
             printf("Energy = %f\n", m_groupEnergies[i]);
         }
     }
+
+    #ifdef COMPILE_FOR_PYBIND
+    // py::array_t<std::complex<float>, py::array::c_style> run(
+    //     const py::array_t<std::complex<float>, py::array::c_style> &in
+    // );
+    // py::array_t<std::complex<float>, py::array::c_style> runMany(
+    //     const py::array_t<std::complex<float>, py::array::c_style> &in
+    // );
+    #endif
 
 private:
     std::vector<int> m_groupStarts;

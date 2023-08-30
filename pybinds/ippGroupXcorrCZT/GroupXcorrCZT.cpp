@@ -48,7 +48,7 @@ void GroupXcorrCZT::resetGroups()
     m_groupEnergies.clear();
 }
 
-void GroupXcorrCZT::xcorr(
+void GroupXcorrCZT::xcorrRaw(
     Ipp32fc *x, int shiftStart, int shiftStep, int numShifts, Ipp32f *out
 ){
     // Check if any groups have been defined

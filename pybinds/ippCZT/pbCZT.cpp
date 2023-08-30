@@ -6,7 +6,7 @@ namespace py = pybind11;
 // https://github.com/pybind/pybind11/blob/master/docs/faq.rst
 PYBIND11_MODULE(pbIppCZT32fc, m) {
     py::class_<IppCZT32fc>(m, "pbIppCZT32fc")
-        .def(py::init<int, Ipp32f, Ipp32f, Ipp32f, Ipp32f>())
+        .def(py::init<int, double, double, double, double>())
         .def("run", &IppCZT32fc::run,
             "Examples:\n"
             ".run(x) # x is a 1d numpy array\n"

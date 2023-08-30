@@ -18,6 +18,8 @@ print(np.linalg.norm(data[11:21])**2 + np.linalg.norm(data[71:83])**2)
 
 print(np.abs(np.vdot(data[10:20], data[10:20]) + np.vdot(data[70:82], data[70:82]))**2)
 
+print(np.exp(-1j*2*np.pi*np.array([-0.1,0,0.1])/100*60))
+
 gxc = GroupXcorrCZT(
     data, np.array([10, 70]), np.array([10, 12]), 
     -0.1, 0.1, 0.1, 100

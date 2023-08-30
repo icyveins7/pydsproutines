@@ -12,14 +12,20 @@ class GroupXcorrCZT
 public:
     GroupXcorrCZT(){}
     GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs, size_t NUM_THREADS=1)
-        : m_threads{NUM_THREADS}, m_czts{NUM_THREADS}
+        : m_threads{NUM_THREADS}//, m_czts{NUM_THREADS}
     {
         if (NUM_THREADS < 1) throw std::invalid_argument("Number of threads must be greater than 0");
-        for (auto czt : m_czts)
-            czt = IppCZT32fc(maxlen, f1, f2, fstep, fs); // instantiate the vector of CZTs
+        for (size_t i = 0; i < NUM_THREADS; ++i)
+            m_czts.emplace_back(maxlen, f1, f2, fstep, fs); // instantiate the vector of CZTs
     }
 
+    /// @brief Adds a group to use for correlation.
+    /// @param start Defines the relative start index of the group.
+    /// @param length Number of elements in the group.
+    /// @param group Pointer to the group data. Data will be copied starting from this pointer.
+    /// @param autoConj Enables auto-conjugation of the group. Default is true.
     void addGroup(int start, int length, Ipp32fc *group, bool autoConj=true);
+
     void resetGroups();
 
     void xcorr(

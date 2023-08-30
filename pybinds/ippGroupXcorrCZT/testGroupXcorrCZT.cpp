@@ -82,12 +82,47 @@ int main(int argc, char *argv[])
     }
 
     // Try to xcorr with threads instead
+    out.zero();
+    printf("Running with threads\n");
     GroupXcorrCZT gxc4(
         12, -0.1, 0.1, 0.1, 100.0, 4
     );
-    gxc4.xcorr(
-        data.data(), shiftStart, shiftStep, numShifts, out.data()
+    printf("Instantiated\n");
+    try{
+        gxc4.xcorr(
+            data.data(), shiftStart, shiftStep, numShifts, out.data()
+        );
+    }
+    catch(std::exception &e){
+        printf("Expected exception: %s\n", e.what());
+    }
+
+    gxc4.addGroup(
+        0, 10, &data.at(10), // use from 10 to 20 (exclusive), not the maxlength
+        true
     );
+    gxc4.addGroup(
+        60, 12, &data.at(70), // use from 70 to 82 (exclusive), max length
+        true
+    );
+    gxc4.addGroup(
+        10, 12, &data.at(20), // use from 70 to 82 (exclusive), max length
+        true
+    );
+    gxc4.addGroup(
+        30, 10, &data.at(40), // use from 70 to 82 (exclusive), max length
+        true
+    );
+    try{
+        gxc4.xcorr(
+            data.data(), shiftStart, shiftStep, numShifts, out.data()
+        );
+    }
+    catch(std::exception &e){
+        printf("Expected exception: %s\n", e.what());
+    }
+    
+    
     // Display output again
     for (int i = 0; i < numShifts; i++){
         for (int j = 0; j < outCols; j++){

@@ -30,3 +30,20 @@ print(gxc.ystackNormSq)
 
 results = gxc.xcorr(data, np.arange(9,12))
 print(results)
+
+import sys
+if sys.platform.startswith('win32'):
+    import os
+    os.add_dll_directory(os.path.join(os.environ['IPPROOT'], "redist", "intel64"))
+
+from pbIppGroupXcorrCZT import pbIppGroupXcorrCZT
+
+# Create the pybind obj
+pbgxc = pbIppGroupXcorrCZT(12, -0.1, 0.1, 0.1, 100)
+print("pybind Numthreads = %d" % (pbgxc.getNumThreads()))
+
+
+pbgxc = pbIppGroupXcorrCZT(12, -0.1, 0.1, 0.1, 100, 4)
+print("pybind Numthreads = %d" % (pbgxc.getNumThreads()))
+
+

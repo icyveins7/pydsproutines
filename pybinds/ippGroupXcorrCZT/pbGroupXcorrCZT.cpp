@@ -6,18 +6,17 @@ namespace py = pybind11;
 // https://github.com/pybind/pybind11/blob/master/docs/faq.rst
 PYBIND11_MODULE(pbIppGroupXcorrCZT, m) {
     py::class_<GroupXcorrCZT>(m, "pbIppGroupXcorrCZT")
-        .def(py::init<int, double, double, double, double, size_t>())
+        .def(py::init<int, double, double, double, double>())
+        .def(py::init<int, double, double, double, double, size_t>()) // default args don't seem to work for constructors..
+        .def("getNumThreads", &GroupXcorrCZT::getNumThreads)
+        .def("addGroup", &GroupXcorrCZT::addGroup)
+        .def("resetGroups", &GroupXcorrCZT::resetGroups)
+        .def("xcorr", &GroupXcorrCZT::xcorr)
         // .def("run", &GroupXcorrCZT::run,
         //     "Examples:\n"
         //     ".run(x) # x is a 1d numpy array\n"
         //     ".run(x[i,:]) # x is a 2d numpy array, operating on 1 row (see runMany)"
         // )
-        // .def("runMany", &IppCZT32fc::runMany,
-        //     "Example:\n"
-        //     ".runMany(x) # x is a 2d numpy array, operating on every row\n"
-        // )
-        // .def_readonly("m_k", &IppCZT32fc::m_k)
-        // .def_readonly("m_N", &IppCZT32fc::m_N)
         ;
 
     m.doc() = "pybind11 for GroupXcorrCZT IPP implementation"; // optional module docstring

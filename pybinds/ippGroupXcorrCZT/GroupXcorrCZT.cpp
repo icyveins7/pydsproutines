@@ -294,3 +294,34 @@ void GroupXcorrCZT::computeGroupPhaseCorrections(int t, int NUM_THREADS)
         );
     }
 }
+
+#ifdef COMPILE_FOR_PYBIND
+py::array_t<float_t, py::array::c_style> GroupXcorrCZT::xcorr(
+    const py::array_t<std::complex<float>, py::array::c_style> &in,
+    int shiftStart, int shiftStep, int numShifts
+){
+    // make sure 1D
+    auto buffer_info = in.request();
+    if (buffer_info.shape.size() != 1)
+        throw std::range_error("Input must be 1d");
+
+    // Make the output
+    py::array_t<float, py::array::c_style> out({numShifts, m_czts.at(0).m_k});
+
+    try{
+        Ipp32fc* iptr = reinterpret_cast<Ipp32fc*>(buffer_info.ptr);
+
+        // Call the raw method
+        xcorrRaw(
+            iptr,
+            shiftStart, shiftStep, numShifts,
+            reinterpret_cast<Ipp32f*>(out.request().ptr)
+        );
+    }
+    catch(...)
+    {
+        printf("Caught pybind runtime error\n");
+    }
+}
+
+#endif

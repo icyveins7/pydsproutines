@@ -21,7 +21,12 @@ class GroupXcorrCZT
 {
 public:
     GroupXcorrCZT(){}
-    GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs, size_t NUM_THREADS=1)
+    GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs)
+        : m_threads{1}
+    {
+        m_czts.emplace_back(maxlen, f1, f2, fstep, fs);
+    }
+    GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs, size_t NUM_THREADS)
         : m_threads{NUM_THREADS}//, m_czts{NUM_THREADS}
     {
         if (NUM_THREADS < 1) throw std::invalid_argument("Number of threads must be greater than 0");
@@ -44,7 +49,9 @@ public:
         Ipp32f *out
     );
 
+    // Some getters
     int getCZTdimensions(){ return m_czts.at(0).m_k; }
+    size_t getNumThreads(){ return m_threads.size(); }
 
     // Debugging?
     void printGroups(){
@@ -57,12 +64,10 @@ public:
     }
 
     #ifdef COMPILE_FOR_PYBIND
-    // py::array_t<std::complex<float>, py::array::c_style> run(
-    //     const py::array_t<std::complex<float>, py::array::c_style> &in
-    // );
-    // py::array_t<std::complex<float>, py::array::c_style> runMany(
-    //     const py::array_t<std::complex<float>, py::array::c_style> &in
-    // );
+    py::array_t<float_t, py::array::c_style> xcorr(
+        const py::array_t<std::complex<float>, py::array::c_style> &in,
+        int shiftStart, int shiftStep, int numShifts
+    );
     #endif
 
 private:

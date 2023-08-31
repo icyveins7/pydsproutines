@@ -322,6 +322,32 @@ py::array_t<float_t, py::array::c_style> GroupXcorrCZT::xcorr(
     {
         printf("Caught pybind runtime error\n");
     }
+
+    return out;
+}
+
+void GroupXcorrCZT::addGroup(int start, 
+    const py::array_t<std::complex<float>, py::array::c_style> &group,
+    bool autoConj
+){
+    // make sure 1D
+    auto buffer_info = group.request();
+    if (buffer_info.shape.size()!= 1)
+        throw std::range_error("Input must be 1d");
+
+    // Call the raw addGroup
+    try{
+        this->addGroup(
+            start, buffer_info.shape[0], 
+            reinterpret_cast<Ipp32fc*>(buffer_info.ptr), 
+            autoConj 
+        );
+    }
+    catch(std::exception &e)
+    {
+        printf("Caught pybind runtime error: %s\n", e.what());
+    }
+    
 }
 
 #endif

@@ -28,7 +28,7 @@ gxc = GroupXcorrCZT(
 print(gxc.ystack)
 print(gxc.ystackNormSq)
 
-results = gxc.xcorr(data, np.arange(9,12))
+results, cztfreq = gxc.xcorr(data, np.arange(9,12))
 print(results)
 
 import sys
@@ -45,5 +45,24 @@ print("pybind Numthreads = %d" % (pbgxc.getNumThreads()))
 
 pbgxc = pbIppGroupXcorrCZT(12, -0.1, 0.1, 0.1, 100, 4)
 print("pybind Numthreads = %d" % (pbgxc.getNumThreads()))
+
+# Add the groups
+pbgxc.addGroup(
+    0, data[10:20]
+)
+pbgxc.addGroup(
+    60, data[70:82]
+)
+pbgxc.printGroups()
+
+pbresults = pbgxc.xcorr(data, 9, 1, 3)
+# print(pbresults)
+# print(type(pbresults))
+
+from verifyRoutines import *
+# print(pbresults.shape)
+# print(results.shape)
+compareValues(results.flatten(), pbresults.flatten())
+
 
 

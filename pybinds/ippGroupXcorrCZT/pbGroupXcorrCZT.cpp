@@ -9,7 +9,14 @@ PYBIND11_MODULE(pbIppGroupXcorrCZT, m) {
         .def(py::init<int, double, double, double, double>())
         .def(py::init<int, double, double, double, double, size_t>()) // default args don't seem to work for constructors..
         .def("getNumThreads", &GroupXcorrCZT::getNumThreads)
-        .def("addGroup", &GroupXcorrCZT::addGroup)
+        .def("addGroup", 
+            static_cast<void (GroupXcorrCZT::*)(int, const py::array_t<std::complex<float>, py::array::c_style>&, bool)>(&GroupXcorrCZT::addGroup),
+            "Add a new group to the cross-correlation calculation.",
+            py::arg("start"),
+            py::arg("grou"),
+            py::arg("autoConj") = true
+        )
+        .def("printGroups", &GroupXcorrCZT::printGroups)
         .def("resetGroups", &GroupXcorrCZT::resetGroups)
         .def("xcorr", &GroupXcorrCZT::xcorr)
         // .def("run", &GroupXcorrCZT::run,

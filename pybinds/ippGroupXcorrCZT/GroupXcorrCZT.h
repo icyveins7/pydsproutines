@@ -55,7 +55,7 @@ public:
 
     // Debugging?
     void printGroups(){
-        for (int i=0; i < m_groups.size(); i++){
+        for (int i=0; i < (int)m_groups.size(); i++){
             printf("Group %d: [%d, %d)\n", 
                 i, m_groupStarts[i], 
                 m_groupStarts[i] + (int)m_groups[i].size());
@@ -64,6 +64,11 @@ public:
     }
 
     #ifdef COMPILE_FOR_PYBIND
+    void addGroup(int start,
+        const py::array_t<std::complex<float>, py::array::c_style> &group,
+        bool autoConj=true
+    );
+
     py::array_t<float_t, py::array::c_style> xcorr(
         const py::array_t<std::complex<float>, py::array::c_style> &in,
         int shiftStart, int shiftStep, int numShifts

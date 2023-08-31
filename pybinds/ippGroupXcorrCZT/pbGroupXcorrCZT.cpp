@@ -13,7 +13,7 @@ PYBIND11_MODULE(pbIppGroupXcorrCZT, m) {
             static_cast<void (GroupXcorrCZT::*)(int, const py::array_t<std::complex<float>, py::array::c_style>&, bool)>(&GroupXcorrCZT::addGroup),
             "Add a new group to the cross-correlation calculation.",
             py::arg("start"),
-            py::arg("grou"),
+            py::arg("group"),
             py::arg("autoConj") = true
         )
         .def("printGroups", &GroupXcorrCZT::printGroups)

@@ -60,7 +60,7 @@ void GroupXcorrCZT::xcorrRaw(
     ippe::stats::Sum(
         m_groupEnergies.data(), (int)m_groupEnergies.size(), &totalGroupEnergy
     );
-    printf("totalGroupEnergy = %.8f\n", totalGroupEnergy);
+    // printf("totalGroupEnergy = %.8f\n", totalGroupEnergy);
 
     // Compute all the group phase corrections
     m_groupPhaseCorrections.clear();

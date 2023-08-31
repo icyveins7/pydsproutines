@@ -49,7 +49,8 @@ void GroupXcorrCZT::resetGroups()
 }
 
 void GroupXcorrCZT::xcorrRaw(
-    Ipp32fc *x, int shiftStart, int shiftStep, int numShifts, Ipp32f *out
+    Ipp32fc *x, int shiftStart, int shiftStep, int numShifts, Ipp32f *out,
+    int xLength
 ){
     // Check if any groups have been defined
     if (m_groupStarts.size() == 0)
@@ -102,6 +103,7 @@ void GroupXcorrCZT::xcorrRaw(
                 numShifts,
                 totalGroupEnergy,
                 out,
+                xLength,
                 t,
                 (int)m_threads.size()
             );
@@ -117,7 +119,8 @@ void GroupXcorrCZT::xcorrRaw(
             shiftStep,
             numShifts,
             totalGroupEnergy,
-            out
+            out,
+            xLength
         );
 
 
@@ -129,6 +132,7 @@ void GroupXcorrCZT::correlateGroups(
     int shiftStart, int shiftStep, int numShifts, 
     Ipp64f totalGroupEnergy,
     Ipp32f *out,
+    int xLength,
     int t, int NUM_THREADS
 ){
     // Retrieve the CZT object used by this thread
@@ -167,7 +171,18 @@ void GroupXcorrCZT::correlateGroups(
             shift = shiftStart + (j + t_jStart) * shiftStep;
             // printf("Group %d(length %zd), shift[%d] = %d\n", 
             //     i, m_groups.at(i).size(), j, shift);
+
+            // Define the starting access index from the input array
             int xi = shift + m_groupStarts.at(i);
+            // Check that it's accessible to prevent access violations
+            if (xLength >= 0 && (xi < 0 || xi + (int)m_groups.at(i).size() >= xLength))
+                throw std::range_error(
+                    "Shift index out of range! group/shift/idxStart/idxEnd =  " + 
+                    std::to_string(i) + "/" + std::to_string(shift) + "/" + 
+                    std::to_string(xi) + "/" + std::to_string(xi + (int)m_groups.at(i).size())
+                );
+            // TODO: this is not a good method, because handling exceptions in threads is a nightmare.
+            // try to move the check to the main thread before calling this?
             // printf("xi = %d\n", xi);
             
             // Calculate the energy for this slice of x
@@ -318,9 +333,10 @@ py::array_t<float_t, py::array::c_style> GroupXcorrCZT::xcorr(
             reinterpret_cast<Ipp32f*>(out.request().ptr)
         );
     }
-    catch(...)
+    catch(std::exception &e)
     {
         printf("Caught pybind runtime error\n");
+        throw e;
     }
 
     return out;
@@ -345,7 +361,8 @@ void GroupXcorrCZT::addGroup(int start,
     }
     catch(std::exception &e)
     {
-        printf("Caught pybind runtime error: %s\n", e.what());
+        printf("Caught pybind addGroup error: %s\n", e.what());
+        throw e;
     }
     
 }

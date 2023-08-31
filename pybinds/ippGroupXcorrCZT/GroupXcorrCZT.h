@@ -46,7 +46,7 @@ public:
     void xcorrRaw(
         Ipp32fc *x, 
         int shiftStart, int shiftStep, int numShifts, 
-        Ipp32f *out
+        Ipp32f *out, int xLength=-1
     );
 
     // Some getters
@@ -92,6 +92,7 @@ private:
         int shiftStart, int shiftStep, int numShifts,
         Ipp64f totalGroupEnergy,
         Ipp32f *out,
+        int xLength,
         int t=0, int NUM_THREADS=1
     );
     

@@ -131,6 +131,20 @@ int main(int argc, char *argv[])
         printf("\n");
     }
 
+    // Add a group that is way out of range
+    gxc4.addGroup(
+        100, 10, &data.at(10), true
+    );
+
+    try{
+        gxc4.xcorrRaw(
+            data.data(), shiftStart, shiftStep, numShifts, out.data(), data.size()
+        );
+    }
+    catch(std::exception &e){
+        printf("Expected exception: %s\n", e.what());
+    }
+
 
     printf("COMPLETE\n");
     return 0;

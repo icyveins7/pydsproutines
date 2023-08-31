@@ -53,6 +53,14 @@ pbgxc.addGroup(
 pbgxc.addGroup(
     60, data[70:82]
 )
+try:
+    pbgxc.addGroup(
+        65, data[75:85]
+    )
+except Exception as e:
+    print("Expected error: %s" % str(e))
+
+
 pbgxc.printGroups()
 
 pbresults = pbgxc.xcorr(data, 9, 1, 3)

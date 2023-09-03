@@ -142,16 +142,33 @@ def plotHeatmap(heatmap, x0, y0, width, height, ax=None, aspect='auto', vmin=Non
 
     return fig, ax
 
-def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None, autoBorder=False):
+def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None, autoBorder=True):
     '''
     This is a useful tool to overlay heatmaps onto normal scatter plots,
     in the mathematical x-y axis (unlike the conventional image axis which has y-axis flipped).
-    
-    heatmap: 2-D array containing the data.
-    x0,y0 : coordinates of bottom-left most point.
-    width, height: scale of the heatmap.
-    imgLvls: list_like, passed to img.setLevels(), specifies colour limits to values
-    autoBorder: configures whether to pad half a bin width around the image, usually the data is generated around the bin 'centres', so this is required
+
+    Parameters
+    ----------
+    heatmap: np.ndarray, M x N
+        For xcorr results, M is usually the number of time bins i.e. shifts.
+        N is usually the number of frequency bins.
+        Transposing the array is not necessary.
+    x0: float
+        The left-most x0 value. For xcorr results, this is usually the smallest time bin i.e. time shift.
+    y0: float
+        The bottom-most y0 value. For xcorr results, this is usually the smallest frequency bin i.e. frequency shift.
+    width: float
+        The span of x values. For xcorr results, this is usually equal to (time bins) * (time bin width).
+    height: float
+        The span of y values. For xcorr results, this is usually equal to (frequency bins) * (frequency bin height).
+    window: pyqtgraph.GraphicsLayoutWidget, optional
+        The window / pyqtgraph widget to add the image to. Will be created if not specified i.e. None.
+    imgLvls: list_like
+        Passed to img.setLevels(), specifies colour limits to values.
+    autoBorder: bool
+        Configures whether to pad half a bin width around the image;
+        Usually the data is generated around the bin centres, so this is required.
+        Default is True.
     '''
     if window is None:
         window = pg.plot()

@@ -8,7 +8,15 @@ Created on Mon Apr 27 16:09:54 2020
 
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
-from PyQt5.QtCore import Qt, QRectF
+
+try:
+    from PyQt5.QtCore import Qt, QRectF
+    from PyQt5.QtWidgets import QApplication
+    print("PyQt5 not found. Trying with PySide6.")
+except ImportError:
+    from PySide6.QtCore import Qt, QRectF
+    from PySide6.QtWidgets import QApplication
+
 import numpy as np
 import scipy.signal as sps
 import matplotlib.pyplot as plt
@@ -16,7 +24,6 @@ from signalCreationRoutines import makeFreq
 from matplotlib import cm
 from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 
-from PyQt5.QtWidgets import QApplication
 
 def closeAllFigs():
     '''Helper function to close both Pyqtgraph and Matplotlib windows.'''

@@ -64,9 +64,21 @@ except Exception as e:
 pbgxc.printGroups()
 
 pbresults = pbgxc.xcorr(data, 9, 1, 3)
-# print(pbresults)
+print(pbresults)
 # print(type(pbresults))
 
+
+#%% Clear the groups and use the convenience method to add instead
+pbgxc.resetGroups()
+pbgxc.addGroupsFromArray(
+    np.array([10, 70]), np.array([10, 12]), data
+)
+pbgxc.printGroups()
+pbresults = pbgxc.xcorr(data, 9, 1, 3)
+print(pbresults)
+
+
+#%%
 from verifyRoutines import *
 # print(pbresults.shape)
 # print(results.shape)

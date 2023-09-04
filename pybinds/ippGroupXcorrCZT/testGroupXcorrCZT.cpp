@@ -106,11 +106,11 @@ int main(int argc, char *argv[])
         true
     );
     gxc4.addGroup(
-        10, 12, &data.at(20), // use from 70 to 82 (exclusive), max length
+        10, 12, &data.at(20), // use from 20 to 32 (exclusive), max length
         true
     );
     gxc4.addGroup(
-        30, 10, &data.at(40), // use from 70 to 82 (exclusive), max length
+        30, 10, &data.at(40), // use from 40 to 52 (exclusive), max length
         true
     );
     try{
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
         );
     }
     catch(std::exception &e){
-        printf("Expected exception: %s\n", e.what());
+        printf("This should be no exception: %s\n", e.what());
     }
     
     
@@ -143,6 +143,31 @@ int main(int argc, char *argv[])
     }
     catch(std::exception &e){
         printf("Expected exception: %s\n", e.what());
+    }
+
+    // Use the convenience multi group adder method for safety
+    int starts[4] = {10, 70, 20, 40};
+    int lengths[4] = {10, 12, 12, 10};
+    gxc4.resetGroups();
+    gxc4.addGroupsFromArray(
+        starts, lengths, 4, data.data()
+    );
+    out.zero();
+    try{
+        gxc4.xcorrRaw(
+            data.data(), shiftStart, shiftStep, numShifts, out.data(), data.size()
+        );
+    }
+    catch(std::exception &e){
+        printf("No exception expected\n");
+    }
+
+    // Display output again (should be identical to before)
+    for (int i = 0; i < numShifts; i++){
+        for (int j = 0; j < outCols; j++){
+            printf("%.6g  ", out.at(i*outCols + j));
+        }
+        printf("\n");
     }
 
 

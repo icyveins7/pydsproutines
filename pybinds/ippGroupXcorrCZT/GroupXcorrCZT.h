@@ -41,6 +41,17 @@ public:
     /// @param autoConj Enables auto-conjugation of the group. Default is true.
     void addGroup(int start, int length, Ipp32fc *group, bool autoConj=true);
 
+    /// @brief Adds groups from an array via slices specified by start indices and lengths.
+    /// This helps to automatically zero the earliest index and track it for each group.
+    /// For example, if [start, start+length) are [10, 20) and [30, 42) then
+    /// Group 1: start = 0, Group 2: start = 20 (offset from 10).
+    /// @param starts The start indices from 'arr' to slice.
+    /// @param lengths The lengths of each group from 'arr' to slice.
+    /// @param arr The long array to slice from.
+    /// @param autoConj Enables auto-conjugation of each group.
+    void addGroupsFromArray(int *starts, int *lengths, size_t numGroups, Ipp32fc *arr, bool autoConj=true);
+
+    /// @brief Clears all groups and their associated internal data.
     void resetGroups();
 
     void xcorrRaw(
@@ -66,6 +77,13 @@ public:
     #ifdef COMPILE_FOR_PYBIND
     void addGroup(int start,
         const py::array_t<std::complex<float>, py::array::c_style> &group,
+        bool autoConj=true
+    );
+
+    void addGroupsFromArray(
+        const py::array_t<int, py::array::c_style> &starts,
+        const py::array_t<int, py::array::c_style> &lengths,
+        const py::array_t<std::complex<float>, py::array::c_style> &arr,
         bool autoConj=true
     );
 

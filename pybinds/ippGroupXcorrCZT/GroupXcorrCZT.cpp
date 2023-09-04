@@ -40,6 +40,22 @@ void GroupXcorrCZT::addGroup(int start, int length, Ipp32fc *group, bool autoCon
     m_groupEnergies.back() = m_groupEnergies.back() * m_groupEnergies.back(); // remember to square to get energy
 }
 
+void GroupXcorrCZT::addGroupsFromArray(int *starts, int *lengths, size_t numGroups, Ipp32fc *arr, bool autoConj)
+{
+    // Find the smallest start index
+    int minStart = starts[0];
+    for (size_t i = 1; i < numGroups; i++)
+    {
+        if (starts[i] < minStart)
+            minStart = starts[i];
+    }
+    // Add each group but with the offset to the minimum as the start instead
+    for (size_t i = 0; i < numGroups; i++)
+    {
+        addGroup(starts[i] - minStart, lengths[i], &arr[starts[i]], autoConj);
+    }
+}
+
 
 void GroupXcorrCZT::resetGroups()
 {
@@ -52,6 +68,10 @@ void GroupXcorrCZT::xcorrRaw(
     Ipp32fc *x, int shiftStart, int shiftStep, int numShifts, Ipp32f *out,
     int xLength
 ){
+    // Disallow backwards shiftSteps
+    if (shiftStep < 0)
+        throw std::invalid_argument("shiftStep cannot be negative");
+
     // Check if any groups have been defined
     if (m_groupStarts.size() == 0)
         throw std::range_error("No groups have been defined!");
@@ -89,6 +109,19 @@ void GroupXcorrCZT::xcorrRaw(
     //     }
     //     printf("\n");
     // }
+
+    // Before we invoke the main loops, check if we are going out of bounds on the input array
+    if (xLength >= 0) // we only check if the size has been optionally supplied.
+    {
+        // Iterate over every group
+        for (int g = 0; g < m_groupStarts.size(); g++){
+            int xi = shiftStart + m_groupStarts.at(g); // this is the smallest index possible
+            if (xi < 0)
+                throw std::range_error("Shifts accesses negative indices!");
+            else if (xi + numShifts * shiftStep + (int)m_groups.at(g).size() >= xLength) // last shift + group length
+                throw std::range_error("Input length is insufficient for search range!");
+        }
+    }
 
     // invoke the main loops
     if (m_threads.size() > 1)
@@ -174,15 +207,6 @@ void GroupXcorrCZT::correlateGroups(
 
             // Define the starting access index from the input array
             int xi = shift + m_groupStarts.at(i);
-            // Check that it's accessible to prevent access violations
-            if (xLength >= 0 && (xi < 0 || xi + (int)m_groups.at(i).size() >= xLength))
-                throw std::range_error(
-                    "Shift index out of range! group/shift/idxStart/idxEnd =  " + 
-                    std::to_string(i) + "/" + std::to_string(shift) + "/" + 
-                    std::to_string(xi) + "/" + std::to_string(xi + (int)m_groups.at(i).size())
-                );
-            // TODO: this is not a good method, because handling exceptions in threads is a nightmare.
-            // try to move the check to the main thread before calling this?
             // printf("xi = %d\n", xi);
             
             // Calculate the energy for this slice of x
@@ -365,6 +389,46 @@ void GroupXcorrCZT::addGroup(int start,
         throw e;
     }
     
+}
+
+void GroupXcorrCZT::addGroupsFromArray(
+    const py::array_t<int, py::array::c_style> &starts,
+    const py::array_t<int, py::array::c_style> &lengths,
+    const py::array_t<std::complex<float>, py::array::c_style> &arr,
+    bool autoConj
+){
+    // make sure all of them are 1D
+    auto buffer_info = arr.request();
+    if (buffer_info.shape.size()!= 1)
+        throw std::range_error("Input must be 1d");
+
+    auto starts_info = starts.request();
+    if (starts_info.shape.size()!= 1)
+        throw std::range_error("Starts must be 1d");
+
+    auto lengths_info = lengths.request();
+    if (lengths_info.shape.size()!= 1)
+        throw std::range_error("Lengths must be 1d");
+
+    // Make sure lengths and starts are the same size
+    if (lengths_info.shape[0] != starts_info.shape[0])
+        throw std::invalid_argument("Lengths must be same size as starts");
+
+    // Call the raw addGroupsFromArray
+    try{
+        this->addGroupsFromArray(
+            reinterpret_cast<int*>(starts_info.ptr),
+            reinterpret_cast<int*>(lengths_info.ptr),
+            lengths_info.shape[0],
+            reinterpret_cast<Ipp32fc*>(buffer_info.ptr),
+            autoConj
+        );
+    }
+    catch(std::exception &e)
+    {
+        printf("Caught pybind addGroupsFromArray error: %s\n", e.what());
+        throw e;
+    }
 }
 
 #endif

@@ -16,6 +16,18 @@ PYBIND11_MODULE(pbIppGroupXcorrCZT, m) {
             py::arg("group"),
             py::arg("autoConj") = true
         )
+        .def("addGroupsFromArray",
+            static_cast<void (GroupXcorrCZT::*)(
+                const py::array_t<int, py::array::c_style>&, 
+                const py::array_t<int, py::array::c_style>&, 
+                const py::array_t<std::complex<float>, py::array::c_style>&, 
+                bool)>(&GroupXcorrCZT::addGroupsFromArray),
+            "Adds multiple groups sliced from a long array to the cross-correlation calculation.",
+            py::arg("starts"),
+            py::arg("lengths"),
+            py::arg("arr"),
+            py::arg("autoConj") = true
+        )
         .def("printGroups", &GroupXcorrCZT::printGroups)
         .def("resetGroups", &GroupXcorrCZT::resetGroups)
         .def("xcorr", &GroupXcorrCZT::xcorr)

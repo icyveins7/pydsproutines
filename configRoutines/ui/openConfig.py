@@ -1,9 +1,15 @@
 import dearpygui.dearpygui as dpg
 import os
+
 from .._core import *
+from .helpers import centreModal
 
 #%%
 class OpenConfigDialog:
+    def __init__(self):
+        # List of tuples(DSPConfig, dpg.add_text)
+        self.cfgs = list()
+
     def run(self):
         # Show a window that lets you open a config file
         with dpg.window(label="Open a config file", 
@@ -21,8 +27,10 @@ class OpenConfigDialog:
             dpg.add_button(
                 label="Open config",
                 callback=self._open_config,
-                user_data=cfgPathInput
+                user_data=[cfgPathInput, window]
             )
+
+        return 1
 
     def _config_file_selector(self, sender, app_data, user_data):
         """
@@ -43,23 +51,53 @@ class OpenConfigDialog:
         """
         Expects user_data to be the input_text id/tag.
         """
-        cfgpath = dpg.get_value(user_data)
+        cfgpathInput, parent = user_data
+        cfgpath = dpg.get_value(cfgpathInput)
         if os.path.exists(cfgpath):
             # Then open it
-            cfg = DirectSingleConfig(cfgpath)
+            self.cfgs.append([
+                DSPConfig(cfgpath),
+                dpg.add_text(
+                    cfgpath,
+                    parent=parent
+                )
+            ])
         else:
             # Ask whether we want to create the config
-            toCreate = False
             with dpg.window(
                 label="Path does not exist",
-                width=700, height=150,
-                modal=True
-            ):
+                width=400, height=50,
+                modal=True,
+                show=True
+            ) as popupModal:
+                centreModal(popupModal)
                 dpg.add_text("Would you like to create a new config at the specified path?")
                 
                 with dpg.group(horizontal=True):
                     dpg.add_button(
-                        "Yes",
-                        callback=lambda x: toCreate=True
+                        label="Yes",
+                        callback=self._create_config,
+                        user_data=[cfgpath, popupModal, parent]
                     )
-                    dpg.add_button("No")
+                    dpg.add_button(
+                        label="No",
+                        callback=self._create_config,
+                        user_data=[None, popupModal, parent]
+                    )
+
+        print(self.cfgs)
+
+    def _create_config(self, sender, app_data, user_data):
+        cfgpath, popupModal, parent = user_data
+        # Create the new config
+        if cfgpath is not None:
+            self.cfgs.append([
+                DSPConfig.new(cfgpath, allow_no_value=True),
+                dpg.add_text(
+                    cfgpath,
+                    parent=parent
+                )
+            ])
+        dpg.configure_item(popupModal, show=False)
+
+

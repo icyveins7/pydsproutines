@@ -8,5 +8,5 @@ class ConfigEditor:
         self.openConfig = OpenConfigDialog()
 
     def run(self):
-        self.openConfig.run()
+        print(self.openConfig.run())
         

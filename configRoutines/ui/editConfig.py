@@ -4,13 +4,19 @@ from .._core import *
 
 #%%
 class EditConfigWindow:
-    def __init__(self, cfg: DSPConfig):
+    def __init__(self, cfg: DSPConfig, cfgpath: str):
         self.cfg = cfg
+        self.cfgpath = cfgpath
+        self._render()
 
-    def run(self):
-        with dpg.window(
-            label=dpg.get_value(self.cfg[1])
-        ) as window:
-            dpg.add_text("Test")
+    def _render(self):
+        self.window = dpg.add_window(
+            label=self.cfgpath,
+            width=400, height=800, pos=(100, 100)
+        )
+        dpg.add_text("Test", parent=self.window)
+
+
+
 
 

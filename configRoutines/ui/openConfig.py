@@ -3,12 +3,13 @@ import os
 
 from .._core import *
 from .helpers import centreModal
+from .editConfig import EditConfigWindow
 
 #%%
 class OpenConfigDialog:
     def __init__(self):
-        # List of tuples(DSPConfig, dpg.add_text)
-        self.cfgs = list()
+        # Key: path, value: tuple(add_text widget, EditConfigWindow)
+        self.cfgDict = dict()
 
     def run(self):
         # Show a window that lets you open a config file
@@ -29,8 +30,6 @@ class OpenConfigDialog:
                 callback=self._open_config,
                 user_data=[cfgPathInput, window]
             )
-
-        return 1
 
     def _config_file_selector(self, sender, app_data, user_data):
         """
@@ -55,13 +54,13 @@ class OpenConfigDialog:
         cfgpath = dpg.get_value(cfgpathInput)
         if os.path.exists(cfgpath):
             # Then open it
-            self.cfgs.append([
-                DSPConfig(cfgpath),
-                dpg.add_text(
-                    cfgpath,
-                    parent=parent
+            self.cfgDict[cfgpath] = (
+                dpg.add_text(cfgpath, parent=parent),
+                EditConfigWindow(
+                    DSPConfig(cfgpath), cfgpath
                 )
-            ])
+            )
+
         else:
             # Ask whether we want to create the config
             with dpg.window(
@@ -85,19 +84,18 @@ class OpenConfigDialog:
                         user_data=[None, popupModal, parent]
                     )
 
-        print(self.cfgs)
+        print(self.cfgDict)
 
     def _create_config(self, sender, app_data, user_data):
         cfgpath, popupModal, parent = user_data
         # Create the new config
         if cfgpath is not None:
-            self.cfgs.append([
-                DSPConfig.new(cfgpath, allow_no_value=True),
-                dpg.add_text(
-                    cfgpath,
-                    parent=parent
+            self.cfgDict[cfgpath] = (
+                dpg.add_text(cfgpath, parent=parent),
+                EditConfigWindow(
+                    DSPConfig.new(cfgpath, allow_no_value=True),
                 )
-            ])
+            )
         dpg.configure_item(popupModal, show=False)
 
 

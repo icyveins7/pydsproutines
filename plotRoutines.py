@@ -9,14 +9,8 @@ Created on Mon Apr 27 16:09:54 2020
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 
-try:
-    from PyQt5.QtCore import Qt, QRectF
-    from PyQt5.QtWidgets import QApplication
-    print("PyQt5 not found. Trying with PySide6.")
-except ImportError:
-    from PySide6.QtCore import Qt, QRectF
-    from PySide6.QtWidgets import QApplication
-
+from PySide6.QtCore import Qt, QRectF
+# from PyQt5.QtCore import Qt, QRectF
 import numpy as np
 import scipy.signal as sps
 import matplotlib.pyplot as plt
@@ -24,6 +18,8 @@ from signalCreationRoutines import makeFreq
 from matplotlib import cm
 from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 
+# from PyQt5.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 
 def closeAllFigs():
     '''Helper function to close both Pyqtgraph and Matplotlib windows.'''
@@ -142,33 +138,16 @@ def plotHeatmap(heatmap, x0, y0, width, height, ax=None, aspect='auto', vmin=Non
 
     return fig, ax
 
-def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None, autoBorder=True):
+def pgPlotHeatmap(heatmap, x0, y0, width, height, window=None, imgLvls=None, autoBorder=False):
     '''
     This is a useful tool to overlay heatmaps onto normal scatter plots,
     in the mathematical x-y axis (unlike the conventional image axis which has y-axis flipped).
-
-    Parameters
-    ----------
-    heatmap: np.ndarray, M x N
-        For xcorr results, M is usually the number of time bins i.e. shifts.
-        N is usually the number of frequency bins.
-        Transposing the array is not necessary.
-    x0: float
-        The left-most x0 value. For xcorr results, this is usually the smallest time bin i.e. time shift.
-    y0: float
-        The bottom-most y0 value. For xcorr results, this is usually the smallest frequency bin i.e. frequency shift.
-    width: float
-        The span of x values. For xcorr results, this is usually equal to (time bins) * (time bin width).
-    height: float
-        The span of y values. For xcorr results, this is usually equal to (frequency bins) * (frequency bin height).
-    window: pyqtgraph.GraphicsLayoutWidget, optional
-        The window / pyqtgraph widget to add the image to. Will be created if not specified i.e. None.
-    imgLvls: list_like
-        Passed to img.setLevels(), specifies colour limits to values.
-    autoBorder: bool
-        Configures whether to pad half a bin width around the image;
-        Usually the data is generated around the bin centres, so this is required.
-        Default is True.
+    
+    heatmap: 2-D array containing the data.
+    x0,y0 : coordinates of bottom-left most point.
+    width, height: scale of the heatmap.
+    imgLvls: list_like, passed to img.setLevels(), specifies colour limits to values
+    autoBorder: configures whether to pad half a bin width around the image, usually the data is generated around the bin 'centres', so this is required
     '''
     if window is None:
         window = pg.plot()

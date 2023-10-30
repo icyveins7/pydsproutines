@@ -9,8 +9,7 @@ Created on Mon Apr 27 16:09:54 2020
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 
-from PySide6.QtCore import Qt, QRectF
-# from PyQt5.QtCore import Qt, QRectF
+
 import numpy as np
 import scipy.signal as sps
 import matplotlib.pyplot as plt
@@ -18,8 +17,13 @@ from signalCreationRoutines import makeFreq
 from matplotlib import cm
 from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 
-# from PyQt5.QtWidgets import QApplication
-from PySide6.QtWidgets import QApplication
+try: # Although this is the recommendation in requirements.txt, this does not work with Spyder
+    from PySide6.QtCore import Qt, QRectF
+    from PySide6.QtWidgets import QApplication
+except ImportError: # This occurs when using spyder which requires pyqt5 instead
+    from PyQt5.QtCore import Qt, QRectF
+    from PyQt5.QtWidgets import QApplication
+
 
 def closeAllFigs():
     '''Helper function to close both Pyqtgraph and Matplotlib windows.'''

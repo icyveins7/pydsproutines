@@ -82,3 +82,76 @@ void multiplySlicesWithIndexedRowsOptimistic(
 
  
 }
+
+
+/*
+Here we design a sliding template multiply, with an additional sliding norm calculation.
+This is usually used in the xcorr step.
+
+We have two inputs:
+1) x: A short (can be contained in shared mem) template array, length xlen
+2) y: Another arbitrarily long input array to slide against
+
+This is the MOST OPTIMISTIC method for the copies;
+we assume that within the shared memory we can fit both
+1) x itself
+2) a large section of y
+
+This allows us to slide against multiple xlen windows within 1 block,
+escaping a lot of repeated global memory reads.
+
+This is especially important when the template itself is very short;
+as the template gets longer this matters less and less when compared to the next 
+step in the xcorr, which is the FFT step.
+
+*/
+extern "C" __global__ 
+void slidingMultiply(
+    const complex<float> *x, // the template
+    const int xlen,
+    const complex<float> *y, // the searched array
+    const int ylen,
+    const int startIdx, // the start index of the searched array to begin the sliding
+    const int idxlen, // the total number of slides
+    complex<float> *z, // the output array, which has dimensions (idxlen) rows * (xlen) columns
+    float *ynormSq, // the norms of the slices of y, may be left as NULL if undesired, dimensions
+    int numSlidesPerBlk // this defines the number of slides to compute per block, and hence determines the workspace (which the caller must calculate correctly)
+){
+    // allocate shared memory
+    extern __shared__ double s[];
+
+    complex<float> *s_x = (complex<float>*)s; // (xlen) complex floats
+    complex<float> *s_ysection = (complex<float>*)&s_x[xlen]; // (numSlidesPerBlk + xlen - 1) complex floats
+    float *s_ynormSq = (float*)&s_ysection[numSlidesPerBlk + xlen - 1]; // (numSlidesPerBlk) floats
+
+    // Load shared mem x and y
+    for (int t = threadIdx.x; t < xlen; t += blockDim.x)
+        s_x[t] = x[t];
+
+    int ysectionSize = numSlidesPerBlk + xlen - 1;
+    int ysectionOffset = blockIdx.x * numSlidesPerBlk;
+    for (int t = threadIdx.x; t < ysectionSize; t += blockDim.x)
+        s_ysection[t] = y[ysectionOffset + t];
+
+    // Zero the shared mem norm squared if output is desired
+    if (ynormSq != NULL)
+    {
+        for (int t = threadIdx.x; t < numSlidesPerBlk; t += blockDim.x)
+            s_ynormSq[t] = 0.0f;
+    }
+
+    // Begin the sliding multiplies
+    for (int i = 0; i < numSlidesPerBlk; i++)
+    {
+        for (int t = threadIdx.x;)
+    }
+    for (int t = threadIdx.x; t < numSlidesPerBlk; t += blockDim.x)
+    {
+        for (int i = 0; i < )
+
+        // TODO
+    }
+
+
+
+}

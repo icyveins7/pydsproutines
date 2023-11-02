@@ -22,7 +22,7 @@ try:
     import cupy as cp
     from cupyExtensions import *
     
-    def cp_fastXcorr(cutout, rx, freqsearch=True, outputCAF=False, shifts=None, absResult=True, BATCH=1024):
+    def cp_fastXcorr(cutout, rx, freqsearch=True, outputCAF=False, shifts=None, absResult=True, BATCH=1024, copyToCpu=True):
         """
         Equivalent to fastXcorr, designed to run on gpu.
         """
@@ -118,11 +118,14 @@ try:
                     d_result[i*BATCH : i*BATCH + TOTAL_THIS_BATCH] = d_max[:TOTAL_THIS_BATCH]**2 / d_rxNormPartSq_batch[:TOTAL_THIS_BATCH] / cutoutNormSq
                         
 
-                # copy all results back
-                h_result = cp.asnumpy(d_result)
-                h_freqlist = cp.asnumpy(d_freqlist)
-                    
-                return h_result, h_freqlist
+                if copyToCpu:
+                    # copy all results back
+                    h_result = cp.asnumpy(d_result)
+                    h_freqlist = cp.asnumpy(d_freqlist)
+                        
+                    return h_result, h_freqlist
+                else:
+                    return d_result, d_freqlist
             
             else:
                 

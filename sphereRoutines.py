@@ -196,3 +196,28 @@ if __name__ == "__main__":
     
     # Check if points truly lie on surface
     check = points[0,:]**2/omega**2 + points[1,:]**2/omega**2 + points[2,:]**2/lmbda**2
+    print(check)
+
+    # Create a ray and an oblate spheroid
+    s = np.array([3,3,3])
+    d = np.array([-1,-1.1,-1.2])
+    # Find intersection
+    intersection = oblate.intersectRay(s, d)
+    # breakpoint()
+    if intersection is not None:
+        # Check if points truly lie on surface
+        check = intersection[0]**2/omega**2 + intersection[1]**2/omega**2 + intersection[2]**2/lmbda**2
+        print(check)
+        # Check if the direction vector is back-calculated correctly
+        check = intersection - s
+        print(check/np.linalg.norm(check), d/np.linalg.norm(d))
+
+        ax2, fig2 = oblate.visualize(np.arange(0,np.pi,0.05), np.arange(0,np.pi,0.05))
+        ax2.plot3D(
+            [s[0], intersection[0]],
+            [s[1], intersection[1]],
+            [s[2], intersection[2]],
+            'rx-'
+        )
+        
+    plt.show()

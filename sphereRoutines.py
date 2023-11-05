@@ -6,6 +6,8 @@ Created on Mon Sep 19 15:40:43 2022
 """
 
 import numpy as np
+import pyqtgraph.opengl as gl
+
 from plotRoutines import *
 
 #%%
@@ -87,6 +89,37 @@ class Ellipsoid:
         ax.plot_wireframe(points[0], points[1], points[2], color=colour)
         
         return ax, fig
+    
+    def intersectRay(self, s: np.ndarray, direction: np.ndarray):
+        # Check 1-D inputs
+        if s.ndim != 1 or direction.ndim != 1:
+            raise ValueError("s and direction must be 1-D arrays")
+
+        # Calculate the coefficients of the quadratic equation, ax^2 + bx + c = 0
+        denominatorsq = np.array([self.a**2, self.b**2, self.c**2])
+        sprime = s - self.mu # Need to offset by the ellipsoid centre
+        coeffs = np.array([
+            np.sum(sprime**2/denominatorsq) - 1.0, # c
+            np.sum(2*sprime*direction/denominatorsq), # b
+            np.sum(direction**2/denominatorsq) # a
+        ])
+        poly = np.polynomial.Polynomial(coeffs)
+
+        # Find the real positive roots
+        lmbda = poly.roots()
+        lmbda = lmbda[np.isreal(lmbda)]
+        lmbda = lmbda[lmbda >= 0]
+        if lmbda.size > 0:
+            # Pick the smallest positive one
+            lmbda = np.min(lmbda)
+            # Propagate the ray to the point
+            x = s + direction*lmbda
+            return x
+
+        else:
+            return None
+
+
         
 class OblateSpheroid(Ellipsoid):
     def __init__(self, omega: float, lmbda: float,

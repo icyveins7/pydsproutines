@@ -114,7 +114,7 @@ void slidingMultiply(
     const int startIdx, // the start index of the searched array to begin the sliding
     const int idxlen, // the total number of slides
     complex<float> *z, // the output array, which has dimensions (idxlen) rows * (xlen) columns
-    float *ynormSq, // the norms of the slices of y, may be left as NULL if undesired, dimensions
+    float *ynormSq, // the norms of the slices of y, may be left as NULL if undesired, dimensions (idxlen)
     int numSlidesPerBlk // this defines the number of slides to compute per block, and hence determines the workspace (which the caller must calculate correctly)
 ){
     // allocate shared memory
@@ -130,8 +130,16 @@ void slidingMultiply(
 
     int ysectionSize = numSlidesPerBlk + xlen - 1;
     int ysectionOffset = blockIdx.x * numSlidesPerBlk;
+    // The number of slides computed this block; the last block may compute less than the allocation
+    int numSlidesThisBlk = idxlen - ysectionOffset > numSlidesPerBlk ? numSlidesPerBlk : idxlen - ysectionOffset;
     for (int t = threadIdx.x; t < ysectionSize; t += blockDim.x)
-        s_ysection[t] = y[ysectionOffset + t];
+    {
+        if (ysectionOffset + t < ylen) // read within bounds
+            s_ysection[t] = y[ysectionOffset + t];
+        else
+            s_ysection[t] = complex<float>(0.0f, 0.0f);
+    }
+        
 
     // Zero the shared mem norm squared if output is desired
     if (ynormSq != NULL)
@@ -140,18 +148,64 @@ void slidingMultiply(
             s_ynormSq[t] = 0.0f;
     }
 
-    // Begin the sliding multiplies
-    for (int i = 0; i < numSlidesPerBlk; i++)
+    // Wait for shared mem syncs
+    __syncthreads();
+
+    // Define stack-variables for the thread
+    complex<float> yt;
+    int row_offset;
+    float normsq;
+
+    // Define the lane id for the warp-level reduction later
+    int laneId = threadIdx.x & 0x1f;
+
+    // Begin the sliding multiplies; outer loop 
+    for (int i = 0; i < numSlidesThisBlk; i++) // we only compute the necessary number of slides
     {
-        for (int t = threadIdx.x;)
-    }
-    for (int t = threadIdx.x; t < numSlidesPerBlk; t += blockDim.x)
+        // Define the starting output index for this slide (skip the block, then skip the index as well)
+        row_offset = blockIdx.x * numSlidesPerBlk + i;
+
+        // Inner loop: Simply multiply and write to global mem, doing it this way lets us conveniently write to contiguous global mem
+        for (int t = threadIdx.x; t < xlen; t += blockDim.x)
+        {
+            yt = s_ysection[i + t];
+            z[row_offset * xlen + t] = s_x[t] * yt; // This should be global coalesced
+            // At the same time, calculate the norm sq for this section if required;
+            if (ynormSq != NULL)
+            {
+                // Calculate the normsq for this current index
+                normsq = norm(yt); // 'norm' is actually normsq -> See cupy/cupy/_core/include/cupy/complex/complex.h
+                // Warp-level shuffle down to the first lane
+                for (int w = 16; w >= 1; w /= 2)
+                {
+                    normsq += __shfl_down_sync(0xffffffff, normsq, w); // we can ignore warpsize and assume it to be 32
+                }
+                // First thread in the warp (first lane) now has the sum of all normsqs, write this atomically back to the shared mem
+                if (laneId == 0)
+                {
+                    atomicAdd(&s_ynormSq[i], normsq); 
+                    // TODO: we may need to compare performing atomicAdd after warp-reduction directly back to global memory -> see https://developer.nvidia.com/blog/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/
+                    // the article suggests that atomicAdd to global may be faster than to shared due to the overhead of shared and then another write to global mem later
+                }
+
+                // At the end, we must reset the thread-local variable to 0, as this may affect the next warp whenever warpsize is not a divisor of xlen
+                normsq = 0;
+            }
+        } // End inner loop
+    } // End outer loop
+
+    // Wait for the syncthreads before reading out
+    __syncthreads();
+
+    // After the first computation, if normsq is required, then the shared mem should be filled
+    // we can then write this back to global memory in coalesced fashion
+    if (ynormSq != NULL)
     {
-        for (int i = 0; i < )
-
-        // TODO
+        for (int t = threadIdx.x; t < numSlidesThisBlk; t += blockDim.x) // only copy up to the number of slides for this block
+        {
+            if (blockIdx.x * numSlidesPerBlk + t < idxlen) // ensure we don't write out of bounds
+                ynormSq[blockIdx.x * numSlidesPerBlk + t] = s_ynormSq[t];
+        }
     }
-
-
 
 }

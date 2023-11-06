@@ -298,10 +298,14 @@ def cupyArgmaxAbsRows_complex64(
     return d_argmax
 
 #%% 
-with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "multiplySlices.cu"), "r") as fid:
-    _module_multiplySlices = cp.RawModule(code=fid.read())
-    _multiplySlicesWithIndexedRowsOptimisticKernel = _module_multiplySlices.get_function("multiplySlicesWithIndexedRowsOptimistic")
+# with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "multiplySlices.cu"), "r") as fid:
+#     _module_multiplySlices = cp.RawModule(code=fid.read())
+#     _multiplySlicesWithIndexedRowsOptimisticKernel = _module_multiplySlices.get_function("multiplySlicesWithIndexedRowsOptimistic")
 
+_multiplySlicesWithIndexedRowsOptimisticKernel, _slidingMultiplyKernel = cupyModuleToKernelsLoader(
+    "multiplySlices.cu", 
+    ["multiplySlicesWithIndexedRowsOptimistic", "slidingMultiply"]
+)
 
         
 def multiplySlicesOptimistically(

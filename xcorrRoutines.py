@@ -25,6 +25,11 @@ try:
     def cp_fastXcorr(cutout, rx, freqsearch=True, outputCAF=False, shifts=None, absResult=True, BATCH=1024, copyToCpu=True):
         """
         Equivalent to fastXcorr, designed to run on gpu.
+
+        It is important to note that this function is sensitive to the memory requirements;
+        this means that for different cutout sizes, the batch size should be tuned to get maximum performance.
+        Otherwise, if using too small or too large batch sizes, the speed of this function may be 
+        slower than a compiled, threaded xcorr function (see CyIppXcorrFFT).
         """
         # Query the ram of the device, but we need extra space for the ffts to work, so use 1/4 to estimate
         if cutout.nbytes * BATCH > cp.cuda.device.Device().mem_info[1] / 4: 

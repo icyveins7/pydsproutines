@@ -45,6 +45,15 @@ def cupyCheckExceedsSharedMem(requestedBytes: int, maximumBytes: int=48000):
 def requireCupyArray(var: cp.ndarray):
     if not isinstance(var, cp.ndarray):
         raise TypeError("Must be cupy array.")
+    
+def cupyGetEnoughBlocks(length: int, THREADS_PER_BLOCK: int):
+    """
+    Gets just enough blocks to cover a certain length.
+    Assumes every block will compute THREADS_PER_BLOCK elements.
+    """
+    NUM_BLKS = length // THREADS_PER_BLOCK
+    NUM_BLKS = NUM_BLKS if NUM_BLKS % THREADS_PER_BLOCK == 0 else NUM_BLKS + 1
+    return NUM_BLKS
 
 
 #%% A block-group paired kernel copy
@@ -304,7 +313,7 @@ def cupyArgmaxAbsRows_complex64(
 
 _multiplySlicesWithIndexedRowsOptimisticKernel, _slidingMultiplyKernel = cupyModuleToKernelsLoader(
     "multiplySlices.cu", 
-    ["multiplySlicesWithIndexedRowsOptimistic", "slidingMultiply"]
+    ["multiplySlicesWithIndexedRowsOptimistic", "slidingMultiplyNormalised"]
 )
 
         
@@ -368,5 +377,86 @@ def multiplySlicesOptimistically(
     
     return d_out
 
+def multiplySlidesNormalised(
+    d_x: cp.ndarray, # This is the template/cutout (shorter array)
+    d_y: cp.ndarray, # This is the searched input (longer array)
+    startIdx: int, # First index of d_y to start searching
+    idxlen: int, # Number of searched indices i.e. [startIdx, startIdx+idxlen)
+    THREADS_PER_BLOCK: int=128,
+    numSlidesPerBlk: int=None
+):
     
+    # Check that inputs are all 32fc
+    cupyRequireDtype(cp.complex64, d_x)
+    cupyRequireDtype(cp.complex64, d_y)
+
+    # Check that the slides do not exceed bounds
+    if startIdx < 0 or startIdx + idxlen > d_y.size:
+        raise ValueError("startIdx and idxlen should be within the bounds of d_y.")
+
+    # Calculate shared mem requirements
+    if numSlidesPerBlk is None:
+        # Calculate the maximum we can use
+        numSlidesPerBlk = (48000 - 2*d_x.nbytes - 8*THREADS_PER_BLOCK) // 8
+        print("Using %d slides per block" % numSlidesPerBlk)
+    smReq = 2*d_x.nbytes + 8*numSlidesPerBlk - 8 + 8*THREADS_PER_BLOCK # Check kernel for details
+    cupyCheckExceedsSharedMem(smReq)
+
+    # Allocate output
+    d_pdts = cp.zeros((idxlen, d_x.size), dtype=cp.complex64)    
     
+    # Execute kernel
+    NUM_BLKS = cupyGetEnoughBlocks(idxlen, THREADS_PER_BLOCK)
+    _slidingMultiplyKernel(
+        (NUM_BLKS,),(THREADS_PER_BLOCK,),
+        (
+            d_x,
+            d_x.size,
+            d_y,
+            d_y.size,
+            startIdx,
+            idxlen,
+            d_pdts,
+            numSlidesPerBlk
+        ),
+        shared_mem=smReq
+    )
+
+    return d_pdts
+    
+if __name__ == "__main__":
+    from signalCreationRoutines import *
+    from verifyRoutines import *
+
+    # Create a short signal
+    x = randnoise(50, 1, 1, 1).astype(np.complex64)
+    # Create a long signal
+    y = randnoise(100, 1, 1, 1).astype(np.complex64)
+
+    # Run the sliding multiply on cpu
+    startIdx = 0
+    idxlen = 51
+    out = np.zeros((idxlen, x.size), dtype=np.complex64)
+    
+    for i in range(startIdx, idxlen):    
+        outnormsq = np.linalg.norm(y[i:i+x.size])**2
+        out[i,:] = y[i:i+x.size] * x / outnormsq
+    
+    # Run the sliding multiply on gpu
+    d_x = cp.asarray(x)
+    d_y = cp.asarray(y)
+
+    d_pdts = multiplySlidesNormalised(
+        d_x,
+        d_y,
+        startIdx,
+        idxlen,
+        THREADS_PER_BLOCK=32
+    )
+
+    compareValues(
+        d_pdts.get().flatten(),
+        out.flatten()
+    )
+
+

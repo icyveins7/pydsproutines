@@ -398,6 +398,8 @@ def multiplySlidesNormalised(
     if numSlidesPerBlk is None:
         # Calculate the maximum we can use
         numSlidesPerBlk = (48000 - 2*d_x.nbytes - 8*THREADS_PER_BLOCK) // 8
+        if numSlidesPerBlk < 1:
+            raise MemoryError("x is too large to use this kernel.")
         print("Using %d slides per block" % numSlidesPerBlk)
     smReq = 2*d_x.nbytes + 8*numSlidesPerBlk - 8 + 8*THREADS_PER_BLOCK # Check kernel for details
     cupyCheckExceedsSharedMem(smReq)

@@ -15,6 +15,8 @@ from timingRoutines import Timer
 
 from scipy.constants import speed_of_light as lightspd
 
+import warnings
+
 try:
     import cupy as cp
     
@@ -70,6 +72,9 @@ class Trajectory:
         """
         if x0.ndim != 1:
             raise np.ValueError("x0 must be a 1D array.")
+    
+        if x0.size != 2 and x0.size != 3:
+            raise TypeError("x0 must represent a 2D or 3D point.")
         self._x0 = x0
 
     @property
@@ -122,6 +127,8 @@ class Trajectory:
             return np.linalg.norm(self.at(t) - tx.at(t), axis=1) / lightspd
         elif method == Trajectory.TauMethod.First_Order_Velocity_Approximation:
             tau = self._quadraticVelocityMethod(tx, t)
+            if np.all(tau < 0):
+                raise ValueError("Not sure how to select tau; both negative valued")
             tau = -np.min(tau, axis=1) # Take the smaller one, which is generally the negative one
 
             return tau

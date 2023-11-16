@@ -46,13 +46,13 @@ def requireCupyArray(var: cp.ndarray):
     if not isinstance(var, cp.ndarray):
         raise TypeError("Must be cupy array.")
     
-def cupyGetEnoughBlocks(length: int, THREADS_PER_BLOCK: int):
+def cupyGetEnoughBlocks(length: int, computedPerBlock: int):
     """
     Gets just enough blocks to cover a certain length.
-    Assumes every block will compute THREADS_PER_BLOCK elements.
+    Assumes every block will compute 'computedPerBlock' elements.
     """
-    NUM_BLKS = length // THREADS_PER_BLOCK
-    NUM_BLKS = NUM_BLKS if NUM_BLKS % THREADS_PER_BLOCK == 0 else NUM_BLKS + 1
+    NUM_BLKS = length // computedPerBlock
+    NUM_BLKS = NUM_BLKS if NUM_BLKS % computedPerBlock == 0 else NUM_BLKS + 1
     return NUM_BLKS
 
 
@@ -413,7 +413,7 @@ def multiplySlidesNormalised(
     d_pdts = cp.zeros((idxlen, d_x.size), dtype=cp.complex64)    
     
     # Execute kernel
-    NUM_BLKS = cupyGetEnoughBlocks(idxlen, THREADS_PER_BLOCK)
+    NUM_BLKS = cupyGetEnoughBlocks(idxlen, numSlidesPerBlk)
     _slidingMultiplyKernel(
         (NUM_BLKS,),(THREADS_PER_BLOCK,),
         (

@@ -385,6 +385,11 @@ def multiplySlidesNormalised(
     THREADS_PER_BLOCK: int=128,
     numSlidesPerBlk: int=None
 ):
+    """
+    Calls the slidingMultiplyNormalised kernel.
+    This kernel maximises usage of shared memory by storing both the template d_x
+    and as much of the searched input d_y in 1 block as possible.
+    """
     
     # Check that inputs are all 32fc
     cupyRequireDtype(cp.complex64, d_x)
@@ -429,25 +434,40 @@ def multiplySlidesNormalised(
 if __name__ == "__main__":
     from signalCreationRoutines import *
     from verifyRoutines import *
+    from timingRoutines import *
+
+    timer = Timer()
 
     # Create a short signal
     x = randnoise(50, 1, 1, 1).astype(np.complex64)
     # Create a long signal
-    y = randnoise(100, 1, 1, 1).astype(np.complex64)
+    y = randnoise(100000, 1, 1, 1).astype(np.complex64)
 
     # Run the sliding multiply on cpu
     startIdx = 0
-    idxlen = 51
+    idxlen = y.size - x.size + 1
     out = np.zeros((idxlen, x.size), dtype=np.complex64)
     
+    timer.start()
     for i in range(startIdx, idxlen):    
-        outnormsq = np.linalg.norm(y[i:i+x.size])**2
+        outnormsq = np.linalg.norm(y[i:i+x.size])
         out[i,:] = y[i:i+x.size] * x / outnormsq
+    timer.end("numpy")
     
     # Run the sliding multiply on gpu
     d_x = cp.asarray(x)
     d_y = cp.asarray(y)
 
+    # # Loop over cupy functions (this is extremely inefficient at these dimensions, don't run this)
+    # d_out = cp.zeros(out.shape, dtype=cp.complex64)
+    # timer.start()
+    # for i in range(startIdx, idxlen):
+    #     outnormsq = cp.linalg.norm(d_y[i:i+x.size])
+    #     d_out[i,:] = d_y[i:i+x.size] * d_x / outnormsq
+    # timer.end("cupy")
+
+    # Use the custom kernel
+    timer.start()
     d_pdts = multiplySlidesNormalised(
         d_x,
         d_y,
@@ -455,6 +475,7 @@ if __name__ == "__main__":
         idxlen,
         THREADS_PER_BLOCK=32
     )
+    timer.end("kernel")
 
     compareValues(
         d_pdts.get().flatten(),

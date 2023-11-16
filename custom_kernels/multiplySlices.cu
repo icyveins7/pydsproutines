@@ -169,6 +169,8 @@ void slidingMultiplyNormalised(
 
     // Define stack-variables for the thread
     int row_offset;
+    complex<float> zt;
+    float normalisation;
 
     // Begin the sliding multiplies; outer loop 
     for (int i = 0; i < numSlidesThisBlk; i++) // we only compute the necessary number of slides
@@ -183,10 +185,16 @@ void slidingMultiplyNormalised(
             // and add the energy of the element at the end
             normSq = normSq - (double)norm(s_ysection[i-1]) + (double)norm(s_ysection[i+xlen-1]);
         }
+        normalisation = (float)sqrt(normSq); // note that we later divide by the norm, not the normSq!
 
         // Inner loop: Simply multiply and write to global mem, doing it this way lets us conveniently write to contiguous global mem
         for (int t = threadIdx.x; t < xlen; t += blockDim.x)
-            z[row_offset * xlen + t] = s_x[t] * s_ysection[i+t] / (float)normSq; // This should be global coalesced
+        {
+            zt = s_x[t] * s_ysection[i+t] / normalisation; // this is the bulk of the compute time
+            z[row_offset * xlen + t] = zt; // This should be global coalesced? 
+            // Note that when timing using nsys, the compiler may have optimized away the computation line if
+            // the global write has been commented out. This may make it appear like the global write is the one taking a long time.
+        }
             
     } // End outer loop
 }

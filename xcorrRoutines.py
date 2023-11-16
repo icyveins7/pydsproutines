@@ -138,6 +138,54 @@ try:
                 
         else:
             print('Not implemented.')
+
+    
+    def cp_fastXcorr_v2(
+        cutout: cp.ndarray,
+        rx: cp.ndarray,
+        startIdx: int=0,
+        idxlen: int=None,
+        THREADS_PER_BLOCK: int=32
+    ):
+        """
+        This function uses an optimised custom kernel for 'short' cutouts.
+        Short cutouts are defined as those that can occupy a small fraction of a CUDA block's shared memory.
+        As such, this function should perform the best when there is a large search range,
+        but a short cutout.
+
+        Parameters
+        ----------
+        cutout : cp.ndarray, cp.complex64
+            The cutout/template to be correlated.
+        rx : cp.ndarray, cp.complex64
+            The signal to be correlated.
+        startIdx : int, optional
+            The starting index of rx to start correlation. The default is 0.
+        idxlen : int, optional
+            The number of indices to correlate over; the correlation index step size
+            is implicitly 1, and cannot be changed.
+            The default is None, which will default to maximum search range of rx.
+        """
+
+        # Call the optimised kernel (this will perform type checking for us already)
+        d_pdts = multiplySlidesNormalised(
+            cutout,
+            rx,
+            startIdx,
+            idxlen,
+            THREADS_PER_BLOCK=THREADS_PER_BLOCK
+        )
+
+        # Perform the FFT on each row
+        d_pdtsfft = cp.fft.fft(d_pdts, axis=1) 
+
+        # We now have fft(x*y)/norm(y), so we take abs squared 
+        # and normalise by the energy of cutout again
+        cutoutNormSq = cp.linalg.norm(cutout)**2.0
+        d_out = cp.abs(d_pdtsfft)**2 / cutoutNormSq
+
+        return d_out
+
 except:
     print("Failed to load cupy?")
         

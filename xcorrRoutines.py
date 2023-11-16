@@ -145,7 +145,8 @@ try:
         rx: cp.ndarray,
         startIdx: int=0,
         idxlen: int=None,
-        THREADS_PER_BLOCK: int=32
+        THREADS_PER_BLOCK: int=32,
+        numSlidesPerBlk: int=None
     ):
         """
         This function uses an optimised custom kernel for 'short' cutouts.
@@ -173,7 +174,8 @@ try:
             rx,
             startIdx,
             idxlen,
-            THREADS_PER_BLOCK=THREADS_PER_BLOCK
+            THREADS_PER_BLOCK=THREADS_PER_BLOCK,
+            numSlidesPerBlk=numSlidesPerBlk
         )
 
         # Perform the FFT on each row

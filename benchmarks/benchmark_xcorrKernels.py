@@ -7,7 +7,22 @@ import numpy as np
 
 timer = Timer()
 
-def benchmark(cutoutlen=1000, numShifts=100000, cupybatchsize=4096, THREADS_PER_BLOCK=32):
+"""
+Notes on optimisation for the new optimised kernel.
+It is important to increase THREADS_PER_BLOCK somewhat to around 128 threads,
+but not too high (256) seems to make it slower!
+
+Setting a non-maximum numSlidesPerBlk also increases speed substantially!
+
+Some measurements from nsys profiling:
+128 threads, 3872 slides (maxed), 6.3ms (only 26 blocks, which is bad occupancy for SMs)
+128 threads, 1024 slides, 3.05ms (98 blocks, decent occupancy)
+128 threads, 512 slides, 3.1ms (suggests that 98 blocks is good enough occupancy)
+256 threads, 1024 slides, 4.7ms (maybe too much load on SMs at this point?)
+"""
+
+def benchmark(cutoutlen=1000, numShifts=100000, cupybatchsize=4096, 
+              THREADS_PER_BLOCK=128, numSlidesPerBlk=1024):
     # Generate some data
     datalen = cutoutlen + numShifts - 1
     x = np.random.randn(datalen) + 1j*np.random.randn(datalen)
@@ -44,7 +59,8 @@ def benchmark(cutoutlen=1000, numShifts=100000, cupybatchsize=4096, THREADS_PER_
         d_x,
         0,
         numShifts,
-        THREADS_PER_BLOCK
+        THREADS_PER_BLOCK,
+        numSlidesPerBlk
     )
 
     timer.start()
@@ -53,7 +69,8 @@ def benchmark(cutoutlen=1000, numShifts=100000, cupybatchsize=4096, THREADS_PER_
         d_x,
         0,
         numShifts,
-        THREADS_PER_BLOCK
+        THREADS_PER_BLOCK,
+        numSlidesPerBlk
     )
     timer.end("cp_fastxcorr v2")
 

@@ -31,6 +31,13 @@ def closeAllFigs():
     plt.close("all")
     
 
+def pgRender():
+    """
+    On Mac OS X, this function is used to render the plot.
+    Otherwise you might get a hanging window.
+    """
+    pg.mkQApp().exec()
+
 def pgPlotDeltaFuncs(fig, x, h, color='r', symbol=None, name=None):
     '''
     Adds delta function dashed lines to the specified pyqtgraph plot.

@@ -20,12 +20,21 @@ def cupyModuleToKernelsLoader(modulefilename: str, kernelNames: list):
     Examples:
         kernel1, kernel2 = cupyModuleToKernelsLoader("mymodule.cu", ["mykern1","mykern2"])
         kernel1, = cupyModuleToKernelsLoader("mymodule.cu", "mykern1")
+
+    Parameters
+    ----------
+    modulefilename : str
+        Name of the module file.
+    kernelNames : list
+        List of kernel names. These are to include the templated types if the kernels are templated.
+        Example: ["mykern1", "mykern2<float>", "mykern2<double>"]
     """
     if isinstance(kernelNames, str):
         kernelNames = [kernelNames]
     kernels = []
     with open(os.path.join(os.path.dirname(__file__), "custom_kernels", modulefilename), "r") as fid:
-        _module = cp.RawModule(code=fid.read())
+        _module = cp.RawModule(code=fid.read(), options=('-std=c++11',),
+                               name_expressions=kernelNames)
         for kernelName in kernelNames:
             kernels.append(_module.get_function(kernelName))
 
@@ -306,6 +315,64 @@ def cupyArgmaxAbsRows_complex64(
     
     return d_argmax
 
+#%%
+(
+    _complex_magnSq_kernel_floatfloat,
+    _complex_magnSq_kernel_floatdouble,
+    _complex_magnSq_kernel_doubledouble   
+) = cupyModuleToKernelsLoader(
+    "complex_magn.cu", 
+    [
+        "complex_magnSq_kernel<float,float>",
+        "complex_magnSq_kernel<float,double>",
+        "complex_magnSq_kernel<double,double>"
+    ]
+)
+
+def cupyComplexMagnSq(
+    d_x: cp.ndarray, 
+    out_dtype: cp.dtype=cp.float64,
+    THREADS_PER_BLOCK: int=128
+):
+    NUM_BLKS = cupyGetEnoughBlocks(d_x.size, THREADS_PER_BLOCK)
+
+    # Call appropriate kernel for appropriate type
+    if out_dtype == cp.float32:
+        cupyRequireDtype(cp.complex64, d_x)
+        # Create output
+        d_magnSq = cp.zeros(d_x.shape, dtype=cp.float32)
+        # Call kernel
+        _complex_magnSq_kernel_floatfloat(
+            (NUM_BLKS,),
+            (THREADS_PER_BLOCK,),
+            (d_x, d_x.size, d_magnSq)
+        )
+
+        return d_magnSq
+    
+    elif out_dtype == cp.float64:
+        # Create output
+        d_magnSq = cp.zeros(d_x.shape, dtype=cp.float64)
+        
+        if d_x.dtype == cp.complex64:
+            _complex_magnSq_kernel_floatdouble(
+                (NUM_BLKS,),
+                (THREADS_PER_BLOCK,),
+                (d_x, d_x.size, d_magnSq)
+            )
+        elif d_x.dtype == cp.complex128:
+            _complex_magnSq_kernel_doubledouble(
+                (NUM_BLKS,),
+                (THREADS_PER_BLOCK,),
+                (d_x, d_x.size, d_magnSq)
+            )
+        else:
+            raise TypeError("d_x must be complex64 or complex128.")
+        
+        return d_magnSq
+
+
+
 #%% 
 # with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "multiplySlices.cu"), "r") as fid:
 #     _module_multiplySlices = cp.RawModule(code=fid.read())
@@ -471,14 +538,6 @@ if __name__ == "__main__":
     d_x = cp.asarray(x)
     d_y = cp.asarray(y)
 
-    # # Loop over cupy functions (this is extremely inefficient at these dimensions, don't run this)
-    # d_out = cp.zeros(out.shape, dtype=cp.complex64)
-    # timer.start()
-    # for i in range(startIdx, idxlen):
-    #     outnormsq = cp.linalg.norm(d_y[i:i+x.size])
-    #     d_out[i,:] = d_y[i:i+x.size] * d_x / outnormsq
-    # timer.end("cupy")
-
     # Use the custom kernel
     timer.start()
     d_pdts = multiplySlidesNormalised(
@@ -493,6 +552,18 @@ if __name__ == "__main__":
     compareValues(
         d_pdts.get().flatten(),
         out.flatten()
+    )
+
+
+    # Testing the magn sq kernel
+    d_cp_yAbsSq = cp.abs(d_y)**2
+    print(d_cp_yAbsSq.dtype)
+    d_yAbsSq = cupyComplexMagnSq(d_y)
+    print(d_yAbsSq.dtype)
+
+    compareValues(
+        d_yAbsSq.get().flatten(),
+        d_cp_yAbsSq.get().flatten()
     )
 
 

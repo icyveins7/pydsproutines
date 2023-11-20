@@ -182,7 +182,8 @@ try:
         d_pdtsfft = cp.fft.fft(d_pdts, axis=1) 
 
         # We now have fft(x*y)/norm(y)/norm(x), so we take abs squared 
-        d_out = cp.abs(d_pdtsfft)**2
+        # d_out = cp.abs(d_pdtsfft)**2
+        d_out = cupyComplexMagnSq(d_pdtsfft, out_dtype=cp.float32) # Is faster now due to combined kernel!
 
         return d_out
 

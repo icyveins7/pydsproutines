@@ -383,7 +383,8 @@ def multiplySlidesNormalised(
     startIdx: int, # First index of d_y to start searching
     idxlen: int, # Number of searched indices i.e. [startIdx, startIdx+idxlen)
     THREADS_PER_BLOCK: int=128,
-    numSlidesPerBlk: int=None
+    numSlidesPerBlk: int=None,
+    coefficient: float=None # Extra constant coefficient to multiply, this should default to norm of d_x
 ):
     """
     Calls the slidingMultiplyNormalised kernel.
@@ -398,6 +399,14 @@ def multiplySlidesNormalised(
     # Check that the slides do not exceed bounds
     if startIdx < 0 or startIdx + idxlen > d_y.size:
         raise ValueError("startIdx and idxlen should be within the bounds of d_y.")
+    
+    # Compute norm of x if required
+    if coefficient is None:
+        coefficient = cp.array([cp.linalg.norm(d_x)], cp.float64) # Create a single element 1D array
+    # Make sure the type is okay
+    cupyRequireDtype(cp.float64, coefficient)
+    if coefficient.size!= 1:
+        raise ValueError("coefficient should be a single element 1D array.")
 
     # Calculate shared mem requirements
     if numSlidesPerBlk is None:
@@ -424,7 +433,8 @@ def multiplySlidesNormalised(
             startIdx,
             idxlen,
             d_pdts,
-            numSlidesPerBlk
+            numSlidesPerBlk,
+            coefficient
         ),
         shared_mem=smReq
     )
@@ -448,10 +458,13 @@ if __name__ == "__main__":
     idxlen = y.size - x.size + 1
     out = np.zeros((idxlen, x.size), dtype=np.complex64)
     
+    # pre-compute x norm
+    xnorm = np.linalg.norm(x)
+
     timer.start()
     for i in range(startIdx, idxlen):    
         outnormsq = np.linalg.norm(y[i:i+x.size])
-        out[i,:] = y[i:i+x.size] * x / outnormsq
+        out[i,:] = y[i:i+x.size] * x / outnormsq / xnorm
     timer.end("numpy")
     
     # Run the sliding multiply on gpu

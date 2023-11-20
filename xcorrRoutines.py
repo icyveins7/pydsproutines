@@ -181,10 +181,8 @@ try:
         # Perform the FFT on each row
         d_pdtsfft = cp.fft.fft(d_pdts, axis=1) 
 
-        # We now have fft(x*y)/norm(y), so we take abs squared 
-        # and normalise by the energy of cutout again
-        cutoutNormSq = cp.linalg.norm(cutout)**2.0
-        d_out = cp.abs(d_pdtsfft)**2 / cutoutNormSq
+        # We now have fft(x*y)/norm(y)/norm(x), so we take abs squared 
+        d_out = cp.abs(d_pdtsfft)**2
 
         return d_out
 

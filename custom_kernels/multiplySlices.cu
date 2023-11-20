@@ -114,7 +114,8 @@ void slidingMultiplyNormalised(
     const int startIdx, // the start index of the searched array to begin the sliding
     const int idxlen, // the total number of slides
     complex<float> *z, // the output array, which has dimensions (idxlen) rows * (xlen) columns, and is normalised by the normsq of the corresponding slice of y
-    int numSlidesPerBlk // this defines the number of slides to compute per block, and hence determines the workspace (which the caller must calculate correctly)
+    int numSlidesPerBlk, // this defines the number of slides to compute per block, and hence determines the workspace (which the caller must calculate correctly)
+    const double* coefficient // extra coefficient to multiply by (usually this is just the pre-computed energy i.e. normSq of x, the template)
 ){
     // allocate shared memory
     extern __shared__ double s[];
@@ -144,7 +145,7 @@ void slidingMultiplyNormalised(
             s_ysection[t] = y[ysectionOffset + t];
             // Initialize the first normSq workspace values while reading in
             if (t < xlen) // Each thread accumulates in its own index in the workspace
-                s_ws[threadIdx.x] += (double)norm(yt); // 'norm' is actually normsq -> See cupy/cupy/_core/include/cupy/complex/complex.h
+                s_ws[threadIdx.x] += (double)norm(yt); // 'norm' is actually magn squared -> See cupy/cupy/_core/include/cupy/complex/complex.h
             // Accumulate as doubles to maintain some good precision
         }
         else
@@ -185,7 +186,8 @@ void slidingMultiplyNormalised(
             // and add the energy of the element at the end
             normSq = normSq - (double)norm(s_ysection[i-1]) + (double)norm(s_ysection[i+xlen-1]);
         }
-        normalisation = (float)sqrt(normSq); // note that we later divide by the norm, not the normSq!
+        // Compute normalisation with the coefficient
+        normalisation = (float)(sqrt(normSq) * *coefficient); // note that we later divide by the norm, not the normSq!
 
         // Inner loop: Simply multiply and write to global mem, doing it this way lets us conveniently write to contiguous global mem
         for (int t = threadIdx.x; t < xlen; t += blockDim.x)

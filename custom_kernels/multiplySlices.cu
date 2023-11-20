@@ -165,15 +165,16 @@ void slidingMultiplyNormalised(
         __syncthreads();
     }
 
-    // Now extract the first normSq value for the first slide in this block
-    double normSq = s_ws[0]; // broadcast to everyone
+    
 
     // Define stack-variables for the thread
     int row_offset;
     complex<float> zt;
     float normalisation;
 
-    // Begin the sliding multiplies; outer loop 
+    // v1: Begin the sliding multiplies; outer loop 
+    // Now extract the first normSq value for the first slide in this block
+    double normSq = s_ws[0]; // broadcast to everyone
     for (int i = 0; i < numSlidesThisBlk; i++) // we only compute the necessary number of slides
     {
         // Define the starting output index for this slide (skip the block, then skip the index as well)
@@ -199,4 +200,38 @@ void slidingMultiplyNormalised(
         }
             
     } // End outer loop
+
+    // // v2: Begin sliding multiplies; store s_x in registers first to alleviate register pressure
+    // // this turns out to be slower..
+    // complex<float> xt;
+    // double normSq;
+    // for (int t = threadIdx.x; t < xlen; t += blockDim.x)
+    // {
+    //     // Read this thread's value
+    //     xt = s_x[t];
+
+    //     // Before we enter inner loop, refresh the normSq to the shared mem value
+    //     normSq = s_ws[0];
+
+    //     // Inner loop
+    //     for (int i = 0; i < numSlidesThisBlk; i++)
+    //     {
+    //         /// Define the starting output index for this slide (skip the block, then skip the index as well)
+    //         row_offset = blockIdx.x * numSlidesPerBlk + i;
+
+    //         // Re-calculate the norm for this slide
+    //         if (i != 0)
+    //         {
+    //             // Remove the energy of the element before the start,
+    //             // and add the energy of the element at the end
+    //             normSq = normSq - (double)norm(s_ysection[i-1]) + (double)norm(s_ysection[i+xlen-1]);
+    //         }
+    //         // Compute normalisation with the coefficient
+    //         normalisation = (float)(sqrt(normSq) * *coefficient); // note that we later divide by the norm, not the normSq!
+
+    //         // Inner calculation: reference thread value of x and multiply with sharedmem value of y
+    //         zt = xt * s_ysection[i+t] / normalisation;
+    //         z[row_offset * xlen + t] = zt;
+    //     }
+    // } // End outer loop
 }

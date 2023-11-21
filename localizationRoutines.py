@@ -45,18 +45,17 @@ def ecef2geodeticLLA(x: np.ndarray):
     if x.ndim == 1 and x.size == 3:
         x = x.reshape((1, 3))
         
-    # Multiple 3-d positions, one in each row
-    if x.shape[1] == 3:
-        lle_list = np.zeros(x.shape)
-        for i, row in enumerate(x):
-            pos = ITRSPosition(Distance(m=row))
-            latlonele = wgs84.subpoint(pos.at(now))
-            lle_list[i,:] = latlonele.latitude.degrees, latlonele.longitude.degrees, latlonele.elevation.m
-
-        return lle_list
+    # Multiple 3-d positions, one in each column
+    if x.shape[0] == 3:
+        pos = ITRSPosition(Distance(m=x)) # This accepts a 3xN array directly
+        latlonele = wgs84.geographic_position_of(pos.at(now))
+        lle_arr = np.vstack(
+            (latlonele.latitude.degrees, latlonele.longitude.degrees, latlonele.elevation.m)
+        )
+        return lle_arr
 
     else:
-        raise ValueError("Invalid dimensions.")
+        raise ValueError("Invalid dimensions; expected 3xN.")
 
 #%% Doppler convention routines
 def calculateRangeRate(

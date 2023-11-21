@@ -19,11 +19,28 @@ class EditConfigWindow:
         self._renderSignalsTab()
         self._renderSourcesTab()
         self._renderProcessesTab()
+        self._renderWorkspacesTab()
 
     def _renderSignalsTab(self):
         with dpg.tab(label="Signals", parent=self.tab_bar):
-            pass
-
+            signals = self.cfg.allSignals
+            # Create a table for the signals
+            # Refer to SignalSectionProxy for details
+            with dpg.table():
+                columns = [
+                    'target_fc',
+                    'baud',
+                    'numPeriodBits',
+                    'numBurstBits',
+                    'numGuardBits',
+                    'numBursts',
+                    'hasChannels',
+                    'channelSpacingHz'
+                ]
+                for col in columns:
+                    dpg.add_table_column(label=col)
+                
+                
     def _renderSourcesTab(self):
         with dpg.tab(label="Sources", parent=self.tab_bar):
             pass
@@ -32,6 +49,9 @@ class EditConfigWindow:
         with dpg.tab(label="Processes", parent=self.tab_bar):
             pass
 
+    def _renderWorkspacesTab(self):
+        with dpg.tab(label="Workspaces", parent=self.tab_bar):
+            pass
 
 
 

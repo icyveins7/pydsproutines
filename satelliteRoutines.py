@@ -34,7 +34,7 @@ class Satellite(EarthSatellite):
 #%% Below we list some common functionality in wrapped functions
 # They are more of a quick reference so we don't have to look it up in the docs.
 
-def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float):
+def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float|list):
     """
     Propagate a satellite to a GPSTime.
     Note that this is not a very optimized function.
@@ -43,8 +43,8 @@ def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float):
     ----------
     satellite : EarthSatellite
         A satellite class instance.
-    gpstime : float
-        A GPS time that is locked to UTC.
+    gpstime : float or list
+        A GPS time or list of times that is locked to UTC.
 
     Returns
     -------
@@ -53,9 +53,18 @@ def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float):
         You probably want to turn this into another frame.
     """
     ts = load.timescale()
-    dd = dt.datetime.fromtimestamp(gpstime, tz=dt.timezone.utc)
-    t = ts.utc(dd.year, dd.month, dd.day, dd.hour, dd.minute, dd.second+dd.microsecond/1e6)
+    if isinstance(gpstime, float):
+        dd = [dt.datetime.fromtimestamp(gpstime, tz=dt.timezone.utc)]
+    elif isinstance(gpstime, list):
+        dd = [dt.datetime.fromtimestamp(i, tz=dt.timezone.utc) for i in gpstime]
+    else:
+        raise TypeError("gpstime must be float or list")
+    t = ts.from_datetimes(dd) # Array container, this lets you avoid multiple .at() calls
     return satellite.at(t)
+
+    # dd = dt.datetime.fromtimestamp(gpstime, tz=dt.timezone.utc)
+    # t = ts.utc(dd.year, dd.month, dd.day, dd.hour, dd.minute, dd.second+dd.microsecond/1e6)
+    # return satellite.at(t)
 
 def sf_geocentric_to_itrs(geocentric: Geocentric, returnVelocity: bool=False):
     """
@@ -108,4 +117,31 @@ if __name__ == "__main__":
     print(e)
     print(r)
     print(v)
+
+    ### Create Satellite object
+    print("===================================")
+    from timingRoutines import Timer
+    timer = Timer()
+
+    sat = Satellite(s, t, const=WGS84)
+    t = [i + 1575849600.0 for i in range(0, 86400)]
+    satgc = sf_propagate_satellite_to_gpstime(sat, t)
+
+    # Go to LLA using skyfield
+    timer.start()
+    satgc_geog = wgs84.geographic_position_of(satgc)
+    satgc_lla = np.vstack((satgc_geog.latitude.degrees, satgc_geog.longitude.degrees, satgc_geog.elevation.m))
+    timer.end("direct to geodetic LLA")
+    print(satgc_lla)
+
+    # Go to LLA using ITRS first, then custom conversion
+    from localizationRoutines import *
+    timer.start()
+    satecef = sf_geocentric_to_itrs(satgc)
+    timer.evt("to ITRS")
+    # print(satecef.m)
+    satecef_lla = ecef2geodeticLLA(satecef.m)
+    timer.end("then to geodetic LLA")
+    print(satecef_lla)
+    
     

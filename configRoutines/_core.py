@@ -124,7 +124,7 @@ class SourceSectionProxy(SectionProxy):
     
     @property
     def conjSamples(self):
-        return self.getbool('conjSamples')
+        return self.getboolean('conjSamples')
     
     @property
     def headerBytes(self):
@@ -140,8 +140,11 @@ class SourceSectionProxy(SectionProxy):
         Assumed to be in units deg,deg,m.
         """
         llastr = self.get('lonlatalt')
-        lon,lat,alt = [float(i) for i in llastr.split(",")]
-        return lon, lat, alt
+        if llastr is not None:
+            lon,lat,alt = [float(i) for i in llastr.split(",")]
+            return lon, lat, alt
+        else:
+            return None
     
 #%%
 class SignalSectionProxy(SectionProxy):

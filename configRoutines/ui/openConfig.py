@@ -34,6 +34,7 @@ class OpenConfigDialog:
             callback=self._open_config,
             parent=self.window
         )
+        dpg.add_separator(parent=self.window)
 
     def _config_file_selector(self, sender, app_data, user_data):
         with dpg.file_dialog(
@@ -90,9 +91,29 @@ class OpenConfigDialog:
 
     def _add_editConfig(self, cfgpath: str, isNew: bool=True):
         dspcfg = DSPConfig.new(cfgpath, allow_no_value=True) if isNew else DSPConfig(cfgpath)
+
+        # Create the two widgets in this open config window
+        cfgWidgetGroup = dpg.add_group(horizontal=True, parent=self.window)
+        dpg.add_text(cfgpath, parent=cfgWidgetGroup)
+        dpg.add_button(
+            label="X",
+            callback=self._del_editConfig,
+            user_data=[cfgpath],
+            parent=cfgWidgetGroup)
+
+        # Store it
         self.cfgDict[cfgpath] = (
-            dpg.add_text(cfgpath, parent=self.window),
-            EditConfigWindow(dspcfg,cfgpath)
+            cfgWidgetGroup,
+            EditConfigWindow(dspcfg,cfgpath,self)
         )
+
+    def _del_editConfig(self, sender, app_data, user_data):
+        # To be called by the edit config window
+        cfgpath, = user_data # Unpack the cfgpath which is the key
+        # Pop it from the cfgDict
+        cfgWidgets = self.cfgDict.pop(cfgpath)
+        dpg.delete_item(cfgWidgets[0])
+        dpg.delete_item(cfgWidgets[1].window)
+        print("Cleaned up %s widgets" % (cfgpath))
 
 

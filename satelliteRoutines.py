@@ -34,7 +34,7 @@ class Satellite(EarthSatellite):
 #%% Below we list some common functionality in wrapped functions
 # They are more of a quick reference so we don't have to look it up in the docs.
 
-def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float|list):
+def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float):
     """
     Propagate a satellite to a GPSTime.
     Note that this is not a very optimized function.
@@ -43,8 +43,8 @@ def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float|list)
     ----------
     satellite : EarthSatellite
         A satellite class instance.
-    gpstime : float or list
-        A GPS time or list of times that is locked to UTC.
+    gpstime : float or list or np.ndarray
+        A GPS time or iterable of times that is locked to UTC.
 
     Returns
     -------
@@ -55,16 +55,12 @@ def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float|list)
     ts = load.timescale()
     if isinstance(gpstime, float):
         dd = [dt.datetime.fromtimestamp(gpstime, tz=dt.timezone.utc)]
-    elif isinstance(gpstime, list):
+    elif hasattr(gpstime, "__iter__") and not isinstance(gpstime, str):
         dd = [dt.datetime.fromtimestamp(i, tz=dt.timezone.utc) for i in gpstime]
     else:
-        raise TypeError("gpstime must be float or list")
+        raise TypeError("gpstime must be float or iterable")
     t = ts.from_datetimes(dd) # Array container, this lets you avoid multiple .at() calls
     return satellite.at(t)
-
-    # dd = dt.datetime.fromtimestamp(gpstime, tz=dt.timezone.utc)
-    # t = ts.utc(dd.year, dd.month, dd.day, dd.hour, dd.minute, dd.second+dd.microsecond/1e6)
-    # return satellite.at(t)
 
 def sf_geocentric_to_itrs(geocentric: Geocentric, returnVelocity: bool=False):
     """

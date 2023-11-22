@@ -24,6 +24,7 @@ class OpenConfigDialog:
                 callback=self._open_config,
                 on_enter=True
             )
+            dpg.focus_item(self.cfgPathInput)
             dpg.add_button(
                 label="Browse",
                 callback=self._config_file_selector

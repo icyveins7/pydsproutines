@@ -11,3 +11,16 @@ def centreModal(modalId):
         [(viewportWidth - modalWidth) // 2,
         (viewportHeight - modalHeight) // 2]
     )
+
+def getAppropriateInput(type, *args, **kwargs):
+    inputWidgets = {
+        int: dpg.add_input_int,
+        float: dpg.add_input_double,
+        str: dpg.add_input_text,
+        bool: dpg.add_checkbox
+    }
+    return inputWidgets[type](*args, **kwargs)
+
+def setValueIfNotNone(widget, value):
+    if value is not None:
+        dpg.set_value(widget, value)

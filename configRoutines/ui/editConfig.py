@@ -1,6 +1,7 @@
 import dearpygui.dearpygui as dpg
 
 from .._core import *
+from .helpers import getAppropriateInput, setValueIfNotNone
 
 #%%
 class EditConfigWindow:
@@ -49,40 +50,40 @@ class EditConfigWindow:
                     with dpg.table_row():
                         # Add cell for name
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, signalName)
+                            inputWidget = getAppropriateInput(str, width=-1)
+                            dpg.set_value(inputWidget, signalName)
                         # Add cell for target_fc
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, signal.target_fc)
+                            inputWidget = getAppropriateInput(float, width=-1)
+                            setValueIfNotNone(inputWidget, signal.target_fc)
                         # Add cell for baud
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, signal.baud)
+                            inputWidget = getAppropriateInput(float, width=-1)
+                            setValueIfNotNone(inputWidget, signal.baud)
                         # Add cell for numPeriodBits
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, signal.numPeriodBits)
+                            inputWidget = getAppropriateInput(int, width=-1)
+                            setValueIfNotNone(inputWidget, signal.numPeriodBits)
                         # Add cell for numBurstBits
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, signal.numBurstBits)
+                            inputWidget = getAppropriateInput(int, width=-1)
+                            setValueIfNotNone(inputWidget, signal.numBurstBits)
                         # Add cell for numGuardBits
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, signal.numGuardBits)
+                            inputWidget = getAppropriateInput(int, width=-1)
+                            setValueIfNotNone(inputWidget, signal.numGuardBits)
                         # Add cell for numBursts
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, signal.numBursts)
+                            inputWidget = getAppropriateInput(int, width=-1)
+                            setValueIfNotNone(inputWidget, signal.numBursts)
                         # Add cell for hasChannels
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, signal.hasChannels)
+                            inputWidget = getAppropriateInput(bool)
+                            setValueIfNotNone(inputWidget, signal.hasChannels)
                         # Add cell for channelSpacingHz
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, signal.channelSpacingHz)
+                            inputWidget = getAppropriateInput(float, width=-1)
+                            setValueIfNotNone(inputWidget, signal.channelSpacingHz)
                     
                 
                 
@@ -109,36 +110,36 @@ class EditConfigWindow:
                     with dpg.table_row():
                         # Add cell for name
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, sourceName)
+                            inputWidget = dpg.add_input_text(width=-1)
+                            dpg.set_value(inputWidget, sourceName)
                         # Add cell for srcdir
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, source.srcdir)
+                            inputWidget = dpg.add_input_text(width=-1)
+                            dpg.set_value(inputWidget, source.srcdir)
                         # Add cell for fs
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, source.fs)
+                            inputWidget = dpg.add_input_text(width=-1)
+                            dpg.set_value(inputWidget, source.fs)
                         # Add cell for fc
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, source.fc)
+                            inputWidget = dpg.add_input_text(width=-1)
+                            dpg.set_value(inputWidget, source.fc)
                         # Add cell for conjSamples
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, source.conjSamples)
+                            inputWidget = dpg.add_input_text(width=-1)
+                            dpg.set_value(inputWidget, source.conjSamples)
                         # Add cell for headerBytes
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, source.headerBytes)
+                            inputWidget = dpg.add_input_text(width=-1)
+                            dpg.set_value(inputWidget, source.headerBytes)
                         # Add cell for dtype
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, source.dtype)
+                            inputWidget = dpg.add_input_text(width=-1)
+                            dpg.set_value(inputWidget, source.dtype)
                         # Add cell for lonlatalt
                         with dpg.table_cell():
-                            inputText = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputText, source.lonlatalt)
+                            inputWidget = dpg.add_input_text(width=-1)
+                            dpg.set_value(inputWidget, source.lonlatalt)
                             
 
     def _renderProcessesTab(self):

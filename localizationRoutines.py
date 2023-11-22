@@ -18,9 +18,9 @@ from satelliteRoutines import *
 import skyfield.api
 
 #%% Coordinate transformations
-def geodeticLLA2ecef(lat_rad, lon_rad, h):
+def geodeticLLA2ecef(lat_rad, lon_rad, h, checkRanges=False):
     # Some error checking
-    if np.abs(lat_rad) > np.pi/2 or np.abs(lon_rad) > np.pi:
+    if checkRanges and (np.any(np.abs(lat_rad) > np.pi/2) or np.any(np.abs(lon_rad) > np.pi)):
         raise ValueError("Latitude and longitude magnitudes are too large. Did you forget to convert to radians?")
     # This should replicate wgs84.latlon().itrs_xyz.m (which also works on arrays)
     # Speedwise, this is about 2-3x faster, since it skips all the object instantiations
@@ -67,10 +67,15 @@ def calculateRangeRate(
     # We use the direction of the wave
     dirvec = rx_x - tx_x
     # Normalise by it
-    dirvec = dirvec/np.linalg.norm(dirvec)
+    if dirvec.ndim == 1:
+        dirvec = dirvec.reshape((1,3)) # Ensure its a 2D row
+    elif dirvec.shape[1] != 3:
+        raise ValueError("Direction vectors (rx_x - tx_x) must be a Nx3 array.")
+    dirvec = dirvec/(np.linalg.norm(dirvec, axis=1).reshape((-1,1)))
     # Find the speed parallel to this direction vector
-    tx_xdot_p = np.dot(tx_xdot, dirvec)
-    rx_xdot_p = np.dot(rx_xdot, dirvec)
+    tx_xdot_p = np.dot(dirvec, tx_xdot) # This ordering of dirvec first lets us have multiple rows of dirvecs dotted with a single 1D xdot array
+    rx_xdot_p = np.dot(dirvec, rx_xdot)
+    
     # The range rate is characterised by the (rx speed - tx speed)
     # This can be seen by noting the conditions for rx and tx respectively
     # If RX moves away from the incoming wave ie same direction, 

@@ -13,34 +13,32 @@ class OpenConfigDialog:
 
     def run(self):
         # Show a window that lets you open a config file
-        with dpg.window(label="Open a config file", 
-                        width=700, height=150,
-                        no_close=True) as window:
-            with dpg.group(horizontal=True):
-                cfgPathInput = dpg.add_input_text(
-                    label="Config filepath",
-                    callback=self._open_config,
-                    on_enter=True,
-                    user_data=[window]
-                )
-                dpg.add_button(
-                    label="Browse",
-                    callback=self._config_file_selector,
-                    user_data=cfgPathInput
-                )
-            dpg.add_button(
-                label="Open config",
+        self.window = dpg.add_window(
+            label="Open a config file", 
+            width=700, height=150,
+            no_close=True)
+        
+        with dpg.group(horizontal=True, parent=self.window):
+            self.cfgPathInput = dpg.add_input_text(
+                label="Config filepath",
                 callback=self._open_config,
-                user_data=[cfgPathInput, window]
+                on_enter=True
+            )
+            dpg.add_button(
+                label="Browse",
+                callback=self._config_file_selector
             )
 
+        dpg.add_button(
+            label="Open config",
+            callback=self._open_config,
+            parent=self.window
+        )
+
     def _config_file_selector(self, sender, app_data, user_data):
-        """
-        Expects user_data to be the input_text id/tag.
-        """
         with dpg.file_dialog(
             callback=lambda dialog, dialog_data: [dpg.set_value(
-                user_data, # This is the tag for the path input passed in
+                self.cfgPathInput, # This is the tag for the path input passed in
                 item # This is the key for the path selected
             ) for key, item in dialog_data['selections'].items()],
             # Although we use a list comprehension, we assume only 1 item, so it reads the last one
@@ -50,25 +48,10 @@ class OpenConfigDialog:
             dpg.add_file_extension(".*")
 
     def _open_config(self, sender, app_data, user_data):
-        """
-        Expects user_data to be the input_text id/tag.
-        """
-        if len(user_data) > 1:
-            cfgpathInput, parent = user_data
-            # print("Found cfgpathInput from user_data: ", cfgpathInput)
-        else:
-            parent, = user_data
-            cfgpathInput = sender
-            # print("Found cfgpathInput as sender: ", cfgpathInput)
-        cfgpath = dpg.get_value(cfgpathInput)
+        cfgpath = dpg.get_value(self.cfgPathInput)
         if os.path.exists(cfgpath):
             # Then open it
-            self.cfgDict[cfgpath] = (
-                dpg.add_text(cfgpath, parent=parent),
-                EditConfigWindow(
-                    DSPConfig(cfgpath), cfgpath
-                )
-            )
+            self._add_editConfig(cfgpath, isNew=False)
 
         else:
             # Ask whether we want to create the config
@@ -88,36 +71,28 @@ class OpenConfigDialog:
                     dpg.add_button(
                         label="Yes",
                         callback=self._create_config,
-                        user_data=[cfgpath, popupModal, parent]
+                        user_data=[cfgpath, popupModal]
                     )
                     dpg.add_button(
                         label="No",
                         callback=self._create_config,
-                        user_data=[None, popupModal, parent]
+                        user_data=[None, popupModal]
                     )
 
         print(self.cfgDict)
 
     def _create_config(self, sender, app_data, user_data):
-        cfgpath, popupModal, parent = user_data
+        cfgpath, popupModal = user_data
         # Create the new config
         if cfgpath is not None:
-            self.cfgDict[cfgpath] = (
-                dpg.add_text(cfgpath, parent=parent),
-                EditConfigWindow(
-                    DSPConfig.new(cfgpath, allow_no_value=True),
-                    cfgpath
-                )
-            )
+            self._add_editConfig(cfgpath, isNew=True)
         dpg.configure_item(popupModal, show=False)
 
-    def _add_editConfig(self, cfgpath: str):
-        # TODO: use this to refactor?
+    def _add_editConfig(self, cfgpath: str, isNew: bool=True):
+        dspcfg = DSPConfig.new(cfgpath, allow_no_value=True) if isNew else DSPConfig(cfgpath)
         self.cfgDict[cfgpath] = (
             dpg.add_text(cfgpath, parent=self.window),
-            EditConfigWindow(
-                DSPConfig.new(cfgpath, allow_no_value=True), cfgpath
-            )
+            EditConfigWindow(dspcfg,cfgpath)
         )
 
 

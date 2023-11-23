@@ -6,6 +6,12 @@ from .helpers import CheckboxEnabledWidget
 
 #%%
 class ConfigPairedWidget(CheckboxEnabledWidget):
+    def __init__(self, enabled: bool, type: type, *args, **kwargs):
+        if type != bool:
+            super().__init__(enabled, type, *args, width=-1, **kwargs)
+        else:
+            super().__init__(enabled, type, *args, **kwargs)
+
     def on_checkbox_changed(self, sender, app_data, user_data):
         super().on_checkbox_changed(sender, app_data, user_data)
         print('hello')
@@ -64,17 +70,21 @@ class EditConfigWindow:
                         # Make paired widgets for each column
                         for col in columns:
                             key, castType = col
+                            if key == 'name': # Skip name column
+                                continue
+
                             with dpg.table_cell():
                                 # If key exists, we enable it
                                 try:
-                                    val = castType(signal.get(key))
-                                    enabled = True
+                                    rawval = signal.get(key)
+                                    enabled = False if rawval is None else True
+                                    val = castType(rawval)
                                 except (KeyError, TypeError):
                                     val = None
                                     enabled = False
 
                                 cpw = ConfigPairedWidget(
-                                    enabled, castType, width=-1
+                                    enabled, castType
                                 )
                                 setValueIfNotNone(cpw.widget, val)
                 

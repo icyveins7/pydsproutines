@@ -69,7 +69,7 @@ class EditConfigWindow:
                                 try:
                                     val = castType(signal.get(key))
                                     enabled = True
-                                except KeyError:
+                                except (KeyError, TypeError):
                                     val = None
                                     enabled = False
 

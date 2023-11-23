@@ -19,10 +19,27 @@ class ConfigPairedWidget(CheckboxEnabledWidget):
 
 #%%
 class EditConfigWindow:
+    signalColumns = [
+        ('name', str),
+        ('target_fc', float),
+        ('baud', float),
+        ('numPeriodBits', int),
+        ('numBurstBits', int),
+        ('numGuardBits', int),
+        ('numBursts', int),
+        ('hasChannels', bool),
+        ('channelSpacingHz', float)
+    ]
+
     def __init__(self, cfg: DSPConfig, cfgpath: str, openCfgObject):
         self.cfg = cfg
         self.cfgpath = cfgpath
         self.openCfgObject = openCfgObject
+        
+        # Containers for widgets
+        self.signalWidgets = dict()
+
+        # Render on init
         self._initialRender()
 
     def _initialRender(self):
@@ -33,62 +50,122 @@ class EditConfigWindow:
             on_close=self.openCfgObject._del_editConfig,
             user_data=[self.cfgpath]
         )
+
+        # Buttons for controls
+        with dpg.group(horizontal=True, parent=self.window):
+            dpg.add_button(
+                label="Write Changes",
+                callback=self._writeChanges
+            )
+            dpg.add_button(
+                label="Reset",
+                callback=self._resetConfig
+            )
+        dpg.add_separator(parent=self.window)
         
         self.tab_bar = dpg.add_tab_bar(parent=self.window)
-        self._renderSignalsTab()
+        self._renderSignalsTab(renderRows=True)
         self._renderSourcesTab()
         self._renderProcessesTab()
         self._renderWorkspacesTab()
 
-    def _renderSignalsTab(self):
+    def _writeChanges(self):
+        pass
+
+    def _resetConfig(self):
+        # Reload the config from the file
+        self.cfg = DSPConfig(self.cfgpath)
+
+        # Re-render everything
+        self._renderSignalsRows(clearBefore=True)
+
+
+    def _renderSignalsTab(self, renderRows: bool=False):
         with dpg.tab(label="Signals", parent=self.tab_bar):
-            signals = self.cfg.allSignals
             # Create a table for the signals
             # Refer to SignalSectionProxy for details
-            with dpg.table():
-                columns = [
-                    ('name', str),
-                    ('target_fc', float),
-                    ('baud', float),
-                    ('numPeriodBits', int),
-                    ('numBurstBits', int),
-                    ('numGuardBits', int),
-                    ('numBursts', int),
-                    ('hasChannels', bool),
-                    ('channelSpacingHz', float)
-                ]
-                for col in columns:
+            with dpg.table(
+                resizable=True,
+                row_background=True,
+                borders_outerH=True, borders_innerH=True,
+                borders_innerV=True, borders_outerV=True
+            ) as table:
+                # Store this widget into container for reference later
+                self.signalWidgets['table'] = table
+
+                for col in self.signalColumns:
                     dpg.add_table_column(label=col[0])
 
-                for signalName, signal in signals.items():
-                    with dpg.table_row():
-                        # Make cell for name first, always there
-                        with dpg.table_cell():
-                            inputWidget = getAppropriateInput(str, width=-1)
-                            dpg.set_value(inputWidget, signalName)
+                # Render rows if asked for
+                if renderRows:
+                    self._renderSignalsRows()
 
-                        # Make paired widgets for each column
-                        for col in columns:
-                            key, castType = col
-                            if key == 'name': # Skip name column
-                                continue
+            # Row button adder
+            dpg.add_button(
+                label="Add Row",
+                width=-1,
+                callback=self._createSignalRow
+            )
 
-                            with dpg.table_cell():
-                                # If key exists, we enable it
-                                try:
-                                    rawval = signal.get(key)
-                                    enabled = False if rawval is None else True
-                                    val = castType(rawval)
-                                except (KeyError, TypeError):
-                                    val = None
-                                    enabled = False
+    def _createSignalRow(self):
+        rowWidgets = dict()
+        with dpg.table_row(parent=self.signalWidgets['table']) as row:
+            # Save rows for reference
+            try:
+                self.signalWidgets['rows'].append(row)
+            except KeyError:
+                self.signalWidgets['rows'] = [row]  
 
-                                cpw = ConfigPairedWidget(
-                                    enabled, castType
-                                )
-                                setValueIfNotNone(cpw.widget, val)
-                
-                
+            # Make cell for name first, always there
+            with dpg.table_cell(parent=row) as cell:
+                inputWidget = getAppropriateInput(str, width=-1, parent=cell)
+                rowWidgets['name'] = inputWidget
+
+            # Make paired widgets for each column
+            for col in self.signalColumns:
+                key, castType = col
+                if key == 'name': # Skip name column
+                    continue
+
+                with dpg.table_cell(parent=row):
+                    cpw = ConfigPairedWidget(
+                        False, castType
+                    )
+                    rowWidgets[key] = cpw
+        
+        return rowWidgets
+
+            
+    
+    def _renderSignalsRows(self, clearBefore: bool=False):
+        if clearBefore:
+            print(self.signalWidgets['rows'])
+            for row in self.signalWidgets['rows']:
+                dpg.delete_item(row)
+            self.signalWidgets['rows'].clear()
+        # Load all signals from the config
+        signals = self.cfg.allSignals
+        print("Rendering signal rows")
+        for signalName, signal in signals.items():
+            # Create the base row
+            rowWidgets = self._createSignalRow()
+            # Set the values of the row
+            dpg.set_value(rowWidgets['name'], signalName)
+            for col in self.signalColumns:
+                key, castType = col
+                if key == 'name': # Skip name column
+                    continue
+                # If key exists, we enable it
+                try:
+                    rawval = signal.get(key)
+                    enabled = False if rawval is None else True
+                    val = castType(rawval)
+                except (KeyError, TypeError):
+                    val = None
+                    enabled = False
+
+                rowWidgets[key].trigger_enabled(enabled, val)
+                     
     def _renderSourcesTab(self):
         with dpg.tab(label="Sources", parent=self.tab_bar):
             sources = self.cfg.allSources
@@ -147,4 +224,6 @@ class EditConfigWindow:
 
 
 
+
+# %%
 

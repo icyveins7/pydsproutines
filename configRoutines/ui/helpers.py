@@ -13,6 +13,15 @@ def centreModal(modalId):
     )
 
 def getAppropriateInput(type, *args, **kwargs):
+    """
+    Calls the appropriate dpg.add_input_ function for the given type,
+    and passes all args and kwargs.
+
+    int: dpg.add_input_int
+    float: dpg.add_input_float
+    str: dpg.add_input_text
+    bool: dpg.add_checkbox
+    """
     inputWidgets = {
         int: dpg.add_input_int,
         float: dpg.add_input_double,
@@ -37,7 +46,7 @@ class CheckboxEnabledWidget:
     in order to maintain the widget appear/disappear callback.
     """
     def __init__(self, enabled: bool, type: type, *args, **kwargs):
-        self.checkbox = dpg.add_checkbox(label="field enabled?") # Defaults to False
+        self.checkbox = dpg.add_checkbox(label="enabled?") # Defaults to False
         # Tick the box on creation if desired
         if enabled:
             dpg.set_value(self.checkbox, True)
@@ -52,3 +61,12 @@ class CheckboxEnabledWidget:
     def on_checkbox_changed(self, sender, app_data, user_data):
         # Always enable/disable the widget depending on it
         dpg.configure_item(self.widget, show=dpg.get_value(self.checkbox))
+
+    def trigger_enabled(self, enabled: bool, widgetValue=None):
+        if enabled:
+            dpg.set_value(self.checkbox, True)
+            dpg.configure_item(self.widget, show=True)
+            setValueIfNotNone(self.widget, widgetValue)
+        else:
+            dpg.set_value(self.checkbox, False)
+            dpg.configure_item(self.widget, show=False)

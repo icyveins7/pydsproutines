@@ -70,7 +70,11 @@ class EditConfigWindow:
         self._renderWorkspacesTab()
 
     def _writeChanges(self):
-        pass
+        self._writeSignals()
+
+        # Dump to file
+        with open(self.cfgpath, 'w') as cfgfile:
+            self.cfg.write(cfgfile)
 
     def _resetConfig(self):
         # Reload the config from the file
@@ -78,6 +82,32 @@ class EditConfigWindow:
 
         # Re-render everything
         self._renderSignalsRows(clearBefore=True)
+
+    ####################### Signals ########################
+    def _writeSignals(self):
+        existingSignals = self.cfg.allSignals
+        # Read each row of the widgets
+        for cellRow in self.signalWidgets['cells']:
+            # Check if the name exists
+            signalName = dpg.get_value(cellRow['name'])
+            if signalName in existingSignals:
+                # Amend
+                for key, _ in self.signalColumns:
+                    if key == 'name':
+                        continue
+
+                    # If enabled then set it config
+                    if dpg.get_value(cellRow[key].checkbox):
+                        self.cfg.getSig(signalName)[key] = str(dpg.get_value(
+                            cellRow[key].widget
+                        ))
+                    else: # Otherwise remove it
+                        if key in self.cfg.getSig(signalName):
+                            self.cfg.getSig(signalName).pop(key)
+
+            else:
+                # Create new one
+                pass # TODO
 
 
     def _renderSignalsTab(self, renderRows: bool=False):
@@ -133,6 +163,11 @@ class EditConfigWindow:
                     )
                     rowWidgets[key] = cpw
         
+        try:
+            self.signalWidgets['cells'].append(rowWidgets)
+        except KeyError:
+            self.signalWidgets['cells'] = [rowWidgets]
+        
         return rowWidgets
 
             
@@ -143,6 +178,8 @@ class EditConfigWindow:
             for row in self.signalWidgets['rows']:
                 dpg.delete_item(row)
             self.signalWidgets['rows'].clear()
+            # Clear the cells too
+            self.signalWidgets['cells'].clear()
         # Load all signals from the config
         signals = self.cfg.allSignals
         print("Rendering signal rows")
@@ -165,7 +202,8 @@ class EditConfigWindow:
                     enabled = False
 
                 rowWidgets[key].trigger_enabled(enabled, val)
-                     
+
+    ##################### Sources ########################
     def _renderSourcesTab(self):
         with dpg.tab(label="Sources", parent=self.tab_bar):
             sources = self.cfg.allSources

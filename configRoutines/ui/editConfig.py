@@ -96,53 +96,45 @@ class EditConfigWindow:
             # Refer to SourceSectionProxy for details
             with dpg.table():
                 columns = [
-                    'name',
-                    'srcdir',
-                    'fs',
-                    'fc',
-                    'conjSamples',
-                    'headerBytes',
-                    'dtype'
-                    'lonlatalt'
+                    ('name', str),
+                    ('srcdir', str),
+                    ('fs', float),
+                    ('fc', float),
+                    ('conjSamples', bool),
+                    ('headerBytes', int),
+                    ('dtype', str),
+                    ('lonlatalt', str)
                 ]
                 for col in columns:
-                    dpg.add_table_column(label=col)
+                    dpg.add_table_column(label=col[0])
 
                 for sourceName, source in sources.items():
                     with dpg.table_row():
-                        # Add cell for name
+                        # Make cell for name first, always there
                         with dpg.table_cell():
-                            inputWidget = dpg.add_input_text(width=-1)
+                            inputWidget = getAppropriateInput(str, width=-1)
                             dpg.set_value(inputWidget, sourceName)
-                        # Add cell for srcdir
-                        with dpg.table_cell():
-                            inputWidget = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputWidget, source.srcdir)
-                        # Add cell for fs
-                        with dpg.table_cell():
-                            inputWidget = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputWidget, source.fs)
-                        # Add cell for fc
-                        with dpg.table_cell():
-                            inputWidget = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputWidget, source.fc)
-                        # Add cell for conjSamples
-                        with dpg.table_cell():
-                            inputWidget = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputWidget, source.conjSamples)
-                        # Add cell for headerBytes
-                        with dpg.table_cell():
-                            inputWidget = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputWidget, source.headerBytes)
-                        # Add cell for dtype
-                        with dpg.table_cell():
-                            inputWidget = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputWidget, source.dtype)
-                        # Add cell for lonlatalt
-                        with dpg.table_cell():
-                            inputWidget = dpg.add_input_text(width=-1)
-                            dpg.set_value(inputWidget, source.lonlatalt)
-                            
+
+                        # Make paired widgets for each column
+                        for col in columns:
+                            key, castType = col
+                            if key == 'name': # Skip name column
+                                continue
+
+                            with dpg.table_cell():
+                                # If key exists, we enable it
+                                try:
+                                    rawval = source.get(key)
+                                    enabled = False if rawval is None else True
+                                    val = castType(rawval)
+                                except (KeyError, TypeError):
+                                    val = None
+                                    enabled = False
+
+                                cpw = ConfigPairedWidget(
+                                    enabled, castType
+                                )
+                                setValueIfNotNone(cpw.widget, val)
 
     def _renderProcessesTab(self):
         with dpg.tab(label="Processes", parent=self.tab_bar):

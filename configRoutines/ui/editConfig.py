@@ -2,6 +2,14 @@ import dearpygui.dearpygui as dpg
 
 from .._core import *
 from .helpers import getAppropriateInput, setValueIfNotNone
+from .helpers import CheckboxEnabledWidget
+
+#%%
+class ConfigPairedWidget(CheckboxEnabledWidget):
+    def on_checkbox_changed(self, sender, app_data, user_data):
+        super().on_checkbox_changed(sender, app_data, user_data)
+        print('hello')
+
 
 #%%
 class EditConfigWindow:
@@ -33,58 +41,42 @@ class EditConfigWindow:
             # Refer to SignalSectionProxy for details
             with dpg.table():
                 columns = [
-                    'name',
-                    'target_fc',
-                    'baud',
-                    'numPeriodBits',
-                    'numBurstBits',
-                    'numGuardBits',
-                    'numBursts',
-                    'hasChannels',
-                    'channelSpacingHz'
+                    ('name', str),
+                    ('target_fc', float),
+                    ('baud', float),
+                    ('numPeriodBits', int),
+                    ('numBurstBits', int),
+                    ('numGuardBits', int),
+                    ('numBursts', int),
+                    ('hasChannels', bool),
+                    ('channelSpacingHz', float)
                 ]
                 for col in columns:
-                    dpg.add_table_column(label=col)
+                    dpg.add_table_column(label=col[0])
 
                 for signalName, signal in signals.items():
                     with dpg.table_row():
-                        # Add cell for name
+                        # Make cell for name first, always there
                         with dpg.table_cell():
                             inputWidget = getAppropriateInput(str, width=-1)
                             dpg.set_value(inputWidget, signalName)
-                        # Add cell for target_fc
-                        with dpg.table_cell():
-                            inputWidget = getAppropriateInput(float, width=-1)
-                            setValueIfNotNone(inputWidget, signal.target_fc)
-                        # Add cell for baud
-                        with dpg.table_cell():
-                            inputWidget = getAppropriateInput(float, width=-1)
-                            setValueIfNotNone(inputWidget, signal.baud)
-                        # Add cell for numPeriodBits
-                        with dpg.table_cell():
-                            inputWidget = getAppropriateInput(int, width=-1)
-                            setValueIfNotNone(inputWidget, signal.numPeriodBits)
-                        # Add cell for numBurstBits
-                        with dpg.table_cell():
-                            inputWidget = getAppropriateInput(int, width=-1)
-                            setValueIfNotNone(inputWidget, signal.numBurstBits)
-                        # Add cell for numGuardBits
-                        with dpg.table_cell():
-                            inputWidget = getAppropriateInput(int, width=-1)
-                            setValueIfNotNone(inputWidget, signal.numGuardBits)
-                        # Add cell for numBursts
-                        with dpg.table_cell():
-                            inputWidget = getAppropriateInput(int, width=-1)
-                            setValueIfNotNone(inputWidget, signal.numBursts)
-                        # Add cell for hasChannels
-                        with dpg.table_cell():
-                            inputWidget = getAppropriateInput(bool)
-                            setValueIfNotNone(inputWidget, signal.hasChannels)
-                        # Add cell for channelSpacingHz
-                        with dpg.table_cell():
-                            inputWidget = getAppropriateInput(float, width=-1)
-                            setValueIfNotNone(inputWidget, signal.channelSpacingHz)
-                    
+
+                        # Make paired widgets for each column
+                        for col in columns:
+                            key, castType = col
+                            with dpg.table_cell():
+                                # If key exists, we enable it
+                                try:
+                                    val = castType(signal.get(key))
+                                    enabled = True
+                                except KeyError:
+                                    val = None
+                                    enabled = False
+
+                                cpw = ConfigPairedWidget(
+                                    enabled, castType, width=-1
+                                )
+                                setValueIfNotNone(cpw.widget, val)
                 
                 
     def _renderSourcesTab(self):
@@ -144,7 +136,8 @@ class EditConfigWindow:
 
     def _renderProcessesTab(self):
         with dpg.tab(label="Processes", parent=self.tab_bar):
-            pass
+            w = ConfigPairedWidget(False, str)
+            
 
     def _renderWorkspacesTab(self):
         with dpg.tab(label="Workspaces", parent=self.tab_bar):

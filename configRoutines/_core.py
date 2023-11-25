@@ -258,6 +258,19 @@ class DSPConfig(DirectSingleConfig):
     def processes(self):
         return {self._keySuffix(key): self._proxies[key] for key in list(self.currentSection.keys()) if self._isProcessingSection(key)}
         
+    # Modifiers
+    def addSignal(self, signalName: str):
+        self.add_section(self._makeSigKey(signalName))
+
+    def addSource(self, sourceName: str):
+        self.add_section(self._makeSrcKey(sourceName))
+
+    def addProcess(self, processName: str):
+        self.add_section(self._makeProKey(processName))
+
+    def addWorkspace(self, workspaceName: str):
+        self.add_section(workspaceName) # Just plain with no prefix
+
     # Auxiliary things..
     def _makeSrcKey(self, src: str):
         return 'src_' + src
@@ -270,6 +283,12 @@ class DSPConfig(DirectSingleConfig):
         
     def getSig(self, sig: str):
         return self._proxies[self._makeSigKey(sig)]
+    
+    def _makeProKey(self, pro: str):
+        return 'pro_' + pro
+    
+    def getProcess(self, pro: str):
+        return self._proxies[self._makeProKey(pro)]
     
     def recastSections(self):
         # Proxies stored in _proxies

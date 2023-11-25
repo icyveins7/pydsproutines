@@ -14,7 +14,6 @@ class ConfigPairedWidget(CheckboxEnabledWidget):
 
     def on_checkbox_changed(self, sender, app_data, user_data):
         super().on_checkbox_changed(sender, app_data, user_data)
-        print('hello')
 
 
 #%%
@@ -90,24 +89,28 @@ class EditConfigWindow:
         for cellRow in self.signalWidgets['cells']:
             # Check if the name exists
             signalName = dpg.get_value(cellRow['name'])
-            if signalName in existingSignals:
-                # Amend
-                for key, _ in self.signalColumns:
-                    if key == 'name':
-                        continue
 
-                    # If enabled then set it config
-                    if dpg.get_value(cellRow[key].checkbox):
-                        self.cfg.getSig(signalName)[key] = str(dpg.get_value(
-                            cellRow[key].widget
-                        ))
-                    else: # Otherwise remove it
-                        if key in self.cfg.getSig(signalName):
-                            self.cfg.getSig(signalName).pop(key)
+            # Create new one if it doesn't
+            if signalName not in existingSignals:
+                self.cfg.addSignal(signalName)
+            
+            # Then amend the section internally
+            for key, _ in self.signalColumns:
+                if key == 'name':
+                    continue
 
-            else:
-                # Create new one
-                pass # TODO
+                # If enabled then set it config
+                if dpg.get_value(cellRow[key].checkbox):
+                    self.cfg.getSig(signalName)[key] = str(dpg.get_value(
+                        cellRow[key].widget
+                    ))
+                else: # Otherwise remove it
+                    if key in self.cfg.getSig(signalName):
+                        self.cfg.getSig(signalName).pop(key)
+
+
+        # Finally, remove those that no longer exist
+        pass # TODO
 
 
     def _renderSignalsTab(self, renderRows: bool=False):

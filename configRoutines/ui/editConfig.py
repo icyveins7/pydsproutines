@@ -19,6 +19,7 @@ class ConfigPairedWidget(CheckboxEnabledWidget):
 #%%
 class EditConfigWindow:
     signalColumns = [
+        ('', None),
         ('name', str),
         ('target_fc', float),
         ('baud', float),
@@ -149,6 +150,14 @@ class EditConfigWindow:
             except KeyError:
                 self.signalWidgets['rows'] = [row]  
 
+            # Make cell for buttons
+            deleteBtn = dpg.add_button(
+                label="Delete",
+                callback=self._deleteSignalRow
+                # Set user_data at the end
+            )
+            rowWidgets['deleteBtn'] = deleteBtn
+
             # Make cell for name first, always there
             with dpg.table_cell(parent=row) as cell:
                 inputWidget = getAppropriateInput(str, width=-1, parent=cell)
@@ -157,7 +166,7 @@ class EditConfigWindow:
             # Make paired widgets for each column
             for col in self.signalColumns:
                 key, castType = col
-                if key == 'name': # Skip name column
+                if key == 'name' or key == '': # Skip button and name column
                     continue
 
                 with dpg.table_cell(parent=row):
@@ -166,6 +175,11 @@ class EditConfigWindow:
                     )
                     rowWidgets[key] = cpw
         
+            # Attach entire row to deleter's user data
+            dpg.set_item_user_data(
+                deleteBtn, [row, rowWidgets]
+            )
+
         try:
             self.signalWidgets['cells'].append(rowWidgets)
         except KeyError:
@@ -173,7 +187,16 @@ class EditConfigWindow:
         
         return rowWidgets
 
-            
+    def _deleteSignalRow(self, sender, app_data, user_data):
+        print('delete row')
+        row, rowWidgets = user_data
+        dpg.delete_item(row) # Delete the row of widgets
+        # And remove from the internal containers
+        print(self.signalWidgets['rows'])
+        print(row)
+        self.signalWidgets['rows'].remove(row)
+        print(self.signalWidgets['cells'])
+        self.signalWidgets['cells'].remove(rowWidgets)
     
     def _renderSignalsRows(self, clearBefore: bool=False):
         if clearBefore:
@@ -193,7 +216,7 @@ class EditConfigWindow:
             dpg.set_value(rowWidgets['name'], signalName)
             for col in self.signalColumns:
                 key, castType = col
-                if key == 'name': # Skip name column
+                if key == 'name' or key == '': # Skip name and button column
                     continue
                 # If key exists, we enable it
                 try:

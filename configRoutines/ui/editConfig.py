@@ -148,7 +148,7 @@ class EditConfigWindow:
             # Refer to SignalSectionProxy for details
             with dpg.table(
                 resizable=True,
-                row_background=True,
+                # don't use row_background=True otherwise the alternating colours is not clear
                 borders_outerH=True, borders_innerH=True,
                 borders_innerV=True, borders_outerV=True
             ) as table:
@@ -247,10 +247,28 @@ class EditConfigWindow:
         self.signalWidgets['cells'].remove(rowWidgets)
 
     def _duplicateSignalRow(self, sender, app_data, user_data):
-        print("Duplicate row")
         row, rowWidgets = user_data
         # Create a new row
         newRowWidgets = self._createSignalRow()
+        # Set the values by extracting them from the UI
+        # We cannot extract from the config because the row may have been changed and
+        # we haven't flushed the changes to the file yet
+        signal = dict()
+        for col in self.signalColumns:
+            key, castType = col
+            if key == 'name' or key == '': # Skip name and button column
+                continue
+            # Check the original rowWidget
+            if dpg.get_value(rowWidgets[key].checkbox):
+                signal[key] = dpg.get_value(rowWidgets[key].widget)
+
+        # Set the new widget values
+        self._setSignalRowValues(
+            dpg.get_value(rowWidgets['name']) + "_copy",
+            signal,
+            newRowWidgets
+        )
+        # No need to save them as we saved them during creation
 
     def _setSignalRowValues(self, signalName: str, signal: dict, rowWidgets: dict):
         # Reference the order of the columns given at class definition
@@ -290,7 +308,7 @@ class EditConfigWindow:
             # Set the values of the row
             self._setSignalRowValues(signalName, signal, rowWidgets)
 
-            
+
     ##################### Sources ########################
     def _renderSourcesTab(self):
         with dpg.tab(label="Sources", parent=self.tab_bar):

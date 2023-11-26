@@ -19,8 +19,8 @@ class ConfigPairedWidget(CheckboxEnabledWidget):
 #%%
 class EditConfigWindow:
     signalColumns = [
-        ('', None),
-        ('name', str),
+        ('', None), # Button column
+        ('name', str), # Does not have a checkbox enabler
         ('target_fc', float),
         ('baud', float),
         ('numPeriodBits', int),
@@ -39,8 +39,13 @@ class EditConfigWindow:
         # Containers for widgets
         self.signalWidgets = dict()
 
+        # Instantiate the themes to be used
+        self._createButtonThemes()
+
         # Render on init
         self._initialRender()
+
+        
 
     def _initialRender(self):
         self.window = dpg.add_window(
@@ -68,6 +73,21 @@ class EditConfigWindow:
         self._renderSourcesTab()
         self._renderProcessesTab()
         self._renderWorkspacesTab()
+
+
+    def _createButtonThemes(self):
+        with dpg.theme() as delBtn_theme:
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, (255, 0, 0), category=dpg.mvThemeCat_Core)
+
+            self.delBtn_theme = delBtn_theme
+
+        with dpg.theme() as dupBtn_theme:
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, (0, 0, 255), category=dpg.mvThemeCat_Core)
+
+            self.dupBtn_theme = dupBtn_theme
+
 
     def _writeChanges(self):
         self._writeSignals()
@@ -159,12 +179,21 @@ class EditConfigWindow:
                 self.signalWidgets['rows'] = [row]  
 
             # Make cell for buttons
-            deleteBtn = dpg.add_button(
-                label="Delete",
-                callback=self._deleteSignalRow
-                # Set user_data at the end
-            )
-            rowWidgets['deleteBtn'] = deleteBtn
+            with dpg.table_cell(parent=row) as cell:
+                deleteBtn = dpg.add_button(
+                    label="Delete",
+                    callback=self._deleteSignalRow
+                    # Set user_data at the end
+                )
+                dpg.bind_item_theme(deleteBtn, self.delBtn_theme)
+                rowWidgets['deleteBtn'] = deleteBtn
+                dupBtn = dpg.add_button(
+                    label="Duplicate",
+                    callback=self._duplicateSignalRow
+                    # Set user_data at the end
+                )
+                dpg.bind_item_theme(dupBtn, self.dupBtn_theme)
+                rowWidgets['dupBtn'] = dupBtn
 
             # Make cell for name first, always there
             with dpg.table_cell(parent=row) as cell:
@@ -183,9 +212,12 @@ class EditConfigWindow:
                     )
                     rowWidgets[key] = cpw
         
-            # Attach entire row to deleter's user data
+            # Attach entire row to buttons' user data
             dpg.set_item_user_data(
                 deleteBtn, [row, rowWidgets]
+            )
+            dpg.set_item_user_data(
+                dupBtn, [row, rowWidgets]
             )
 
         try:
@@ -196,15 +228,50 @@ class EditConfigWindow:
         return rowWidgets
 
     def _deleteSignalRow(self, sender, app_data, user_data):
-        print('delete row')
+        """
+        Callback to delete a signal row and remove 
+        its associated widgets from all containers.
+
+        Parameters
+        ----------
+        user_data: list
+            Should contain [row, rowWidgets],
+            where row is the dpg.table_row widget
+            and rowWidgets is a dictionary of widgets.
+            See _createSignalRow for details.
+        """
         row, rowWidgets = user_data
         dpg.delete_item(row) # Delete the row of widgets
         # And remove from the internal containers
-        print(self.signalWidgets['rows'])
-        print(row)
         self.signalWidgets['rows'].remove(row)
-        print(self.signalWidgets['cells'])
         self.signalWidgets['cells'].remove(rowWidgets)
+
+    def _duplicateSignalRow(self, sender, app_data, user_data):
+        print("Duplicate row")
+        row, rowWidgets = user_data
+        # Create a new row
+        newRowWidgets = self._createSignalRow()
+
+    def _setSignalRowValues(self, signalName: str, signal: dict, rowWidgets: dict):
+        # Reference the order of the columns given at class definition
+        # Ignore the button column for obvious reasons
+        # Set the values of the row
+        dpg.set_value(rowWidgets['name'], signalName)
+        for col in self.signalColumns:
+            key, castType = col
+            if key == 'name' or key == '': # Skip name and button column
+                continue
+            # If key exists, we enable it
+            try:
+                rawval = signal.get(key)
+                enabled = False if rawval is None else True
+                val = castType(rawval)
+            except (KeyError, TypeError):
+                val = None
+                enabled = False
+
+            rowWidgets[key].trigger_enabled(enabled, val)
+
     
     def _renderSignalsRows(self, clearBefore: bool=False):
         if clearBefore:
@@ -221,22 +288,9 @@ class EditConfigWindow:
             # Create the base row
             rowWidgets = self._createSignalRow()
             # Set the values of the row
-            dpg.set_value(rowWidgets['name'], signalName)
-            for col in self.signalColumns:
-                key, castType = col
-                if key == 'name' or key == '': # Skip name and button column
-                    continue
-                # If key exists, we enable it
-                try:
-                    rawval = signal.get(key)
-                    enabled = False if rawval is None else True
-                    val = castType(rawval)
-                except (KeyError, TypeError):
-                    val = None
-                    enabled = False
+            self._setSignalRowValues(signalName, signal, rowWidgets)
 
-                rowWidgets[key].trigger_enabled(enabled, val)
-
+            
     ##################### Sources ########################
     def _renderSourcesTab(self):
         with dpg.tab(label="Sources", parent=self.tab_bar):

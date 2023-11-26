@@ -262,14 +262,26 @@ class DSPConfig(DirectSingleConfig):
     def addSignal(self, signalName: str):
         self.add_section(self._makeSigKey(signalName))
 
+    def removeSignal(self, signalName: str):
+        self.remove_section(self._makeSigKey(signalName))
+
     def addSource(self, sourceName: str):
         self.add_section(self._makeSrcKey(sourceName))
+
+    def removeSource(self, sourceName: str):
+        self.remove_section(self._makeSrcKey(sourceName))
 
     def addProcess(self, processName: str):
         self.add_section(self._makeProKey(processName))
 
+    def removeProcess(self, processName: str):
+        self.remove_section(self._makeProKey(processName))
+
     def addWorkspace(self, workspaceName: str):
         self.add_section(workspaceName) # Just plain with no prefix
+
+    def removeWorkspace(self, workspaceName: str):
+        self.remove_section(workspaceName) # Just plain with no prefix
 
     # Auxiliary things..
     def _makeSrcKey(self, src: str):

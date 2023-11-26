@@ -45,7 +45,7 @@ class EditConfigWindow:
     def _initialRender(self):
         self.window = dpg.add_window(
             label=self.cfgpath,
-            width=400, height=800, pos=(100, 100),
+            width=800, height=400, pos=(100, 100),
             # Set cleanup to the same one as the external button
             on_close=self.openCfgObject._del_editConfig,
             user_data=[self.cfgpath]
@@ -85,7 +85,11 @@ class EditConfigWindow:
 
     ####################### Signals ########################
     def _writeSignals(self):
-        existingSignals = self.cfg.allSignals
+        """
+        Amends the internal signal-only structs of the DSPConfig object.
+        Does not dump this to file; that is to be called separately.
+        """
+        existingSignals = list(self.cfg.allSignals.keys())
         # Read each row of the widgets
         for cellRow in self.signalWidgets['cells']:
             # Check if the name exists
@@ -94,10 +98,13 @@ class EditConfigWindow:
             # Create new one if it doesn't
             if signalName not in existingSignals:
                 self.cfg.addSignal(signalName)
+            # Mark those that have been found
+            else: # else-statement so that it will not try to remove if it's not present at first
+                existingSignals.remove(signalName)
             
             # Then amend the section internally
             for key, _ in self.signalColumns:
-                if key == 'name':
+                if key == 'name' or key == '':
                     continue
 
                 # If enabled then set it config
@@ -111,8 +118,9 @@ class EditConfigWindow:
 
 
         # Finally, remove those that no longer exist
-        pass # TODO
-
+        # These are the remainders from existingSignals
+        for signalName in existingSignals:
+            self.cfg.removeSignal(signalName)
 
     def _renderSignalsTab(self, renderRows: bool=False):
         with dpg.tab(label="Signals", parent=self.tab_bar):

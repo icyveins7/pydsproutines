@@ -181,8 +181,11 @@ class SignalSectionProxy(SectionProxy):
 
     @property
     def hasChannels(self):
-        '''For signals that occupy multiple channels, this returns True.'''
-        return self.getboolean('hasChannels')
+        '''
+        For signals that occupy multiple channels, this returns True.
+        This is defined by checking for the presence of a 'numChannels' key.
+        '''
+        return self.getint('numChannels') is not None
 
     @property
     def numChannels(self):

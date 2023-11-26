@@ -27,7 +27,7 @@ class EditConfigWindow:
         ('numBurstBits', int),
         ('numGuardBits', int),
         ('numBursts', int),
-        ('hasChannels', bool),
+        ('numChannels', int),
         ('channelSpacingHz', float)
     ]
 

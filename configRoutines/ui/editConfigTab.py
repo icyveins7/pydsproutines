@@ -38,12 +38,13 @@ class EditConfigTab:
             Recommended to subclass and then define this statically in the class definition.
             Then call super().__init__() in ctor with the specific subclass columns.
 
-            First 2 rows are fixed.
+            First 2 columns are always the button column and the 'name' column;
+            these do not need to be included in the definition and will always be added.
+
             Example:
             [
-                ('', None), # For buttons
-                ('name', str), # Title of section
-                ('field1', bool) # Example of first column 
+                ('field1', bool), # Example of first column 
+                ('field2', str) # Example of second column
                 ...
             ]
         """
@@ -59,8 +60,21 @@ class EditConfigTab:
             'table': None
         }
 
-        # # Render it on init
-        # self._renderTab()
+        # Generate the themes
+        self._createButtonThemes()
+
+    def _createButtonThemes(self):
+        with dpg.theme() as delBtn_theme:
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, (255, 0, 0), category=dpg.mvThemeCat_Core)
+
+            self.delBtn_theme = delBtn_theme
+
+        with dpg.theme() as dupBtn_theme:
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, (0, 0, 255), category=dpg.mvThemeCat_Core)
+
+            self.dupBtn_theme = dupBtn_theme
 
     def _renderTab(self, content: dict, renderRows: bool=False):
         with dpg.tab(label=self.tabLabel, parent=self.tab_bar):
@@ -75,6 +89,10 @@ class EditConfigTab:
                 # Store this widget into container for reference later
                 self.widgets['table'] = table
 
+                # Add the fixed columns separately
+                dpg.add_table_column() # For buttons
+                dpg.add_table_column(label="name") # For section name
+                # Then add the field-specific ones
                 for col in self.columns:
                     dpg.add_table_column(label=col[0])
 
@@ -121,14 +139,14 @@ class EditConfigTab:
                     callback=self._deleteRow
                     # Set user_data at the end
                 )
-                # dpg.bind_item_theme(deleteBtn, self.delBtn_theme)
+                dpg.bind_item_theme(deleteBtn, self.delBtn_theme)
                 rowWidgets['deleteBtn'] = deleteBtn
                 dupBtn = dpg.add_button(
                     label="Duplicate",
                     callback=self._duplicateRow
                     # Set user_data at the end
                 )
-                # dpg.bind_item_theme(dupBtn, self.dupBtn_theme)
+                dpg.bind_item_theme(dupBtn, self.dupBtn_theme)
                 rowWidgets['dupBtn'] = dupBtn
 
             # Make cell for name first, always there
@@ -139,9 +157,6 @@ class EditConfigTab:
             # Make paired widgets for each column
             for col in self.columns:
                 key, castType = col
-                if key == 'name' or key == '': # Skip button and name column
-                    continue
-
                 with dpg.table_cell(parent=row):
                     cpw = ConfigPairedWidget(
                         False, castType
@@ -171,8 +186,6 @@ class EditConfigTab:
         dpg.set_value(rowWidgets['name'], name)
         for col in self.columns:
             key, castType = col
-            if key == 'name' or key == '': # Skip name and button column
-                continue
             # If key exists, we enable it
             try:
                 rawval = content.get(key)
@@ -256,8 +269,6 @@ class EditConfigTab:
         content = dict()
         for col in self.columns:
             key, castType = col
-            if key == 'name' or key == '': # Skip name and button column
-                continue
             # Check the original rowWidget
             if dpg.get_value(rowWidgets[key].checkbox):
                 content[key] = dpg.get_value(rowWidgets[key].widget)
@@ -274,8 +285,6 @@ class EditConfigTab:
 #%%
 class EditSourcesTab(EditConfigTab):
     columns = [
-        ('', None),
-        ('name', str),
         ('srcdir', str),
         ('fs', float),
         ('fc', float),
@@ -287,4 +296,17 @@ class EditSourcesTab(EditConfigTab):
 
     def __init__(self, tab_bar: int, cfg: DSPConfig):
         super().__init__("Sources", tab_bar, self.columns, cfg)
-        self._renderTab(self.cfg.allSources)
+        self._renderTab(self.cfg.allSources, renderRows=True)
+
+#%%
+class EditProcessesTab(EditConfigTab):
+    columns = [
+        ('src', str),
+        ('sig', str),
+        ('numTaps', int),
+        ('target_osr', int)
+    ]
+    
+    def __init__(self, tab_bar: int, cfg: DSPConfig):
+        super().__init__("Processes", tab_bar, self.columns, cfg)
+        self._renderTab(self.cfg.allProcesses, renderRows=True)

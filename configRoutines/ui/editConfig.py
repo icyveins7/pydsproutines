@@ -3,7 +3,7 @@ import dearpygui.dearpygui as dpg
 from .._core import *
 from .helpers import getAppropriateInput, setValueIfNotNone
 from .helpers import CheckboxEnabledWidget
-from .editConfigTab import EditSourcesTab
+from .editConfigTab import EditSourcesTab, EditProcessesTab
 
 #%%
 class ConfigPairedWidget(CheckboxEnabledWidget):
@@ -73,7 +73,8 @@ class EditConfigWindow:
         self._renderSignalsTab(renderRows=True)
         # self._renderSourcesTab()
         self.sourcesTab = EditSourcesTab(self.tab_bar, self.cfg)
-        self._renderProcessesTab()
+        # self._renderProcessesTab()
+        self.processesTab = EditProcessesTab(self.tab_bar, self.cfg)
         self._renderWorkspacesTab()
 
 

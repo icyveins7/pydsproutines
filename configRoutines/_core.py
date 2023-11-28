@@ -245,6 +245,10 @@ class DSPConfig(DirectSingleConfig):
     @property
     def allProcesses(self):
         return {self._keySuffix(key): item for key, item in self._proxies.items() if self._isProcessingSection(key)}
+    
+    @property
+    def allWorkspaces(self):
+        return {self._keySuffix(key): item for key, item in self._proxies.items() if self._isWorkspaceSection(key)}
         
     # But usually you want to activate a certain workspace
     def loadMenu(self):

@@ -1,3 +1,4 @@
+from configRoutines._core import DSPConfig
 import dearpygui.dearpygui as dpg
 
 from .._core import *
@@ -197,44 +198,13 @@ class EditConfigTab:
 
             rowWidgets[key].trigger_enabled(enabled, val)
 
-    def _writeToConfig(self, content: dict, cfg: DSPConfig):
+    def _writeToConfig(self):
         """
         Amends the internal signal-only structs of the DSPConfig object.
         Does not dump this to file; that is to be called separately.
         """
-        pass # TODO, this section probably needs to be overloaded in the derived classes
-        # existingKeys = list(content.keys())
-        # # Read each row of the widgets
-        # for cellRow in self.widgets['cells']:
-        #     # Check if the name exists
-        #     name = dpg.get_value(cellRow['name'])
-
-        #     # Create new one if it doesn't
-        #     if name not in existingKeys:
-        #         cfg.addSignal(name)
-        #     # Mark those that have been found
-        #     else: # else-statement so that it will not try to remove if it's not present at first
-        #         existingKeys.remove(name)
-            
-        #     # Then amend the section internally
-        #     for key, _ in self.columns:
-        #         if key == 'name' or key == '':
-        #             continue
-
-        #         # If enabled then set it config
-        #         if dpg.get_value(cellRow[key].checkbox):
-        #             cfg.getSig(name)[key] = str(dpg.get_value(
-        #                 cellRow[key].widget
-        #             ))
-        #         else: # Otherwise remove it
-        #             if key in cfg.getSig(name):
-        #                 cfg.getSig(name).pop(key)
-
-        # # Finally, remove those that no longer exist
-        # # These are the remainders from existingKeys
-        # for name in existingKeys:
-        #     cfg.removeSignal(name)
-    
+        raise NotImplementedError("Please re-implement in subclass.")
+        
     def _deleteRow(self, sender, app_data, user_data):
         """
         Callback to delete a row and remove 
@@ -282,6 +252,55 @@ class EditConfigTab:
         # No need to save them as we saved them during creation
 
     
+
+#%%
+class EditSignalsTab(EditConfigTab):
+    columns = [
+        ('target_fc', float),
+        ('baud', float),
+        ('numPeriodBits', int),
+        ('numBurstBits', int),
+        ('numGuardBits', int),
+        ('numBursts', int),
+        ('numChannels', int),
+        ('channelSpacingHz', float)
+    ]
+
+    def __init__(self, tab_bar: int, cfg: DSPConfig):
+        super().__init__("Signals", tab_bar, self.columns, cfg)
+        self._renderTab(self.cfg.allSignals, renderRows=True)
+
+    def _writeToConfig(self):
+        # Overload to get sources
+        existingKeys = list(self.cfg.allSignals.keys())
+        # Read each row of the widgets
+        for cellRow in self.widgets['cells']:
+            # Check if the name exists
+            name = dpg.get_value(cellRow['name'])
+
+            # Create new one if it doesn't
+            if name not in existingKeys:
+                self.cfg.addSignal(name)
+            # Mark those that have been found
+            else: # else-statement so that it will not try to remove if it's not present at first
+                existingKeys.remove(name)
+            
+            # Then amend the section internally
+            for key, _ in self.columns:
+                # If enabled then set it config
+                if dpg.get_value(cellRow[key].checkbox):
+                    self.cfg.getSig(name)[key] = str(dpg.get_value(
+                        cellRow[key].widget
+                    ))
+                else: # Otherwise remove it
+                    if key in self.cfg.getSig(name):
+                        self.cfg.getSig(name).pop(key)
+
+        # Finally, remove those that no longer exist
+        # These are the remainders from existingKeys
+        for name in existingKeys:
+            self.cfg.removeSignal(name)
+
 #%%
 class EditSourcesTab(EditConfigTab):
     columns = [
@@ -298,11 +317,43 @@ class EditSourcesTab(EditConfigTab):
         super().__init__("Sources", tab_bar, self.columns, cfg)
         self._renderTab(self.cfg.allSources, renderRows=True)
 
+    def _writeToConfig(self):
+        # Overload to get sources
+        existingKeys = list(self.cfg.allSources.keys())
+        # Read each row of the widgets
+        for cellRow in self.widgets['cells']:
+            # Check if the name exists
+            name = dpg.get_value(cellRow['name'])
+
+            # Create new one if it doesn't
+            if name not in existingKeys:
+                self.cfg.addSource(name)
+            # Mark those that have been found
+            else: # else-statement so that it will not try to remove if it's not present at first
+                existingKeys.remove(name)
+            
+            # Then amend the section internally
+            for key, _ in self.columns:
+                # If enabled then set it config
+                if dpg.get_value(cellRow[key].checkbox):
+                    self.cfg.getSrc(name)[key] = str(dpg.get_value(
+                        cellRow[key].widget
+                    ))
+                else: # Otherwise remove it
+                    if key in self.cfg.getSrc(name):
+                        self.cfg.getSrc(name).pop(key)
+
+        # Finally, remove those that no longer exist
+        # These are the remainders from existingKeys
+        for name in existingKeys:
+            self.cfg.removeSource(name)
+
+
 #%%
 class EditProcessesTab(EditConfigTab):
     columns = [
         ('src', str),
-        ('sig', str),
+        ('sig', str), # TODO: figure out good way to make combobox for this
         ('numTaps', int),
         ('target_osr', int)
     ]
@@ -310,3 +361,39 @@ class EditProcessesTab(EditConfigTab):
     def __init__(self, tab_bar: int, cfg: DSPConfig):
         super().__init__("Processes", tab_bar, self.columns, cfg)
         self._renderTab(self.cfg.allProcesses, renderRows=True)
+
+    def _writeToConfig(self):
+        # Overload to get sources
+        existingKeys = list(self.cfg.allProcesses.keys())
+        # Read each row of the widgets
+        for cellRow in self.widgets['cells']:
+            # Check if the name exists
+            name = dpg.get_value(cellRow['name'])
+
+            # Create new one if it doesn't
+            if name not in existingKeys:
+                self.cfg.addProcess(name)
+            # Mark those that have been found
+            else: # else-statement so that it will not try to remove if it's not present at first
+                existingKeys.remove(name)
+            
+            # Then amend the section internally
+            for key, _ in self.columns:
+                # If enabled then set it config
+                if dpg.get_value(cellRow[key].checkbox):
+                    self.cfg.getProcess(name)[key] = str(dpg.get_value(
+                        cellRow[key].widget
+                    ))
+                else: # Otherwise remove it
+                    if key in self.cfg.getProcess(name):
+                        self.cfg.getProcess(name).pop(key)
+
+        # Finally, remove those that no longer exist
+        # These are the remainders from existingKeys
+        for name in existingKeys:
+            self.cfg.removeProcess(name)
+
+
+#%% 
+# Workspaces is a bit more generic since it's just a list of processes
+# Will have to customise a bit more

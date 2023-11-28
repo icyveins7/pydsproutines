@@ -397,3 +397,50 @@ class EditProcessesTab(EditConfigTab):
 #%% 
 # Workspaces is a bit more generic since it's just a list of processes
 # Will have to customise a bit more
+
+class EditWorkspacesTab(EditConfigTab):
+    def __init__(self, tab_bar: int, cfg: DSPConfig):
+        super().__init__("Workspaces", tab_bar, [], cfg)
+        self._renderTab(self.cfg.allWorkspaces, renderRows=True)
+
+    def _renderTab(self, content: dict, renderRows: bool=False):
+        with dpg.tab(label=self.tabLabel, parent=self.tab_bar):
+            # Create a table for the signals
+            # Refer to SignalSectionProxy for details
+            with dpg.table(
+                resizable=True,
+                # don't use row_background=True otherwise the alternating colours is not clear
+                borders_outerH=True, borders_innerH=True,
+                borders_innerV=True, borders_outerV=True
+            ) as table:
+                # Store this widget into container for reference later
+                self.widgets['table'] = table
+
+                # Add the fixed columns separately
+                dpg.add_table_column() # For buttons
+                dpg.add_table_column(label="name") # For section name
+                # Then add the field-specific ones
+                for col in self.columns:
+                    dpg.add_table_column(label=col[0])
+
+                # Render rows if asked for
+                if renderRows:
+                    self._renderRows(content)
+
+            # Row button adder
+            dpg.add_button(
+                label="Add Row",
+                width=-1,
+                callback=self._createRow
+            )
+
+            # Testing
+            dpg.add_combo(
+                ["1", "2", "3", "4", "5", "6", "7"],
+                no_preview=True,
+                callback=self._combo_callback
+            )
+
+    def _combo_callback(self, sender, app_data, user_data):
+        print("combo callback")
+        print(dpg.get_value(sender))

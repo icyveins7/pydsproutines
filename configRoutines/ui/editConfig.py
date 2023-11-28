@@ -3,7 +3,7 @@ import dearpygui.dearpygui as dpg
 from .._core import *
 from .helpers import getAppropriateInput, setValueIfNotNone
 from .helpers import CheckboxEnabledWidget
-from .editConfigTab import EditSignalsTab, EditSourcesTab, EditProcessesTab
+from .editConfigTab import EditSignalsTab, EditSourcesTab, EditProcessesTab, EditWorkspacesTab
 
 #%%
 class ConfigPairedWidget(CheckboxEnabledWidget):
@@ -54,6 +54,7 @@ class EditConfigWindow:
         self.signalsTab = EditSignalsTab(self.tab_bar, self.cfg)
         self.sourcesTab = EditSourcesTab(self.tab_bar, self.cfg)
         self.processesTab = EditProcessesTab(self.tab_bar, self.cfg)
+        self.workspacesTab = EditWorkspacesTab(self.tab_bar, self.cfg)
         
 
     def _writeChanges(self):
@@ -61,6 +62,7 @@ class EditConfigWindow:
         self.signalsTab._writeToConfig()
         self.sourcesTab._writeToConfig()
         self.processesTab._writeToConfig()
+        # TODO: workspacesTab
 
         # Dump to file
         with open(self.cfgpath, 'w') as cfgfile:
@@ -74,5 +76,6 @@ class EditConfigWindow:
         self.signalsTab._renderRows(self.cfg.allSignals, clearBefore=True)
         self.sourcesTab._renderRows(self.cfg.allSources, clearBefore=True)
         self.processesTab._renderRows(self.cfg.allProcesses, clearBefore=True)
+        # TODO: workspacesTab
 
     

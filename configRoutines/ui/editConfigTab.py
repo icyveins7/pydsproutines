@@ -3,7 +3,7 @@ import dearpygui.dearpygui as dpg
 
 from .._core import *
 from .helpers import getAppropriateInput, setValueIfNotNone
-from .helpers import CheckboxEnabledWidget
+from .helpers import CheckboxEnabledWidget, TextInputWithComboWidget
 
 class ConfigPairedWidget(CheckboxEnabledWidget):
     def __init__(self, enabled: bool, type: type, *args, **kwargs):
@@ -287,14 +287,21 @@ class EditSignalsTab(EditConfigTab):
             
             # Then amend the section internally
             for key, _ in self.columns:
-                # If enabled then set it config
-                if dpg.get_value(cellRow[key].checkbox):
-                    self.cfg.getSig(name)[key] = str(dpg.get_value(
-                        cellRow[key].widget
-                    ))
-                else: # Otherwise remove it
+                isChecked, cellValue = cellRow[key].get_value()
+                if isChecked:
+                    self.cfg.getSig(name)[key] = str(cellValue)
+                else:
                     if key in self.cfg.getSig(name):
                         self.cfg.getSig(name).pop(key)
+
+                # # If enabled then set it config
+                # if dpg.get_value(cellRow[key].checkbox):
+                #     self.cfg.getSig(name)[key] = str(dpg.get_value(
+                #         cellRow[key].widget
+                #     ))
+                # else: # Otherwise remove it
+                #     if key in self.cfg.getSig(name):
+                #         self.cfg.getSig(name).pop(key)
 
         # Finally, remove those that no longer exist
         # These are the remainders from existingKeys
@@ -435,12 +442,8 @@ class EditWorkspacesTab(EditConfigTab):
             )
 
             # Testing
-            dpg.add_combo(
-                ["1", "2", "3", "4", "5", "6", "7"],
-                no_preview=True,
-                callback=self._combo_callback
+            self.t = TextInputWithComboWidget()
+            dpg.configure_item(
+                self.t.dropdown, 
+                items=list(self.cfg.allSignals.keys())
             )
-
-    def _combo_callback(self, sender, app_data, user_data):
-        print("combo callback")
-        print(dpg.get_value(sender))

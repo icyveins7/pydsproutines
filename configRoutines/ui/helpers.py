@@ -35,6 +35,32 @@ def setValueIfNotNone(widget, value):
         dpg.set_value(widget, value)
 
 
+###############################
+class TextInputWithComboWidget:
+    """
+    Creates a text input and a dropdown next to it.
+    The text input is the primary input widget, but the dropdown
+    can be used to autofill the text input.
+    """
+    def __init__(self, *args, **kwargs):
+        """
+        Initializes object with two widgets:
+        1) self.textInput: The text input widget
+        2) self.dropdown: The dropdown widget
+
+        User should set the list of values for the dropdown after init.
+        """
+        with dpg.group(horizontal=True):
+            self.dropdown = dpg.add_combo(
+                no_preview=True,
+                callback=self.dropdown_callback
+            ) # Width=-1 only works if its the last one
+            self.textInput = dpg.add_input_text(*args, width=-1, **kwargs)
+            
+
+    def dropdown_callback(self, sender, app_data, user_data):
+        dpg.set_value(self.textInput, dpg.get_value(sender))
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class CheckboxEnabledWidget:
     """
@@ -70,3 +96,9 @@ class CheckboxEnabledWidget:
         else:
             dpg.set_value(self.checkbox, False)
             dpg.configure_item(self.widget, show=False)
+
+    def get_value(self):
+        if dpg.get_value(self.checkbox):
+            return (True, dpg.get_value(self.widget))
+        else:
+            return (False, None)

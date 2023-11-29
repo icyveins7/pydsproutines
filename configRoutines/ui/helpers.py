@@ -26,7 +26,8 @@ def getAppropriateInput(type, *args, **kwargs):
         int: dpg.add_input_int,
         float: dpg.add_input_double,
         str: dpg.add_input_text,
-        bool: dpg.add_checkbox
+        bool: dpg.add_checkbox,
+        list: TextInputWithComboWidget
     }
     return inputWidgets[type](*args, **kwargs)
 
@@ -53,9 +54,11 @@ class TextInputWithComboWidget:
         with dpg.group(horizontal=True):
             self.dropdown = dpg.add_combo(
                 no_preview=True,
-                callback=self.dropdown_callback
+                callback=self.dropdown_callback,
+                *args,
+                **kwargs
             ) # Width=-1 only works if its the last one
-            self.textInput = dpg.add_input_text(*args, width=-1, **kwargs)
+            self.textInput = dpg.add_input_text(*args, **kwargs)
             
 
     def dropdown_callback(self, sender, app_data, user_data):
@@ -71,34 +74,48 @@ class CheckboxEnabledWidget:
     In the new method, remember to call super().on_checkbox_changed(self, sender, app_data, user_data)
     in order to maintain the widget appear/disappear callback.
     """
-    def __init__(self, enabled: bool, type: type, *args, **kwargs):
-        self.checkbox = dpg.add_checkbox(label="enabled?") # Defaults to False
-        # Tick the box on creation if desired
-        if enabled:
-            dpg.set_value(self.checkbox, True)
-        # Create and show widget if box is ticked
-        self.widget = getAppropriateInput(type, *args, show=enabled, **kwargs)
+    def __init__(self, type: type, *args, **kwargs):
+        self.checkbox = dpg.add_checkbox(
+            label="enabled?",
+            callback=self.on_checkbox_changed            
+        ) # Defaults to False
 
-        dpg.set_item_callback(
-            self.checkbox,
-            self.on_checkbox_changed
-        )
+        # Create but hide widget
+        self.widget = getAppropriateInput(type, *args, show=False, **kwargs)
 
     def on_checkbox_changed(self, sender, app_data, user_data):
-        # Always enable/disable the widget depending on it
-        dpg.configure_item(self.widget, show=dpg.get_value(self.checkbox))
-
-    def trigger_enabled(self, enabled: bool, widgetValue=None):
-        if enabled:
-            dpg.set_value(self.checkbox, True)
-            dpg.configure_item(self.widget, show=True)
-            setValueIfNotNone(self.widget, widgetValue)
+        if isinstance(self.widget, TextInputWithComboWidget):
+            dpg.configure_item(self.widget.textInput, show=dpg.get_value(self.checkbox))
+            dpg.configure_item(self.widget.dropdown, show=dpg.get_value(self.checkbox))
+                                                                         
         else:
-            dpg.set_value(self.checkbox, False)
-            dpg.configure_item(self.widget, show=False)
+            # Always enable/disable the widget depending on it
+            dpg.configure_item(self.widget, show=dpg.get_value(self.checkbox))
+
+    def set_value(self, enabled: bool, widgetValue=None, **kwargs):
+        dpg.set_value(self.checkbox, enabled)
+
+        # Special compound widgets
+        if isinstance(self.widget, TextInputWithComboWidget):
+            dpg.configure_item(self.widget.textInput, show=enabled)
+            dpg.configure_item(self.widget.dropdown, show=enabled)
+            if enabled:
+                # Set value directly on text input
+                setValueIfNotNone(self.widget.textInput, widgetValue)
+
+        else: # Normal widgets
+            dpg.configure_item(self.widget, show=enabled)
+            if enabled:
+                setValueIfNotNone(self.widget, widgetValue)
 
     def get_value(self):
-        if dpg.get_value(self.checkbox):
-            return (True, dpg.get_value(self.widget))
+        isChecked = dpg.get_value(self.checkbox)
+        if isChecked:
+            if isinstance(self.widget, TextInputWithComboWidget):
+                value = dpg.get_value(self.widget.textInput)
+            else:
+                value = dpg.get_value(self.widget)
         else:
-            return (False, None)
+            value = None
+
+        return (isChecked, value)

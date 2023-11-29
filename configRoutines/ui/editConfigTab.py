@@ -6,16 +6,11 @@ from .helpers import getAppropriateInput, setValueIfNotNone
 from .helpers import CheckboxEnabledWidget, TextInputWithComboWidget
 
 class ConfigPairedWidget(CheckboxEnabledWidget):
-    def __init__(self, enabled: bool, type: type, *args, **kwargs):
+    def __init__(self, type: type, *args, **kwargs):
         if type != bool:
-            super().__init__(enabled, type, *args, width=-1, **kwargs)
+            super().__init__(type, *args, width=-1, **kwargs)
         else:
-            super().__init__(enabled, type, *args, **kwargs)
-
-    def on_checkbox_changed(self, sender, app_data, user_data):
-        super().on_checkbox_changed(sender, app_data, user_data)
-
-
+            super().__init__(type, *args, **kwargs)
 
 #%%
 class EditConfigTab:
@@ -124,7 +119,7 @@ class EditConfigTab:
             # Set the values of the row
             self._setRowValues(key, item, rowWidgets)
 
-    def _createRow(self):
+    def _createRow(self) -> dict:
         rowWidgets = dict()
         with dpg.table_row(parent=self.widgets['table']) as row:
             # Save rows for reference
@@ -159,9 +154,7 @@ class EditConfigTab:
             for col in self.columns:
                 key, castType = col
                 with dpg.table_cell(parent=row):
-                    cpw = ConfigPairedWidget(
-                        False, castType
-                    )
+                    cpw = ConfigPairedWidget(castType)
                     rowWidgets[key] = cpw
         
             # Attach entire row to buttons' user data
@@ -187,6 +180,7 @@ class EditConfigTab:
         dpg.set_value(rowWidgets['name'], name)
         for col in self.columns:
             key, castType = col
+            castType = str if castType == list else castType # Lists are to be regarded as str types
             # If key exists, we enable it
             try:
                 rawval = content.get(key)
@@ -196,7 +190,7 @@ class EditConfigTab:
                 val = None
                 enabled = False
 
-            rowWidgets[key].trigger_enabled(enabled, val)
+            rowWidgets[key].set_value(enabled, val)
 
     def _writeToConfig(self):
         """
@@ -294,15 +288,6 @@ class EditSignalsTab(EditConfigTab):
                     if key in self.cfg.getSig(name):
                         self.cfg.getSig(name).pop(key)
 
-                # # If enabled then set it config
-                # if dpg.get_value(cellRow[key].checkbox):
-                #     self.cfg.getSig(name)[key] = str(dpg.get_value(
-                #         cellRow[key].widget
-                #     ))
-                # else: # Otherwise remove it
-                #     if key in self.cfg.getSig(name):
-                #         self.cfg.getSig(name).pop(key)
-
         # Finally, remove those that no longer exist
         # These are the remainders from existingKeys
         for name in existingKeys:
@@ -341,12 +326,10 @@ class EditSourcesTab(EditConfigTab):
             
             # Then amend the section internally
             for key, _ in self.columns:
-                # If enabled then set it config
-                if dpg.get_value(cellRow[key].checkbox):
-                    self.cfg.getSrc(name)[key] = str(dpg.get_value(
-                        cellRow[key].widget
-                    ))
-                else: # Otherwise remove it
+                isChecked, cellValue = cellRow[key].get_value()
+                if isChecked:
+                    self.cfg.getSrc(name)[key] = str(cellValue)
+                else:
                     if key in self.cfg.getSrc(name):
                         self.cfg.getSrc(name).pop(key)
 
@@ -359,8 +342,8 @@ class EditSourcesTab(EditConfigTab):
 #%%
 class EditProcessesTab(EditConfigTab):
     columns = [
-        ('src', str),
-        ('sig', str), # TODO: figure out good way to make combobox for this
+        ('src', list),
+        ('sig', list), 
         ('numTaps', int),
         ('target_osr', int)
     ]
@@ -368,6 +351,22 @@ class EditProcessesTab(EditConfigTab):
     def __init__(self, tab_bar: int, cfg: DSPConfig):
         super().__init__("Processes", tab_bar, self.columns, cfg)
         self._renderTab(self.cfg.allProcesses, renderRows=True)
+
+    def _createRow(self) -> dict:
+        # Create as per normal
+        rowWidgets = super()._createRow()
+
+        # Set the dropdowns' items
+        dpg.configure_item(
+            rowWidgets['src'].widget.dropdown, # Extract the actual dpg combo widget 
+            items=list(self.cfg.allSources.keys())
+        )
+        dpg.configure_item(
+            rowWidgets['sig'].widget.dropdown, # Extract the actual dpg combo widget 
+            items=list(self.cfg.allSignals.keys())
+        )
+
+        return rowWidgets # Remember to return at the end
 
     def _writeToConfig(self):
         # Overload to get sources
@@ -386,12 +385,10 @@ class EditProcessesTab(EditConfigTab):
             
             # Then amend the section internally
             for key, _ in self.columns:
-                # If enabled then set it config
-                if dpg.get_value(cellRow[key].checkbox):
-                    self.cfg.getProcess(name)[key] = str(dpg.get_value(
-                        cellRow[key].widget
-                    ))
-                else: # Otherwise remove it
+                isChecked, cellValue = cellRow[key].get_value()
+                if isChecked:
+                    self.cfg.getProcess(name)[key] = str(cellValue)
+                else:
                     if key in self.cfg.getProcess(name):
                         self.cfg.getProcess(name).pop(key)
 
@@ -441,9 +438,3 @@ class EditWorkspacesTab(EditConfigTab):
                 callback=self._createRow
             )
 
-            # Testing
-            self.t = TextInputWithComboWidget()
-            dpg.configure_item(
-                self.t.dropdown, 
-                items=list(self.cfg.allSignals.keys())
-            )

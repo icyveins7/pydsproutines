@@ -1,4 +1,16 @@
 """
+Results from nsys profile:
+For length 1000000
+257.472us filter_smtaps
+230.976us filter_smtaps_sminput
+
+Generally, filter_smtaps_sminput kernel uses less blocks, and hence the occupancy for the SMs may be low.
+This causes it to be slower when the input length is small, but it gains performance
+and crosses over the filter_smtaps kernel at about 1M samples.
+
+
+DEPRECATED
+----------
 Early results:
 
 Note that the order of kernels called affects the timer.start/end() timing.
@@ -24,7 +36,7 @@ import scipy.signal as sps
 timer = Timer()
 
 # Generate some noise
-length = 100000
+length = 1000000
 noise = randnoise(length, 1.0, 1.0, 1.0).astype(np.complex64)
 d_noise = cp.asarray(noise, cp.complex64)
 
@@ -45,14 +57,14 @@ timer.start()
 d_filt_smtaps = cpkf.filter_smtaps(d_noise, d_taps)
 timer.end("gpu smtaps")
 
-# # Filter the noise (GPU, sm input)
-# timer.start()
-# d_filt_smtaps_sminput = cpkf.filter_smtaps_sminput(d_noise, d_taps)
-# timer.end("gpu smtaps sminput")
+# Filter the noise (GPU, sm input)
+timer.start()
+d_filt_smtaps_sminput = cpkf.filter_smtaps_sminput(d_noise, d_taps)
+timer.end("gpu smtaps sminput")
 
-# # Check results
-# compareValues(cpu_filt, d_filt_smtaps.get())
-# compareValues(cpu_filt, d_filt_smtaps_sminput.get())
+# Check results
+compareValues(cpu_filt, d_filt_smtaps.get())
+compareValues(cpu_filt, d_filt_smtaps_sminput.get())
 
 # # Try to filter with downsampling
 # dsr = 4

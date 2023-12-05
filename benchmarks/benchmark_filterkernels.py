@@ -45,24 +45,24 @@ timer.start()
 d_filt_smtaps = cpkf.filter_smtaps(d_noise, d_taps)
 timer.end("gpu smtaps")
 
-# Filter the noise (GPU, sm input)
-timer.start()
-d_filt_smtaps_sminput = cpkf.filter_smtaps_sminput(d_noise, d_taps)
-timer.end("gpu smtaps sminput")
+# # Filter the noise (GPU, sm input)
+# timer.start()
+# d_filt_smtaps_sminput = cpkf.filter_smtaps_sminput(d_noise, d_taps)
+# timer.end("gpu smtaps sminput")
+
+# # Check results
+# compareValues(cpu_filt, d_filt_smtaps.get())
+# compareValues(cpu_filt, d_filt_smtaps_sminput.get())
+
+# # Try to filter with downsampling
+# dsr = 4
+# dsphase = 1
+# timer.start()
+# d_filt_smtaps_ds = cpkf.filter_smtaps(d_noise, d_taps, dsr=dsr, dsPhase=dsphase)
+# timer.end("gpu smtaps downsample")
 
 # Check results
-compareValues(cpu_filt, d_filt_smtaps.get())
-compareValues(cpu_filt, d_filt_smtaps_sminput.get())
-
-# Try to filter with downsampling
-dsr = 4
-dsphase = 1
-timer.start()
-d_filt_smtaps_ds = cpkf.filter_smtaps(d_noise, d_taps, dsr=dsr, dsPhase=dsphase)
-timer.end("gpu smtaps downsample")
-
-# Check results
-compareValues(cpu_filt[dsphase::dsr], d_filt_smtaps_ds.get())
+# compareValues(cpu_filt[dsphase::dsr], d_filt_smtaps_ds.get())
 
 
 

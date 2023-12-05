@@ -44,11 +44,13 @@ void filter_smtaps(
         // Otherwise loop over the taps
         for (int j = 0; j < tapslen; j++)
         {
+            int xIdx = k - j;
+
             // accumulate
-            if (k - j >= 0)
-                z = z + d_x[k - j] * s_taps[j]; // this uses the input data
-            else if (delaylen + k - j >= 0 && d_delay != NULL) // d_delay must be supplied for this to work
-                z = z + d_delay[delaylen + k - j] * s_taps[j]; // this uses the delay data (from previous invocations)
+            if (xIdx >= 0 && xIdx < len)
+                z = z + d_x[xIdx] * s_taps[j]; // this uses the input data
+            else if (delaylen + xIdx >= 0 && d_delay != NULL) // d_delay must be supplied for this to work
+                z = z + d_delay[delaylen + xIdx] * s_taps[j]; // this uses the delay data (from previous invocations)
         }
 
         // Coalesced writes

@@ -73,7 +73,7 @@ extern "C" __global__ void test_kernel(
   // Seems like m*n = fft length?
   for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
     if ((i * stride + threadIdx.x) < cufftdx::size_of<FFT>::value) {
-        thread_data[i] = input[index]; // the global memory reads are actually coalesced since index is incrementing for each thread
+        thread_data[i] = input[index]; // the global memory reads are actually coalesced since 'index' is incrementing for each thread
         index += stride;
     }
   }
@@ -117,32 +117,72 @@ using IFFT = decltype(
     FFTsPerBlock<FFT_PER_BLK>() // supplied as -DFFT_PER_BLK, this changes the blockDim.y returned
 );
 
-// extern "C" __global__ void filter_sm_convolution(
-//   const complex_type* input, int input_len,
-//   const float* taps_fft, int tapslen,
-// ){
-//   // Local array requirement for cufftdx
-//   complex_type thread_data[FFT::storage_size]; // this is a thread-local register
+extern "C" __global__ void filter_sm_convolution(
+  const complex_type* input, int input_len,
+  const complex_type* taps_fft, int tapslen,
+  complex_type* output
+){
+  // Local array requirement for cufftdx
+  complex_type thread_data[FFT::storage_size]; // this is a thread-local register
 
-//   // ID of FFT in CUDA block, in range [0; FFT::ffts_per_block)
-//   const unsigned int local_fft_id = threadIdx.y;
-//   // Load data from global memory to registers
-//   example::io<FFT>::load(data, thread_data, local_fft_id);
+  // Define the ACTUAL convolved length based on FFT size: L + N - 1 = FFT size
+  const int length_per_blk = FFT_SIZE - tapslen + 1;
+  if (length_per_blk < 0) // Should never happen!
+    return;
+  // Define the first index to read (including zero-padded at the front of input, so we can go negative)
+  int writeIdx = blockIdx.x * length_per_blk;
+  int readIdx = writeIdx - tapslen + 1 + threadIdx.x; // offset backwards so we have the 'delay'
 
-//   // Execute FFT
-//   extern __shared__ complex_type shared_mem[];
-//   FFT().execute(thread_data, shared_mem);
+  // ID of FFT in CUDA block, in range [0; FFT::ffts_per_block)
+  const unsigned int local_fft_id = threadIdx.y;
+  // Load data from global memory to registers
+  // example::io<FFT>::load(data, thread_data, local_fft_id);
 
-//   // Scale values
-//   scalar_type scale = 1.0 / cufftdx::size_of<FFT>::value;
-//   for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
-//       thread_data[i].x *= scale;
-//       thread_data[i].y *= scale;
-//   }
+  // TODO: fix reading? not even sure
+  for (unsigned int i = 0; i < FFT::elements_per_thread; i++) {
+    if ((i * FFT::stride + threadIdx.x) < cufftdx::size_of<FFT>::value) 
+    {
+      // Read from the global memory if in range
+      if (readIdx >= 0 && readIdx < input_len)
+        thread_data[i].x = readIdx; // input[readIdx];
+      // else
+      // {
+      //   thread_data[i].x = taps_fft[i].x;
+      //   thread_data[i].y = FFT_SIZE;
+      // }
 
-//   // Execute inverse FFT
-//   IFFT().execute(thread_data, shared_mem);
+      readIdx += FFT::stride;
+    }
+  }
 
-//   // Save results
-//   example::io<FFT>::store(thread_data, data, local_fft_id);
-// }
+  // // Execute FFT
+  // extern __shared__ complex_type shared_mem[];
+  // FFT().execute(thread_data, shared_mem);
+
+  // // Multiply by the taps_fft
+  // // cast doesn't seem to work?
+  // // complex<float> *cast_thread_data = reinterpret_cast<complex<float>*>(thread_data); // cast it so we can use cupy's internal multiply functions
+  // for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+  // {
+  //   cast_thread_data[i].x = cast_thread_data[i].x * taps_fft[i * FFT::stride + threadIdx.x].x - cast_thread_data[i].y * taps_fft[i * FFT::stride + threadIdx.x].y;
+  //   cast_thread_data[i].y = cast_thread_data[i].x * taps_fft[i * FFT::stride + threadIdx.x].y + cast_thread_data[i].y * taps_fft[i * FFT::stride + threadIdx.x].x;
+  // }
+
+  // // Execute inverse FFT
+  // IFFT().execute(thread_data, shared_mem);
+
+  // Save results
+  // example::io<FFT>::store(thread_data, data, local_fft_id);
+
+  for (unsigned int i = 0; i < FFT::elements_per_thread; i++) 
+  {
+    // Set the read index from the output (skip the front section which should have convolved with 0s/circular)
+    readIdx = i * FFT::stride + threadIdx.x;
+
+    if (readIdx < cufftdx::size_of<FFT>::value) //  && readIdx >= tapslen - 1) 
+    {
+        output[writeIdx] = thread_data[i];
+        writeIdx += FFT::stride;
+    }
+  }
+}

@@ -402,28 +402,30 @@ class CupyKernelFilter:
         return d_out
  
     
-    def filter_smtaps_sminput(self, d_x: cp.ndarray, d_taps: cp.ndarray, THREADS_PER_BLOCK: int=128):
+    def filter_smtaps_sminput(self, d_x: cp.ndarray, d_taps: cp.ndarray, THREADS_PER_BLOCK: int=128, OUTPUT_PER_BLK: int=256):
         # Type checking
-        assert(d_taps.dtype == cp.float32)
-        assert(d_x.dtype == cp.complex64)
+        cupyRequireDtype(cp.float32, d_taps)
+        cupyRequireDtype(cp.complex64, d_x)
         # Dimension checking
-        assert(d_x.ndim == 1 and d_taps.ndim == 1)
-        # Maximum length checking
-        assert(d_taps.size < 2400)
-        # Note that this length is fixed as we draw a line at a minimum of 2 * tapslength for the workspace.
-        # In theory, it can still work with anything more than 1 * tapslength, but this is the line we draw.
+        if d_x.ndim != 1:
+            raise ValueError("d_x must be 1D.")
+        if d_taps.ndim != 1:
+            raise ValueError("d_taps must be 1D.")
         
         # Allocate output
         d_out = cp.zeros(d_x.size, dtype=cp.complex64)
         
-        # Calculate the workspace available (we move in multiples of THREADS_PER_BLOCK)
-        workspaceFactor = ((48000 - d_taps.nbytes) - (d_taps.size-1) * 8) // 8 // THREADS_PER_BLOCK
-        # print(workspaceFactor)
-        workspaceSize = workspaceFactor * THREADS_PER_BLOCK + d_taps.size - 1
-        OUTPUT_PER_BLK = workspaceFactor * THREADS_PER_BLOCK
+        # # Calculate the workspace available (we move in multiples of THREADS_PER_BLOCK)
+        # workspaceFactor = ((48000 - d_taps.nbytes) - (d_taps.size-1) * 8) // 8 // THREADS_PER_BLOCK
+        # # print(workspaceFactor)
+        # workspaceSize = workspaceFactor * THREADS_PER_BLOCK + d_taps.size - 1
+        # OUTPUT_PER_BLK = workspaceFactor * THREADS_PER_BLOCK
+
+        workspaceSize = OUTPUT_PER_BLK + d_taps.size - 1 
         
         # Calculate shared memory requirement
         smReq = d_taps.nbytes + workspaceSize * 8
+        cupyCheckExceedsSharedMem(smReq)
         
         # Calculate number of blocks required and the output size per block
         NUM_BLOCKS = d_x.size // OUTPUT_PER_BLK

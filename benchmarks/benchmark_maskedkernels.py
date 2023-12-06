@@ -24,7 +24,7 @@ import cupy as cp
 
 #%% Load the kernels
 (multiplyOnlyMaskedRowsKernel,
-multiplyRowsBasedOnMask) = cupyModuleToKernelsLoader("maskedaccess.cu", ["multiplyOnlyMaskedRows", "multiplyRowsBasedOnMask"])
+multiplyRowsBasedOnMask), _ = cupyModuleToKernelsLoader("maskedaccess.cu", ["multiplyOnlyMaskedRows", "multiplyRowsBasedOnMask"])
 
 #%% Initialize some data
 M = 10000 # rows

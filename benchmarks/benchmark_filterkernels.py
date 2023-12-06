@@ -1,27 +1,17 @@
 """
 Results from nsys profile:
 For length 1000000
-257.472us filter_smtaps
-230.976us filter_smtaps_sminput
+317us filter_smtaps
+230us filter_smtaps_sminput, 128 per blk
+240us filter_smtaps_sminput, 1024 per blk
 
 Generally, filter_smtaps_sminput kernel uses less blocks, and hence the occupancy for the SMs may be low.
 This causes it to be slower when the input length is small, but it gains performance
 and crosses over the filter_smtaps kernel at about 1M samples.
 
+Also, it's better for the filter_smtaps_sminput kernel to use less per block; probably due to better SMs work balancing since
+there will be more blocks.
 
-DEPRECATED
-----------
-Early results:
-
-Note that the order of kernels called affects the timer.start/end() timing.
-As such we report nvprof kernel durations here.
-
-96.256us filter_smtaps
-64.512us filter_smtaps_sminput
-78.656us filter_smtaps with 4x downsample 
-    (this is not a 4x improvement! probably a lot of global mem reads,
-     but this would allow us to skip an expensive copy using cp.ascontiguousarray(),
-     which is necessary after manually downsampling the output)
 """
 
 from filterRoutines import *
@@ -60,7 +50,12 @@ timer.end("gpu smtaps")
 # Filter the noise (GPU, sm input)
 timer.start()
 d_filt_smtaps_sminput = cpkf.filter_smtaps_sminput(d_noise, d_taps)
-timer.end("gpu smtaps sminput")
+timer.end("gpu smtaps sminput 128 per blk")
+
+# Do again, but use more per block
+timer.start()
+d_filt_smtaps_sminput = cpkf.filter_smtaps_sminput(d_noise, d_taps, OUTPUT_PER_BLK=1024)
+timer.end("gpu smtaps sminput 1028 per blk")
 
 # Check results
 compareValues(cpu_filt, d_filt_smtaps.get())

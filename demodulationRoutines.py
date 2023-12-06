@@ -576,7 +576,7 @@ try:
      compareIntegerPreambles_kernel,
      cutAndRotate_gray_kernel,
      detectBPSKorQPSK_kernel,
-     demod_b_or_q_psk_kernel) = cupyModuleToKernelsLoader(
+     demod_b_or_q_psk_kernel), _ = cupyModuleToKernelsLoader(
         "demodulation.cu",
         [
             "lockPhase_mapSyms_singleBlkKernel_qpsk",

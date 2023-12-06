@@ -9,60 +9,8 @@ Other generic cupy extensions that don't fit anywhere else..
 
 import cupy as cp
 import numpy as np
-import os
 
-#%% Convenience functions
-def cupyModuleToKernelsLoader(modulefilename: str, kernelNames: list):
-    """
-    Helper function to generate the CuPy kernel objects from a module.
-    The module is expected to reside in the custom_kernels folder.
-
-    Examples:
-        kernel1, kernel2 = cupyModuleToKernelsLoader("mymodule.cu", ["mykern1","mykern2"])
-        kernel1, = cupyModuleToKernelsLoader("mymodule.cu", "mykern1")
-
-    Parameters
-    ----------
-    modulefilename : str
-        Name of the module file.
-    kernelNames : list
-        List of kernel names. These are to include the templated types if the kernels are templated.
-        Example: ["mykern1", "mykern2<float>", "mykern2<double>"]
-    """
-    if isinstance(kernelNames, str):
-        kernelNames = [kernelNames]
-    kernels = []
-    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", modulefilename), "r") as fid:
-        _module = cp.RawModule(code=fid.read(), options=('-std=c++11',),
-                               name_expressions=kernelNames)
-        for kernelName in kernelNames:
-            kernels.append(_module.get_function(kernelName))
-
-    return kernels
-
-def cupyRequireDtype(dtype: type, var: cp.ndarray):
-    """
-    Example: cupyRequireDtype(cp.uint32, myarray)
-    """
-    if var.dtype != dtype:
-        raise TypeError("Must be %s, found %s" % (dtype, var.dtype))
-    
-def cupyCheckExceedsSharedMem(requestedBytes: int, maximumBytes: int=48000):
-    if requestedBytes > maximumBytes:
-        raise MemoryError("Shared memory requested %d bytes exceeds maximum %d bytes" % (requestedBytes, maximumBytes))
-
-def requireCupyArray(var: cp.ndarray):
-    if not isinstance(var, cp.ndarray):
-        raise TypeError("Must be cupy array.")
-    
-def cupyGetEnoughBlocks(length: int, computedPerBlock: int):
-    """
-    Gets just enough blocks to cover a certain length.
-    Assumes every block will compute 'computedPerBlock' elements.
-    """
-    NUM_BLKS = length // computedPerBlock
-    NUM_BLKS = NUM_BLKS if NUM_BLKS % computedPerBlock == 0 else NUM_BLKS + 1
-    return NUM_BLKS
+from cupyHelpers import *
 
 
 #%% A block-group paired kernel copy
@@ -124,10 +72,11 @@ def cupyCopyGroups32fc(x: cp.ndarray, y: cp.ndarray,
     copy_groups_kernel32fc((NUM_BLOCKS,), (threads_per_blk,),
                            (x, y, xStarts, lengths, yStarts))
 
-_copySlicesToMatrix_32fckernel, _copyEqualSlicesToMatrix_32fckernel, \
-    _copyIncrementalEqualSlicesToMatrix_32fckernel = cupyModuleToKernelsLoader(
+kernels, _ = cupyModuleToKernelsLoader(
     "copying.cu", 
     ["copySlicesToMatrix_32fc", "copyEqualSlicesToMatrix_32fc", "copyIncrementalEqualSlicesToMatrix_32fc"])
+_copySlicesToMatrix_32fckernel, _copyEqualSlicesToMatrix_32fckernel, \
+    _copyIncrementalEqualSlicesToMatrix_32fckernel = kernels # Unpack
 
 def cupyCopySlicesToMatrix_32fc(
     d_x: cp.ndarray,
@@ -231,10 +180,12 @@ def cupyCopyIncrementalEqualSlicesToMatrix_32fc(
     
 
 #%%
-_argmax3d_uint32kernel, _argmaxAbsRows_cplx64kernel = cupyModuleToKernelsLoader(
+kernels, _ = cupyModuleToKernelsLoader(
     "argmax.cu", 
     ["multiArgmax3d_uint32", "multiArgmaxAbsRows_complex64"]
 )
+_argmax3d_uint32kernel, _argmaxAbsRows_cplx64kernel = kernels # Unpack
+
 def cupyArgmax3d_uint32(d_x: cp.ndarray, THREADS_PER_BLOCK: int=128, alsoReturnMaxValue: bool=False):
     # Input checks
     if d_x.dtype != cp.uint32:
@@ -320,7 +271,7 @@ def cupyArgmaxAbsRows_complex64(
     _complex_magnSq_kernel_floatfloat,
     _complex_magnSq_kernel_floatdouble,
     _complex_magnSq_kernel_doubledouble   
-) = cupyModuleToKernelsLoader(
+), _ = cupyModuleToKernelsLoader(
     "complex_magn.cu", 
     [
         "complex_magnSq_kernel<float,float>",
@@ -374,11 +325,7 @@ def cupyComplexMagnSq(
 
 
 #%% 
-# with open(os.path.join(os.path.dirname(__file__), "custom_kernels", "multiplySlices.cu"), "r") as fid:
-#     _module_multiplySlices = cp.RawModule(code=fid.read())
-#     _multiplySlicesWithIndexedRowsOptimisticKernel = _module_multiplySlices.get_function("multiplySlicesWithIndexedRowsOptimistic")
-
-_multiplySlicesWithIndexedRowsOptimisticKernel, _slidingMultiplyKernel = cupyModuleToKernelsLoader(
+(_multiplySlicesWithIndexedRowsOptimisticKernel, _slidingMultiplyKernel), _ = cupyModuleToKernelsLoader(
     "multiplySlices.cu", 
     ["multiplySlicesWithIndexedRowsOptimistic", "slidingMultiplyNormalised"]
 )

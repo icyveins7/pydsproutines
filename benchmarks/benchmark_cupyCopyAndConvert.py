@@ -23,3 +23,11 @@ timer.end()
 # This should be faster on copy, but has overhead of requiring additional GPU memory
 d_data = cp.asarray(data) # 26.6ms, about half as expected
 d_fdata = d_data.astype(np.float32) # 1.7ms, very small
+
+# Repeat it again
+d_data = cp.asarray(data)
+d_fdata = d_data.astype(np.float32) 
+# Note that on the first invocation of the .astype(np.float32), 
+# nsys will show that it starts way after the memcpy
+# This is probably due to the jit compile of the kernel
+# This second call shows up in nsys as right after the memcpy

@@ -317,6 +317,14 @@ def makeFreq(length, fs):
             freq[i] = freq[i] - fs
     return freq
 
+def timeSliceSignal(x: np.ndarray, tstart: float, tstop: float, fs: float):
+    """
+    Convenience function to extract a time slice of a signal.
+    This is easier to use when you have already plotted the signal with time x-axis
+    rather than sample x-axis.
+    """
+    return x[int(tstart*fs):int(tstop*fs)]
+
 #%%
 try:
     import cupy as cp

@@ -285,6 +285,24 @@ def cupyComplexMagnSq(
     out_dtype: cp.dtype=cp.float64,
     THREADS_PER_BLOCK: int=128
 ):
+    """
+    Simple grid-stride kernel invocation to calculate the magnitude squared
+    of a complex array.
+
+    Has 3 input-output flavour pairs:
+    complex<float> -> float
+    complex<float> -> double
+    complex<double> -> double
+
+    Parameters
+    ----------
+    d_x : cp.ndarray
+        Input array.
+    out_dtype : cp.dtype, optional
+        Output data type. Defaults to float64.
+    THREADS_PER_BLOCK : int, optional
+        Number of threads per block. Defaults to 128.
+    """
     NUM_BLKS = cupyGetEnoughBlocks(d_x.size, THREADS_PER_BLOCK)
 
     # Call appropriate kernel for appropriate type

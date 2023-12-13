@@ -79,11 +79,11 @@ if __name__ == "__main__":
     import argparse
     # Generate commandline args for the benchmark function
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cutoutlen', default=1000)
-    parser.add_argument('--numShifts', default=100000)
-    parser.add_argument('--cupyBatchSize', default=4096)
-    parser.add_argument('--threadsPerBlk', default=128)
-    parser.add_argument('--numSlidesPerBlk', default=1024)
+    parser.add_argument('--cutoutlen', default=1000, type=int)
+    parser.add_argument('--numShifts', default=100000, type=int)
+    parser.add_argument('--cupyBatchSize', default=4096, type=int)
+    parser.add_argument('--threadsPerBlk', default=128, type=int)
+    parser.add_argument('--numSlidesPerBlk', default=1024, type=int)
 
     args = parser.parse_args()
     print(args)

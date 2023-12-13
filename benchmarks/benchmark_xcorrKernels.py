@@ -76,4 +76,21 @@ def benchmark(cutoutlen=1000, numShifts=100000, cupybatchsize=4096,
 
 
 if __name__ == "__main__":
-    benchmark()
+    import argparse
+    # Generate commandline args for the benchmark function
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--cutoutlen', default=1000)
+    parser.add_argument('--numShifts', default=100000)
+    parser.add_argument('--cupyBatchSize', default=4096)
+    parser.add_argument('--threadsPerBlk', default=128)
+    parser.add_argument('--numSlidesPerBlk', default=1024)
+
+    args = parser.parse_args()
+    print(args)
+    benchmark(
+        args.cutoutlen, 
+        args.numShifts,
+        args.cupyBatchSize, 
+        args.threadsPerBlk, 
+        args.numSlidesPerBlk
+    )

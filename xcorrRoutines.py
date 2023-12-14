@@ -9,7 +9,7 @@ import numpy as np
 import scipy as sp
 import scipy.signal as sps
 import time
-from spectralRoutines import czt, CZTCached
+from spectralRoutines import czt, CZTCached, CZTCachedGPU
 from signalCreationRoutines import makeFreq
 from musicRoutines import MUSIC
 # from numba import jit
@@ -146,7 +146,8 @@ try:
         startIdx: int=0,
         idxlen: int=None,
         THREADS_PER_BLOCK: int=32,
-        numSlidesPerBlk: int=None
+        numSlidesPerBlk: int=None,
+        cztObj: CZTCachedGPU=None
     ):
         """
         This function uses an optimised custom kernel for 'short' cutouts.
@@ -166,7 +167,14 @@ try:
             The number of indices to correlate over; the correlation index step size
             is implicitly 1, and cannot be changed.
             The default is None, which will default to maximum search range of rx.
+        cztObj : CZTCachedGPU (see spectralRoutines)
+            GPU-based CZT object. The xcorr will default to using FFTs if this is not supplied.
         """
+        if idxlen is None:
+            idxlen = rx.size - cutout.size - startIdx + 1
+
+        if cztObj is not None and cztObj.m != cutout.size:
+            raise ValueError("CZT object input length doesn't match the cutout array size")
 
         # Call the optimised kernel (this will perform type checking for us already)
         d_pdts = multiplySlidesNormalised(
@@ -178,8 +186,12 @@ try:
             numSlidesPerBlk=numSlidesPerBlk
         )
 
-        # Perform the FFT on each row
-        d_pdtsfft = cp.fft.fft(d_pdts, axis=1) 
+        if cztObj is None:
+            # Perform the FFT on each row
+            d_pdtsfft = cp.fft.fft(d_pdts, axis=1) 
+        else:
+            # Use the czt on each row
+            d_pdtsfft = cztObj.runMany(d_pdts)
 
         # We now have fft(x*y)/norm(y)/norm(x), so we take abs squared 
         # d_out = cp.abs(d_pdtsfft)**2

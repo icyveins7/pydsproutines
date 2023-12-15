@@ -30,6 +30,14 @@ def closeAllFigs():
     QApplication.closeAllWindows()
     plt.close("all")
     
+def _getPgColourRotation() -> list:
+    '''
+    Load a list of colours to rotate for pyqtgraph,
+    like how matplotlib does it.
+    '''
+    colourRotation = plt.rcParams['axes.prop_cycle'].by_key()['color'] # This is in strings like '#1f77b4'
+    colourRotation.insert(0, 'w') # Put white first cause that's the default pyqtgraph colour
+    return colourRotation
 
 def pgRender():
     """
@@ -273,7 +281,7 @@ def pgPlotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, titl
         ax.addLegend()
         
     # Load the default colour rotation from matplotlib
-    colourRotation = plt.rcParams['axes.prop_cycle'].by_key()['color'] # This is in strings like '#1f77b4'
+    colourRotation = _getPgColourRotation()
 
     for i, data in enumerate(dataList):
         amp = np.abs(data)
@@ -323,6 +331,8 @@ def pgPlotSpectra(dataList, fs, nfft=None, labels=None, colors=None, windowTitle
     if labels is not None:
         ax.addLegend()
         
+    colourRotation = _getPgColourRotation()
+
     for i, data in enumerate(dataList):
         spec = 20*np.log10(np.abs(np.fft.fft(data, n=nfft)))
         if nfft is None:
@@ -333,7 +343,7 @@ def pgPlotSpectra(dataList, fs, nfft=None, labels=None, colors=None, windowTitle
         if colors is not None:
             ax.plot(freqs, spec, pen=colors[i], name=labels[i] if labels is not None else None)
         else:
-            ax.plot(freqs, spec, name=labels[i] if labels is not None else None)
+            ax.plot(freqs, spec, pen=colourRotation[i%len(colourRotation)], name=labels[i] if labels is not None else None)
 
     return win, ax
 
@@ -568,6 +578,12 @@ def mplBtnToggle(p, fig):
 
 #%% testing
 if __name__ == "__main__":
+    yList = [
+        np.arange(3) + 3*i for i in range(15)
+    ]
     win, ax = pgPlotAmpTime(
-        [[1,2,3],[4,5,6]],[[1,2,3],[1,2,3]]
+        yList, [1] * len(yList)
+    )
+    fwin, fax = pgPlotSpectra(
+        yList, [1] * len(yList)
     )

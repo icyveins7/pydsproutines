@@ -81,15 +81,23 @@ void multiArgmax3d_uint32(
 }
 
 
-// Multi argmax on every row of a complex 2D matrix, with internal abs performed
-// Each block tackles 1 row.
+/*
+Multi argmax on every row of a complex 2D matrix, with internal abs performed
+Each block tackles 1 row.
+
+Likely use-case is for post-xcorr FFTs, which result in a rows(time index) by
+columns(FFT index), and flattening this 2D ambiguity function will result in 
+a maxed-for-each-time frequency index, and the resulting QF or QF2 value.
+*/ 
+
 extern "C" __global__
 void multiArgmaxAbsRows_complex64(
     const complex<float> *d_x,
     const int numRows, // dimension 1 of d_x
     const int length,  // dimension 2 of d_x
     unsigned int *d_argmax, // output, has length numRows
-    float *d_max // output, has length numRows (optional)
+    float *d_max, // output, has length numRows (optional)
+    const bool useNormSqInstead
 ){
     // allocate shared memory
     extern __shared__ double s[];
@@ -108,7 +116,10 @@ void multiArgmaxAbsRows_complex64(
     float absval;
     for (int t = threadIdx.x; t < length; t += blockDim.x)
     {
-        absval = abs(d_row[t]);
+        if (useNormSqInstead)
+            absval = norm(d_row[t]); // this is actually magn squared -> cupy/cupy/_core/include/cupy/complex/complex.h
+        else
+            absval = abs(d_row[t]);
         if (absval > s_ws[threadIdx.x]) // update the workspace values for this thread
         {
             s_ws[threadIdx.x] = absval;

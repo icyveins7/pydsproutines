@@ -227,8 +227,14 @@ def cupyArgmaxAbsRows_complex64(
     d_argmax: cp.ndarray=None,
     d_max: cp.ndarray=None,
     returnMaxValues: bool=False,
-    THREADS_PER_BLOCK: int=128
+    THREADS_PER_BLOCK: int=128,
+    useNormSqInstead: bool=False
 ):
+    """
+    Performs a CUDA block->row argmax along the columns for each row.
+    Optionally returns the max values themselves, along with the argmax indices.
+    Optionally also allowed to use magnSq (i.e. abs()^2) instead of just abs().
+    """
     cupyRequireDtype(cp.complex64, d_x)
 
     # Allocate output
@@ -257,7 +263,7 @@ def cupyArgmaxAbsRows_complex64(
     NUM_BLKS = numRows
     _argmaxAbsRows_cplx64kernel(
         (NUM_BLKS,), (THREADS_PER_BLOCK,),
-        (d_x, numRows, length, d_argmax, d_max),
+        (d_x, numRows, length, d_argmax, d_max, useNormSqInstead),
         shared_mem=smReq
     )
 

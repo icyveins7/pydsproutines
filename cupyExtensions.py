@@ -457,7 +457,7 @@ def multiplySlidesNormalised(
     cupyCheckExceedsSharedMem(smReq)
 
     # Allocate output
-    d_pdts = cp.zeros((idxlen, d_x.size), dtype=cp.complex64)    
+    d_pdts = cp.empty((idxlen, d_x.size), dtype=cp.complex64)    
     
     # Execute kernel
     NUM_BLKS = cupyGetEnoughBlocks(idxlen, numSlidesPerBlk)

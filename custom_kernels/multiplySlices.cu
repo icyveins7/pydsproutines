@@ -146,8 +146,8 @@ void slidingMultiplyNormalised(
     {
         if (ysectionOffset + t < ylen) // read within bounds
         {
-            yt = y[ysectionOffset + t];
-            s_ysection[t] = y[ysectionOffset + t];
+            yt = y[ysectionOffset + t + startIdx];
+            s_ysection[t] = yt;
             // Initialize the first normSq workspace values while reading in
             if (t < xlen) // Each thread accumulates in its own index in the workspace
                 s_ws[threadIdx.x] += (double)norm(yt); // 'norm' is actually magn squared -> See cupy/cupy/_core/include/cupy/complex/complex.h

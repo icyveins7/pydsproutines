@@ -272,13 +272,16 @@ def pgPlotAmpTime(dataList, fs, labels=None, colors=None, windowTitle=None, titl
     if labels is not None:
         ax.addLegend()
         
+    # Load the default colour rotation from matplotlib
+    colourRotation = plt.rcParams['axes.prop_cycle'].by_key()['color'] # This is in strings like '#1f77b4'
+
     for i, data in enumerate(dataList):
         amp = np.abs(data)
-        t = np.arange(data.size) / fs[i]
+        t = np.arange(len(data)) / fs[i] # Don't use .size so lists are okay
         if colors is not None:
             ax.plot(t, amp, pen=colors[i], name=labels[i] if labels is not None else None)
         else:
-            ax.plot(t, amp, name=labels[i] if labels is not None else None)
+            ax.plot(t, amp, pen=colourRotation[i%len(colourRotation)], name=labels[i] if labels is not None else None)
     
     return win, ax
     
@@ -561,3 +564,10 @@ def mplBtnToggle(p, fig):
     # Connect the button
     fig.canvas.mpl_connect('key_press_event', btnToggle)
     
+
+
+#%% testing
+if __name__ == "__main__":
+    win, ax = pgPlotAmpTime(
+        [[1,2,3],[4,5,6]],[[1,2,3],[1,2,3]]
+    )

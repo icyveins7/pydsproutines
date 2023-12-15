@@ -147,7 +147,9 @@ try:
         idxlen: int=None,
         THREADS_PER_BLOCK: int=32,
         numSlidesPerBlk: int=None,
-        cztObj: CZTCachedGPU=None
+        cztObj: CZTCachedGPU=None,
+        flattenCAF: bool=False,
+        BATCH: int=None
     ):
         """
         This function uses an optimised custom kernel for 'short' cutouts.
@@ -169,6 +171,14 @@ try:
             The default is None, which will default to maximum search range of rx.
         cztObj : CZTCachedGPU (see spectralRoutines)
             GPU-based CZT object. The xcorr will default to using FFTs if this is not supplied.
+        flattenCAF : bool, optional
+            Defaults to False, which returns the 2D ambiguity function.
+            Otherwise it flattens to the QF2 vs time, and the corresponding 
+            maximum frequency index for each time.
+        BATCH : int, optional
+            Runs multiples of BATCH size to cover the xcorr indices.
+            Defaults to None, which will cover all of it in 1 go; this may cause OutOfMemoryErrors
+            if it is large.
         """
         if idxlen is None:
             idxlen = rx.size - cutout.size - startIdx + 1
@@ -176,28 +186,65 @@ try:
         if cztObj is not None and cztObj.m != cutout.size:
             raise ValueError("CZT object input length doesn't match the cutout array size")
 
-        # Call the optimised kernel (this will perform type checking for us already)
-        d_pdts = multiplySlidesNormalised(
-            cutout,
-            rx,
-            startIdx,
-            idxlen,
-            THREADS_PER_BLOCK=THREADS_PER_BLOCK,
-            numSlidesPerBlk=numSlidesPerBlk
-        )
+        if BATCH is None:
+            BATCH = idxlen
 
-        if cztObj is None:
-            # Perform the FFT on each row
-            d_pdtsfft = cp.fft.fft(d_pdts, axis=1) 
+        # Allocate outputs
+        if flattenCAF:
+            d_freqIdx = cp.empty(idxlen, dtype=cp.uint32)
+            d_qf2 = cp.empty(idxlen, dtype=cp.float32)
         else:
-            # Use the czt on each row
-            d_pdtsfft = cztObj.runMany(d_pdts)
+            d_out = cp.empty((idxlen, cutoutsize), dtype=cp.float32)
 
-        # We now have fft(x*y)/norm(y)/norm(x), so we take abs squared 
-        # d_out = cp.abs(d_pdtsfft)**2
-        d_out = cupyComplexMagnSq(d_pdtsfft, out_dtype=cp.float32) # Is faster now due to combined kernel!
+        # Track the finished index
+        fi = 0
+        while fi < idxlen:
+            # How many to calculate this batch?
+            THIS_BATCH_LEN = BATCH if fi + BATCH < idxlen else idxlen - fi
+            # print("Processing %d:%d / %d" % (fi, fi+THIS_BATCH_LEN, idxlen))
 
-        return d_out
+            # Call the optimised kernel (this will perform type checking for us already)
+            d_pdts = multiplySlidesNormalised(
+                cutout,
+                rx,
+                startIdx + fi,
+                THIS_BATCH_LEN,
+                THREADS_PER_BLOCK=THREADS_PER_BLOCK,
+                numSlidesPerBlk=numSlidesPerBlk
+            )
+
+            if cztObj is None:
+                # Perform the FFT on each row
+                d_pdtsfft = cp.fft.fft(d_pdts, axis=1) 
+            else:
+                # Use the czt on each row
+                d_pdtsfft = cztObj.runMany(d_pdts)
+
+            # We now have fft(x*y)/norm(y)/norm(x), so we take abs squared 
+            if flattenCAF:
+                cupyArgmaxAbsRows_complex64(
+                    d_pdtsfft,
+                    d_argmax=d_freqIdx[fi:fi+THIS_BATCH_LEN],
+                    d_max=d_qf2[fi:fi+THIS_BATCH_LEN],
+                    returnMaxValues=True,
+                    THREADS_PER_BLOCK=THREADS_PER_BLOCK,
+                    useNormSqInstead=True
+                )
+                
+            else:
+                d_out[fi:fi+THIS_BATCH_LEN, :] = cupyComplexMagnSq(
+                    d_pdtsfft[fi:fi+THIS_BATCH_LEN, :], 
+                    out_dtype=cp.float32) # Is faster now due to combined kernel!
+
+            # Increment index
+            fi += THIS_BATCH_LEN
+
+
+        # Return
+        if flattenCAF:
+            return d_freqIdx, d_qf2
+        else:
+            return d_out
 
 except:
     print("Failed to load cupy?")

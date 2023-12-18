@@ -460,7 +460,8 @@ def plotConstellation(syms, fmt='.', labels=None, ax=None):
 def plotPossibleConstellations(
     syms_rs: np.ndarray, 
     osr: int, 
-    fmt: str='.'
+    fmt: str='.',
+    ax: np.ndarray=None
 ):
     """
     Convenience function to plot all possible resample points to find an eye-opening
@@ -470,7 +471,9 @@ def plotPossibleConstellations(
     # Create enough subplots
     rows = int(osr**0.5)
     cols = osr // rows if osr % rows == 0 else osr // rows + 1
-    fig, ax = plt.subplots(rows, cols)
+    if ax is None:
+        fig, ax = plt.subplots(rows, cols)
+
     for i in range(osr):
         plotConstellation(
             syms_rs[i::osr],
@@ -478,7 +481,7 @@ def plotPossibleConstellations(
             ax=ax[i // cols, i % cols]
         )
         ax[i//cols, i%cols].set_title('%d::%d' % (i, osr))
-    return fig, ax
+    return ax
 
 def plotFreqz(taps, cutoff=None):
     fig, ax = plt.subplots(1,1,num="Filter performance (%d taps)" % taps.size)

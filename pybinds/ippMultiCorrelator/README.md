@@ -61,18 +61,70 @@ Computational complexity is given as follows:
 Total complexity is
 
 $$
-O(N (\eta L \log (\eta L) + (\eta-1)L^2))
+O(N (\eta L \log (\eta L) + (\eta-1)L^2)) \approx O(N \eta L \log (\eta L) + N \eta L^2)
+$$
+
+However, this isn't the full story! We consider the case where multiple different preambles are computed; in these scenarios, we don't repeat the FFT for each time index. Instead, we only re-do the dot products. So for $K$ different preambles, the total complexity is 
+
+$$
+O(N \eta L \log (\eta L) + KN \eta L^2)
+$$
+
+Note that the FFT term is unscaled by $K$!
+
+An easier way to consider this is to boil this down to a per-time-index complexity of 
+
+$$
+O(\eta L \log (\eta L) + K \eta L^2)
 $$
 
 ## Comparison to sliding dot product + FFTs
 
 Algorithm is briefly given by the following:
 
-1. For each time index, cut a slice from $x$ of length $\eta L$ and multiply it against a preamble.
+1. For each time index, cut a slice from $x$ of length $\eta L$ and multiply it against a preamble (here we use $\eta L$ to compare since this method necessitates pre-upsampling)
 2. Perform the FFT of this interrim array and save it.
 3. Normalise the result.
 
-Computational complexity for this in the asymptotic limit of large $N$ is given by $O(N \eta L \log (\eta L) + NL)$.
+Computational complexity for this for a single preamble is given by $O(\eta L \log (\eta L) + \eta L)$.
+
+However, for $K$ different preambles, this scales linearly as $O(K \eta L \log (\eta L) + K \eta L)$. The bad thing about this is that the FFT term is scaled along with the linear multiplication term!
+
+If we compare the dominant term for this (the FFT term) with the dominant term for the multi-preamble method above (the $L^2$ term), then we can see that the comparison is
+
+$$
+O(L) \,\, \text{vs} \,\, O(\log (\eta L))
+$$
+
+### Complexity estimation examples
+
+$\log_2$ is used where $\log$ is required. We compute scalar values by plugging in the full complexity formulas for both methods given above.
+
+1. $\eta = 10, L = 10$. Expectation in the limit is that $\frac{L}{\log (\eta L)} \approx 1.5$, so the multi-preamble method should be worse by about 50%.
+
+$K=1$.
+
+Multi-preamble: $1664.39$.<br>
+Sliding + FFT: $764.39$.
+
+$K = 32$
+
+Multi-preamble: $32664$.<br>
+Sliding + FFT: $24460$.
+
+2. $\eta = 1000, L = 10$. Expectation in the limit is that $\frac{L}{\log (\eta L)} \approx 0.75$, so the multi-preamble method should be better by about 25%.
+
+$K=1$.
+
+Multi-preamble: $232877$.<br>
+Sliding + FFT: $142877$.
+
+$K = 32$
+
+Multi-preamble: $3332877$.<br>
+Sliding + FFT: $4572067$.
+
+
 
 ## Comparison to generalised xcorr
 

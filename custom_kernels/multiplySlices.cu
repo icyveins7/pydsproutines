@@ -214,3 +214,181 @@ void slidingMultiplyNormalised(
             
     } // End outer loop
 }
+
+/*
+Multi-template sliding dot products.
+
+Motivation:
+To discard the use of cuFFT calls, one can create multiple templates
+to test for with correlation; these will come with their frequency shifted copies.
+This way you will not have to use FFT to search the CAF.
+
+However, this assumes some knowledge of the frequency range which the peak will reside in.
+
+Also, this can be used to test multiple distinct templates.
+
+Only the best template (index) should be saved, along with the normalised peak value.
+
+Example:
+2 templates with 3 frequency shifts -> 6 total templates.
+
+Design goals:
+Use shared memory to store all templates.
+
+Recommendation:
+This may not perform well with large OSRs, especially since it will consume a lot of shared memory.
+
+Algorithm:
+1) Load a slice of the input array.
+2) Loop over following:
+3) Load a single template into shared mem.
+4) Slide and dot product template across the input slice.
+5) For each one, save dot product into shared memory workspace if higher than before, and also write the current template index.
+6) Repeat 2-5 for each template.
+7) Write shared mem workspace to final global output.
+*/
+
+extern "C" __global__ 
+void multiTemplateSlidingDotProduct(
+    const complex<float> *d_templates, // (numTemplate rows * templateLength columns)
+    const float *d_template_energies,
+    const int numTemplates,
+    const int templateLength,
+    const complex<float> *d_x,
+    const int xlength,
+    const int numSlidesPerBlk,
+    int *d_templateIdx,
+    float *d_output
+){
+    const int xsectionLength = numSlidesPerBlk + templateLength - 1;
+
+    // allocate shared memory
+    extern __shared__ double s[];
+
+    complex<float> *s_template = (complex<float>*)s; // (templateLength) complex floats
+    complex<float> *s_xsection = (complex<float>*)&s_template[templateLength]; // (numSlidesPerBlk + templateLength - 1) complex floats
+    complex<float> *s_ws = (complex<float>*)&s_xsection[xsectionLength]; // (THREADS_PER_BLK) complex floats
+    int *s_templateIdx = (int*)&s_ws[blockDim.x]; // (numSlidesPerBlk) ints
+    float *s_output = (float*)&s_templateIdx[numSlidesPerBlk]; // (numSlidesPerBlk) floats
+    /*
+    Total shared memory footprint:
+    numSlidesPerBlk * (4 + 4 + 8) + 
+    templateLength * (8 + 8) + 
+    THREADS_PER_BLK * 8
+
+    Ignored the -1 from xsection
+    */
+
+    float *s_wsf = (float*)s_ws; // we mangle the pointer type here just for the pre-normalization calculation
+
+    // Initialize the xsection slice
+    for (int t = threadIdx.x; t < xsectionLength; t += blockDim.x)
+    {
+        int idx = blockIdx.x * numSlidesPerBlk + t; // the accessor index for the global input
+        complex<float> xsection = (idx < xlength) ? d_x[idx] : 0; // read to register
+        s_xsection[t] = xsection; // write to shared mem
+
+        // We also fill up the workspace to calculate the first normalization here
+        if (t < templateLength)
+        {
+            // we use our mangled pointer here..
+            if (t == threadIdx.x) // first loop we write
+                s_wsf[threadIdx.x] = norm(xsection); // 'norm' is actually magn squared -> See cupy/cupy/_core/include/cupy/complex/complex.h
+            else // consequent loops we accumulate
+                s_wsf[threadIdx.x] += norm(xsection);
+        }
+            
+    }
+
+    // Initialize the shared memory temporary outputs
+    for (int t = threadIdx.x; t < numSlidesPerBlk; t += blockDim.x)
+    {
+        s_templateIdx[t] = 0;
+        s_output[t] = 0.0f;
+    }
+
+    __syncthreads();
+
+    // Pre-Compute the first normalization across the xsection slice
+    for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1)
+    {
+        if (threadIdx.x < s)
+        {
+            // accumulate using the mangled pointer
+            s_wsf[threadIdx.x] += s_wsf[threadIdx.x + s];
+        }
+        __syncthreads();
+    }
+
+    // All threads keep a copy of the first normalization in register
+    float firstNormalization = s_wsf[0];
+    float normalization;
+
+    //////// Begin computation loop
+    for (int i = 0; i < numTemplates; i++)
+    {
+        // Load the current template into the shared memory
+        for (int t = threadIdx.x; t < templateLength; t += blockDim.x)
+            s_template[t] = d_templates[i * templateLength + t];
+
+        // And the current energy (into thread local register)
+        float template_energy = d_template_energies[i];
+        
+        __syncthreads();
+
+        // Iterate over the slides
+        for (int k = 0; k < numSlidesPerBlk; k++)
+        {
+            // Multiply across the template
+            for (int t = threadIdx.x; t < templateLength; t += blockDim.x)
+            {
+                // On first loop write
+                if (t == threadIdx.x)
+                    s_ws[threadIdx.x] = s_template[t] * s_xsection[k + t];
+                // On consequent loops accumulate
+                else
+                    s_ws[threadIdx.x] += s_template[t] * s_xsection[k + t];
+            }
+            
+            // At this point the workspace needs to be summed over
+            __syncthreads();
+
+            for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1)
+            {
+                if (threadIdx.x < s)
+                {
+                    s_ws[threadIdx.x] += s_ws[threadIdx.x + s];
+                }
+                __syncthreads();
+            }
+            // Now the dot product is in the first index
+
+            // Update the shared memory output if better
+            if (threadIdx.x == 0)
+            {
+                // Update the normalization energy for the current slide
+                // Each slide works on indices[k, k+templateLength)
+                normalization = (k > 0) ? normalization + norm(s_xsection[k + templateLength-1]) - norm(s_xsection[k-1]) : firstNormalization;
+
+                // Calculate the output with both template and input normalizations
+                float output = norm(s_ws[0]) / template_energy / normalization; // 'norm' is actually magn squared -> See cupy/cupy/_core/include/cupy/complex/complex.h
+
+                // Only overwrite if larger
+                if (output > s_output[k])
+                {
+                    s_output[k] = output;
+                    s_templateIdx[k] = i;
+                }
+            }
+        }
+    }
+
+    // When complete, write to global output
+    __syncthreads(); // do i need this one?
+    for (int t = threadIdx.x; t < numSlidesPerBlk; t += blockDim.x)
+    {
+        d_output[blockIdx.x * numSlidesPerBlk + t] = s_output[t];
+        d_templateIdx[blockIdx.x * numSlidesPerBlk + t] = s_templateIdx[t];
+    }
+
+}

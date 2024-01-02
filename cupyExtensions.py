@@ -349,9 +349,11 @@ def cupyComplexMagnSq(
 
 
 #%% 
-(_multiplySlicesWithIndexedRowsOptimisticKernel, _slidingMultiplyKernel), _ = cupyModuleToKernelsLoader(
+(_multiplySlicesWithIndexedRowsOptimisticKernel, 
+ _slidingMultiplyKernel,
+ _multiTemplateSlidingDotKernel), _ = cupyModuleToKernelsLoader(
     "multiplySlices.cu", 
-    ["multiplySlicesWithIndexedRowsOptimistic", "slidingMultiplyNormalised"]
+    ["multiplySlicesWithIndexedRowsOptimistic", "slidingMultiplyNormalised","multiTemplateSlidingDotProduct"]
 )
 
         
@@ -478,6 +480,81 @@ def multiplySlidesNormalised(
     )
 
     return d_pdts
+
+def multiTemplateSlidingDotProduct(
+    d_x: cp.ndarray, # This is the searched input (longer array)
+    d_templates: cp.ndarray, # This is the matrix of templates (1 row = 1 template)
+    startIdx: int, # First index of d_x to start searching
+    idxlen: int, # Number of searched indices i.e. [startIdx, startIdx+idxlen)
+    d_templateEnergies: cp.ndarray=None,
+    numSlidesPerBlk: int=None,
+    THREADS_PER_BLOCK: int=128
+):
+    # Check 32fc input arrays
+    cupyRequireDtype(cp.complex64, d_x)
+    cupyRequireDtype(cp.complex64, d_templates)
+
+    # Ensure templates is 2D
+    if d_templates.ndim != 2:
+        raise ValueError("Templates should be 2D; each row is an individual template.")
+    numTemplates, templateLength = d_templates.shape
+
+    # Check that the slides do not exceed bounds
+    if startIdx < 0:
+        raise ValueError("startIdx should be >= 0.")
+    endIdx = startIdx + idxlen - 1
+    if endIdx + templateLength - 1 >= d_x.size:
+        raise ValueError("final slide index (%d) should be within the bounds of d_x (%d)." % (
+            endIdx + templateLength - 1, d_x.size
+        ))
+    
+    # Pre-compute the template energies if not provided
+    if d_templateEnergies is None:
+        # d_templateEnergies = cp.linalg.norm(d_templates, axis=1) # DO NOT USE THIS. nsys will complain for some reason (cupy library bug?)
+        d_templateEnergies = cp.sum(cp.abs(d_templates)**2, axis=1)
+    # Ensure types of template energies
+    cupyRequireDtype(cp.float32, d_templateEnergies)
+    if d_templateEnergies.size != numTemplates:
+        raise ValueError("d_templateEnergies size should be equal to the rows of templates.")
+
+    # Calculate shared mem requirements
+    smReq = templateLength * 16 + THREADS_PER_BLOCK * 8 # This is the minimal requirement
+    if numSlidesPerBlk is None:
+        # Calculate the maximum we can use
+        numSlidesPerBlk = (48000 - smReq) // 16
+        if numSlidesPerBlk < 1:
+            raise MemoryError("x is too large to use this kernel.")
+        print("Using %d slides per block" % numSlidesPerBlk)
+    smReq += (numSlidesPerBlk * 16)
+    print("smReq = %d" % (smReq))
+    cupyCheckExceedsSharedMem(smReq)
+
+    # Allocate output
+    d_templateIdx = cp.empty(idxlen, dtype=cp.int32)
+    d_qf2 = cp.empty(idxlen, dtype=cp.float32)
+
+    # Execute kernel
+    NUM_BLKS = cupyGetEnoughBlocks(idxlen, numSlidesPerBlk)
+    print("NUM_BLKS = %d" % (NUM_BLKS))
+    _multiTemplateSlidingDotKernel(
+        (NUM_BLKS,),(THREADS_PER_BLOCK,),
+        (
+            d_templates,
+            d_templateEnergies,
+            d_templates.shape[0],
+            templateLength,
+            d_x[startIdx:startIdx+idxlen+templateLength-1],
+            idxlen+templateLength-1,
+            numSlidesPerBlk,
+            d_templateIdx,
+            d_qf2
+        ),
+        shared_mem=smReq
+    )
+
+    return d_templateIdx, d_qf2
+
+    
     
 if __name__ == "__main__":
     from signalCreationRoutines import *

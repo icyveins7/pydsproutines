@@ -62,6 +62,6 @@ def cupyGetEnoughBlocks(length: int, computedPerBlock: int):
     Assumes every block will compute 'computedPerBlock' elements.
     """
     NUM_BLKS = length // computedPerBlock
-    NUM_BLKS = NUM_BLKS if NUM_BLKS % computedPerBlock == 0 else NUM_BLKS + 1
+    NUM_BLKS = NUM_BLKS if length % computedPerBlock == 0 else NUM_BLKS + 1
     return NUM_BLKS
 

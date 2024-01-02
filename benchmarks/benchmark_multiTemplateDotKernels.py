@@ -11,11 +11,21 @@ import numpy as np
 
 timer = Timer()
 
+"""
+Initial tests suggest using as small THREADS_PER_BLOCK as possible,
+so default to 32 (especially try to be less than templateLength).
+
+Seems like for 20 templates at length 100, with 10M slides,
+this takes about 260ms.
+
+TODO: more scenarios for comparison.
+"""
+
 def benchmark(
     idxlen: int=100000,
     numTemplates: int=10,
     templateLength: int=100,
-    THREADS_PER_BLOCK: int=128,
+    THREADS_PER_BLOCK: int=32,
     numSlidesPerBlk: int=100
 ):
     # Create signal

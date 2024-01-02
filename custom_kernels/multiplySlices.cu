@@ -323,6 +323,7 @@ void multiTemplateSlidingDotProduct(
     // All threads keep a copy of the first normalization in register
     float firstNormalization = s_wsf[0];
     float normalization;
+    complex<float> dotproduct;
 
     //////// Begin computation loop
     for (int i = 0; i < numTemplates; i++)
@@ -344,11 +345,15 @@ void multiTemplateSlidingDotProduct(
             {
                 // On first loop write
                 if (t == threadIdx.x)
-                    s_ws[threadIdx.x] = s_template[t] * s_xsection[k + t];
+                    dotproduct = s_template[t] * s_xsection[k+t];
+                    // s_ws[threadIdx.x] = s_template[t] * s_xsection[k + t];
                 // On consequent loops accumulate
                 else
-                    s_ws[threadIdx.x] += s_template[t] * s_xsection[k + t];
+                    dotproduct += s_template[t] * s_xsection[k+t];
+                    // s_ws[threadIdx.x] += s_template[t] * s_xsection[k + t];
             }
+            // Write from register to shared memory
+            s_ws[threadIdx.x] = dotproduct;
             
             // At this point the workspace needs to be summed over
             __syncthreads();

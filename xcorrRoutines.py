@@ -194,7 +194,7 @@ try:
             d_freqIdx = cp.empty(idxlen, dtype=cp.uint32)
             d_qf2 = cp.empty(idxlen, dtype=cp.float32)
         else:
-            d_out = cp.empty((idxlen, cutoutsize), dtype=cp.float32)
+            d_out = cp.empty((idxlen, cutout.size), dtype=cp.float32)
 
         # Track the finished index
         fi = 0

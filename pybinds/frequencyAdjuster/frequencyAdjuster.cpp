@@ -59,14 +59,14 @@ public:
             m_phaseOffset.data(),
             (int)m_phase.size()
         );
-        // Convert back to cartesian
-        ippe::convert::PolarToCartDeinterleaved(
-            m_magn.data(),
-            m_phaseOffset.data(),
-            re,
-            im,
-            (int)m_magn.size()
-        );
+        // // Convert back to cartesian
+        // ippe::convert::PolarToCartDeinterleaved(
+        //     m_magn.data(),
+        //     m_phaseOffset.data(),
+        //     re,
+        //     im,
+        //     (int)m_magn.size()
+        // );
     };
 
 private:
@@ -103,13 +103,13 @@ public:
             (int)m_x.size()
         );
 
-        // Split into real and imaginary parts
-        ippe::convert::CplxToReal(
-            m_tone.data(),
-            re,
-            im,
-            (int)m_tone.size()
-        );
+        // // Split into real and imaginary parts
+        // ippe::convert::CplxToReal(
+        //     m_tone.data(),
+        //     re,
+        //     im,
+        //     (int)m_tone.size()
+        // );
     }
 
 private:
@@ -120,7 +120,7 @@ private:
 
 int main()
 {
-    size_t len = 100000;    
+    size_t len = 1000000;    
 
     // Make some data
     ippe::vector<Ipp32fc> syms(len);
@@ -139,6 +139,7 @@ int main()
 
 
         // Method 1
+        printf("Method1 \n");
         {
             HighResolutionTimer t;
             adj.adjust(0.125f, 0.0f, re.data(), im.data()); 
@@ -152,6 +153,7 @@ int main()
         printf("=========\n");
 
         // Method 2
+        printf("Method2\n");
         {
             HighResolutionTimer t;
             adj2.adjust(0.125f, 0.0f, re.data(), im.data());

@@ -482,6 +482,9 @@ class SimpleDemodulatorQPSK(SimpleDemodulatorPSK):
 
     @staticmethod
     def mapSyms(reimc: np.ndarray):
+        if reimc.dtype != np.complex64:
+            raise TypeError('Input array must be complex64.')
+
         # Reshape
         reimd = reimc.view(np.float32).reshape((-1,2))
         

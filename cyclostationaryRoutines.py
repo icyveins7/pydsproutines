@@ -164,6 +164,44 @@ def estimateBaud(x: np.ndarray, fs: float):
     return estBaud, peaks[-2], peaks[-3], Xf, freq
 
 #%%
+def estimateOffsetViaCM(
+    x: np.ndarray,
+    fs: float,
+    order: int
+) -> float:
+    """
+    Performs the CMX0 frequency offset estimation.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Input array
+    fs : float
+        Sampling rate of the input.
+    order : int
+        The order of the CM. E.g. 2 for CM20, 4 for CM40.
+
+    Returns
+    -------
+    offset: float
+        The frequency offset. Shift by -offset to centre the signal.
+    """
+    # Power the signal
+    xp = x**order
+
+    # Take the FFT
+    xpf = np.fft.fft(xp)
+
+    # Find the max value
+    mi = np.argmax(xpf)
+    freqvec = makeFreq(x.size, fs)
+    freqpeak = freqvec[mi]
+    offset = freqpeak / order
+
+    return offset
+    
+
+#%%
 try:
     import cupy as cp
     from cupyExtensions import *
@@ -247,3 +285,15 @@ try:
 except Exception as e:
     print("Skipping cupy-related cyclostationaryRoutines.")
         
+
+
+#%%
+if __name__ == "__main__":
+    from signalCreationRoutines import randPSKsyms
+    syms, bits = randPSKsyms(1000, 4)
+    x = sps.resample_poly(syms, 2, 1)
+    fs = 1000
+    x = x * np.exp(1j*2*np.pi*5*np.arange(x.size)/fs)
+
+    offset = estimateOffsetViaCM(x, fs, 4)
+    print("Estimated offset = %f" % (offset))

@@ -1,3 +1,6 @@
 [submodule "ipp_ext"]
 	path = ipp_ext
 	url = https://github.com/icyveins7/ipp_ext
+[submodule "pybinds/frequencyAdjuster/ffs"]
+	path = pybinds/frequencyAdjuster/ffs
+	url = git@github.com:icyveins7/ffs.git

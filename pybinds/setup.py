@@ -22,6 +22,13 @@ ext_modules = [
         # Define COMPILE_FOR_PYBIND
         extra_compile_args=["-DCOMPILE_FOR_PYBIND"]
     ),
+    Pybind11Extension(
+        "frequencyAdjuster.pbffs",
+        ["frequencyAdjuster/pbffs.cpp"],
+        include_dirs=["frequencyAdjuster/ffs/include"],
+        # Define COMPILE_FOR_PYBIND
+        extra_compile_args=["-DCOMPILE_FOR_PYBIND"]
+    ),
 ]
 
 setup(

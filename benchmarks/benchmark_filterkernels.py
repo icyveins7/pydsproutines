@@ -1,6 +1,7 @@
 """
 Results from nsys profile:
 For length 1000000
+670us cupyx.scipy.signal.convolve; time from first regular_fft to end of true_divide
 317us filter_smtaps
 230us filter_smtaps_sminput, 128 per blk
 240us filter_smtaps_sminput, 1024 per blk
@@ -21,6 +22,7 @@ from signalCreationRoutines import *
 
 import numpy as np
 import cupy as cp
+import cupyx.scipy.signal as cpxsps
 import scipy.signal as sps
 
 timer = Timer()
@@ -38,6 +40,15 @@ d_taps = cp.asarray(taps, cp.float32)
 timer.start()
 cpu_filt = sps.lfilter(taps, 1.0, noise)
 timer.end("cpu")
+
+
+# Filter using cupy's convolve
+d_cupy_conv = cpxsps.convolve(d_taps, d_noise) # Run once to make it warm
+timer.start()
+d_cupy_conv = cpxsps.convolve(d_taps, d_noise) # note that .lfilter isn't available until cupy > 13.0, so use convolve manually
+# Note that convolve, similar to numpy, will produce longer output
+# we need the front part only but we won't time this: d_cupy_conv[:d_noise.size]
+timer.end("cupy convolve")
 
 # Instantiate the CupyKernelFilter class
 cpkf = CupyKernelFilter()
@@ -58,6 +69,7 @@ d_filt_smtaps_sminput = cpkf.filter_smtaps_sminput(d_noise, d_taps, OUTPUT_PER_B
 timer.end("gpu smtaps sminput 1028 per blk")
 
 # Check results
+compareValues(cpu_filt, d_cupy_conv.get()[:cpu_filt.size])
 compareValues(cpu_filt, d_filt_smtaps.get())
 compareValues(cpu_filt, d_filt_smtaps_sminput.get())
 

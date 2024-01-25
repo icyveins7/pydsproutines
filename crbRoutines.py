@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+from scipy.constants import speed_of_light
 
 
 class LocalizationCRBComponent:
@@ -171,6 +172,7 @@ class AOA3DCRBComponent(LocalizationCRBComponent):
 
         return np.vstack((dphi, dtheta))
 
+
 class TDOAComponent(LocalizationCRBComponent):
     def __init__(
         self,
@@ -178,12 +180,46 @@ class TDOAComponent(LocalizationCRBComponent):
         inv_sigma_td_sq: float,
         S: np.ndarray
     ):
-        super().__init__(x, inv_sigma_td_sq, S)
-        self.r = np.linalg.norm(x - S)
+        """
+        Instantiate a TDOA CRB component.
+        This corresponds to a single uncorrelated TDOA measurement between 2 sensors.
 
-    def _differentiate(self):
-        r_dx = (self.x - self.S) / self.r
-        return r_dx
+        Parameters
+        ----------
+        x : np.ndarray
+            Target position vector.
+        inv_sigma_td_sq : float
+            Inverse uncertainty for the TDOA measurement, in units of s^-2.
+            This will be internally converted to the appropriate range units required.
+        S : np.ndarray
+            A (2,3) shape matrix, representing the 2 sensors' positions;
+            the TDOA measurement convention is assumed to be |x-S[1]| - |x-S[0]|.
+        """
+        # Check that there are 2 sensors exactly
+        if S.shape != (2, 3):
+            raise ValueError("S must be a (2,3) shape matrix")
+
+        # Translate TDOA inv sigma value to RDOA inv sigma value
+        self.inv_sigma_rdoa_sq = inv_sigma_td_sq/speed_of_light**2
+
+        super().__init__(x, self.inv_sigma_rdoa_sq, S)
+        self.r = np.linalg.norm(x - S, axis=1) # This is the ranges to each sensor, length 2
+
+    def _differentiate(self) -> np.ndarray:
+        """
+        Calculate the partial derivatives of the range-difference.
+
+        Returns
+        -------
+        np.ndarray
+            (3, ) shape array for the partial derivatives.
+        """
+        # Calculate the partials for the individual ranges
+        r_dx = (self.x - self.S) / self.r.reshape((-1,1)) # Need to reshape to column to broadcast divides
+        
+        # Return the difference of the partials
+        return r_dx[1] - r_dx[0]
+    
 
 #%%
 class CRB:
@@ -282,13 +318,32 @@ if __name__ == "__main__":
     from scipy.spatial.transform import Rotation as R
 
     class TestBasicCRBComponent(unittest.TestCase):
-        def test_basic(self):
+        def test_position_shape_throw(self):
+            # Must throw ValueError if x is not a (3, ) array
+            self.assertRaises(
+                ValueError,
+                LocalizationCRBComponent,
+                np.zeros(3).reshape((-1,1)),
+                1.0,
+                np.ones(3) 
+            )
+        def test_unimplemented_base_differentiate(self):
             # Create the non subclass one and show that it throws
             self.assertRaises(
                 NotImplementedError,
                 LocalizationCRBComponent,
                 np.zeros(3),
                 1.0,
+                np.ones(3) 
+            )
+
+        def test_sigma_type_error(self):
+            # Must throw type error if sigma is not float/np.ndarray
+            self.assertRaises(
+                TypeError,
+                LocalizationCRBComponent,
+                np.zeros(3),
+                1,
                 np.ones(3) 
             )
 

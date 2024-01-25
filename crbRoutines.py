@@ -165,15 +165,43 @@ class AOA3DCRBComponent(LocalizationCRBComponent):
 
 #%%
 class CRB:
-    def __init__(self, constraints: np.ndarray):
+    def __init__(self, constraints: np.ndarray=None):
+        """
+        Container for CRB components.
+        Instantiate this and then use addComponent()
+        on the individual components before using
+        compute() to generate the final CRB.
+
+        Parameters
+        ----------
+        constraints : np.ndarray, optional
+            Constraints matrix for the eventual CRB. This should be provided
+            as a row-wise matrix; one row for each constraint.
+        """
 
         self.components = []
         self.constraints = constraints
-        if self.constraints.ndim == 1:
-            self.constraints = self.constraints.reshape((1, -1)) # make it into a row
+        if self.constraints is not None:
+            if self.constraints.ndim == 1:
+                self.constraints = self.constraints.reshape((1, -1)) # make it into a row
 
     def addComponent(self, component: LocalizationCRBComponent):
+        """
+        Add a LocalizationCRBComponent subclass.
+
+        Parameters
+        ----------
+        component : LocalizationCRBComponent subclass instance
+            This component should correspond to a measurement.
+
+        Returns
+        -------
+        self
+            Returns the current instance so that addComponent() calls
+            can be chained like .addComponent().addComponent().
+        """
         self.components.append(component)
+        return self
 
     def compute(self):
         # Calculate FIMs for each component
@@ -182,8 +210,11 @@ class CRB:
             fim += component.fim()
 
         # Compute FIM 
-        U = sp.linalg.null_space(self.constraints)
-        crb = U @ np.linalg.inv(U.T @ fim @ U) @ U.T
+        if self.constraints is not None:
+            U = sp.linalg.null_space(self.constraints)
+            crb = U @ np.linalg.inv(U.T @ fim @ U) @ U.T
+        else:
+            crb = np.linalg.inv(fim)
 
         return crb
 
@@ -219,6 +250,33 @@ if __name__ == "__main__":
     # Begin unittests
     import unittest
     from scipy.spatial.transform import Rotation as R
+
+    class TestBasicCRBComponent(unittest.TestCase):
+        def test_basic(self):
+            # Create the non subclass one and show that it throws
+            self.assertRaises(
+                NotImplementedError,
+                LocalizationCRBComponent,
+                np.zeros(3),
+                1.0,
+                np.ones(3) 
+            )
+
+    class TestBasicCRB(unittest.TestCase):
+        def test_instantiation(self):
+            # Show that constraints are automatically made into 2d
+            constraint = np.ones(3)
+            crb = CRB(constraint)
+            self.assertEqual(crb.constraints.shape, (1, 3))
+
+
+        def test_chained_adds(self):
+            # Show that addComponent() is able to chain calls
+            crb = CRB()
+            comp1 = AOA3DCRBComponent(np.zeros(3), 1.0, np.ones(3))
+            comp2 = AOA3DCRBComponent(np.ones(3), 1.0, 2*np.ones(3))
+            crb.addComponent(comp1).addComponent(comp2)
+
     class TestAOA3DCRBComponent(unittest.TestCase):
         def expectedTrace(self, delta: float, length: float):
             return np.tan(delta) * length

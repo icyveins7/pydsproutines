@@ -154,17 +154,20 @@ class AOA3DCRBComponent(LocalizationCRBComponent):
         np.ndarray
             2 x 3 array with dphi and dtheta partial derivatives.
         """
+        # Some small optimizations
+        x2y2 = self.uf[0]**2 + self.uf[1]**2 # Used a lot below
+        
         # Calculate phi derivatives
         dphi = np.zeros(3, np.float64)
-        dphi[0] = -self.uf[1] / (self.uf[0]**2 + self.uf[1]**2)
-        dphi[1] = self.uf[0] / (self.uf[0]**2 + self.uf[1]**2)
+        dphi[0] = -self.uf[1] / (x2y2)
+        dphi[1] = self.uf[0] / (x2y2)
         dphi[2] = 0.0
 
         # Calculate theta derivatives
         dtheta = np.zeros(3, np.float64)
-        dtheta[0] = - self.uf[2]*self.uf[0] / (np.linalg.norm(self.uf)**2 * np.sqrt(self.uf[0]**2 + self.uf[1]**2))
-        dtheta[1] = - self.uf[2]*self.uf[1] / (np.linalg.norm(self.uf)**2 * np.sqrt(self.uf[0]**2 + self.uf[1]**2))
-        dtheta[2] = np.sqrt(self.uf[0]**2 + self.uf[1]**2) / np.linalg.norm(self.uf)**2
+        dtheta[0] = - self.uf[2]*self.uf[0] / (np.linalg.norm(self.uf)**2 * np.sqrt(x2y2))
+        dtheta[1] = - self.uf[2]*self.uf[1] / (np.linalg.norm(self.uf)**2 * np.sqrt(x2y2))
+        dtheta[2] = np.sqrt(x2y2) / np.linalg.norm(self.uf)**2
 
         return np.vstack((dphi, dtheta))
 

@@ -22,6 +22,12 @@ class LocalizationCRBComponent:
         Otherwise, it is sufficient to split each measurement scalar into separate subclasses,
         and have each subclass use a scalar float sigma argument.
 
+        For subclasses, the only required methods to reimplement are:
+        1) Constructor __init__ itself (call super().__init__ if nothing else)
+        2) _differentiate().
+
+        Anything else is secondary/optional.
+
         Parameters
         ----------
         x : np.ndarray
@@ -203,7 +209,15 @@ class CRB:
         self.components.append(component)
         return self
 
-    def compute(self):
+    def compute(self) -> np.ndarray:
+        """
+        Computes the CRB based on all components.
+
+        Returns
+        -------
+        np.ndarray
+            Final CRB as a square matrix, including constraints if provided.
+        """
         # Calculate FIMs for each component
         fim = np.zeros((3,3), np.float64)
         for component in self.components:

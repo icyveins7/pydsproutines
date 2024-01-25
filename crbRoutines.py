@@ -171,6 +171,19 @@ class AOA3DCRBComponent(LocalizationCRBComponent):
 
         return np.vstack((dphi, dtheta))
 
+class TDOAComponent(LocalizationCRBComponent):
+    def __init__(
+        self,
+        x: np.ndarray,
+        inv_sigma_td_sq: float,
+        S: np.ndarray
+    ):
+        super().__init__(x, inv_sigma_td_sq, S)
+        self.r = np.linalg.norm(x - S)
+
+    def _differentiate(self):
+        r_dx = (self.x - self.S) / self.r
+        return r_dx
 
 #%%
 class CRB:

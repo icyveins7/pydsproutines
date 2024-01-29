@@ -693,7 +693,7 @@ def calcCRB_TD(x, S, sig_r, pairs=None, cmat=None):
         U = sp.linalg.null_space(cmat.T)
         crb = U @ np.linalg.inv(U.T @ FIM @ U) @ U.T
         
-    return crb
+    return crb, FIM
 
 def calcCRB_TDFD(x, S, sig_r, xdot, Sdot, sig_r_dot, pairs=None, cmat=None):
     ''' S is presented column-wise i.e. 3 X N array. '''

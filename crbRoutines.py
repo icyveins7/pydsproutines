@@ -202,8 +202,8 @@ class TDOAComponent(LocalizationCRBComponent):
         # Translate TDOA inv sigma value to RDOA inv sigma value
         self.inv_sigma_rdoa_sq = inv_sigma_td_sq/speed_of_light**2
 
-        super().__init__(x, self.inv_sigma_rdoa_sq, S)
         self.r = np.linalg.norm(x - S, axis=1) # This is the ranges to each sensor, length 2
+        super().__init__(x, self.inv_sigma_rdoa_sq, S)
 
     def _differentiate(self) -> np.ndarray:
         """
@@ -261,6 +261,23 @@ class CRB:
         self.components.append(component)
         return self
 
+    def fim(self) -> np.ndarray:
+        """
+        Calculate the Fisher Information Matrix.
+        Usually you can call compute() to generate the final CRB directly.
+
+        Returns
+        -------
+        np.ndarray
+            Fisher information matrix.
+        """
+        # Calculate FIMs for each component
+        fim_mat = np.zeros((3,3), np.float64)
+        for component in self.components:
+            fim_mat += component.fim()
+
+        return fim_mat
+
     def compute(self) -> np.ndarray:
         """
         Computes the CRB based on all components.
@@ -270,10 +287,7 @@ class CRB:
         np.ndarray
             Final CRB as a square matrix, including constraints if provided.
         """
-        # Calculate FIMs for each component
-        fim = np.zeros((3,3), np.float64)
-        for component in self.components:
-            fim += component.fim()
+        fim = self.fim()
 
         # Compute FIM 
         if self.constraints is not None:
@@ -287,31 +301,42 @@ class CRB:
 
 #%%
 if __name__ == "__main__":
-    # Create the AOA3DCRBComponent for simple case along x-axis
-    # x = np.array([100,0,0])
-    # x = np.array([0,100,0], np.float64)
-    # angle = np.random.rand() * np.pi - np.pi/2 # Between -pi/2 and pi/2
-    # x = np.array([100*np.cos(angle), 0, 100*np.sin(angle)], np.float64)
-    # S = np.zeros(3)
-    # delta = 0.1
-    # aoacrb = AOA3DCRBComponent(x, delta, S)
-    # print(aoacrb.inv_sigma_sq)
-    # print(aoacrb.uf)
-    # print(aoacrb.u)
-    # print(aoacrb.dphi)
-    # print(aoacrb.dtheta)
-    # print(aoacrb.partials)
-    # print(aoacrb.fim())
+    # from localizationRoutines import *
+    # x = np.zeros(3)
+    # S = np.array([
+    #     [1, 0, 0],
+    #     [-1, 0, 0],
+    #     [0, 1, 0],
+    #     [0, -1, 0]
+    # ]).T
 
+    # sig_r = 1e-6
+    # crb_old, fim_old = calcCRB_TD(x, S, np.ones(2)*sig_r, 
+    #                               pairs=np.array([[1,0],[3,2]]),
+    #                               cmat=np.array([0,0,1]).reshape((-1,1)))
+    # print(fim_old)
+    # print(crb_old)
+    # print("-------------------------")
 
-    # # Create the CRB for this and add the component
-    # planeconstraint = aoacrb.u # We use the direction vector as the normal
-    # crb = CRB(planeconstraint)
-    # crb.addComponent(aoacrb)
-    # print(crb.constraints)
+    # sig_td = sig_r / speed_of_light
+    # inv_sigma_td_sq = 1/sig_td**2
+    # comp1 = TDOAComponent(x, inv_sigma_td_sq, S.T[[0,1],:])
+    # print(comp1.r)
+    # comp2 = TDOAComponent(x, inv_sigma_td_sq, S.T[[2,3],:])
+    # print(comp2.r)
+    # crb = CRB(constraints=np.array([0,0,1]))
+    # crb.addComponent(comp1).addComponent(comp2)#.addComponent(comp3)
+    # print(fim)
     # print(crb.compute())
-    # print(np.trace(crb.compute()))
 
+    # print("==========================")
+    # print(crb_old - crb.compute())
+    # print(crb_old / crb.compute())
+
+    # print(crb_old @ fim_old)
+    # print(crb.compute() @ fim)
+
+    # assert(False)
 
     # Begin unittests
     import unittest
@@ -361,6 +386,79 @@ if __name__ == "__main__":
             comp1 = AOA3DCRBComponent(np.zeros(3), 1.0, np.ones(3))
             comp2 = AOA3DCRBComponent(np.ones(3), 1.0, 2*np.ones(3))
             crb.addComponent(comp1).addComponent(comp2)
+
+    class TestTDOACRBComponent(unittest.TestCase):
+        def setUp(self):
+            self.x = np.zeros(3)
+            self.S = np.array([
+                [1, 0, 0], # Right
+                [-1, 0, 0], # Left
+                [0, 1, 0], # Forward
+                [0, -1, 0], # Backward
+                [0, 0, 1], # Top
+                [0, 0, -1] # Bottom
+            ])
+
+            self.sig_r = 1e-6
+            self.sig_td = self.sig_r / speed_of_light
+            self.inv_sigma_td_sq = 1/self.sig_td**2
+
+        def test_plane_constrained_tdoa(self):
+            # Target and sensors all in the plane in an equidistant simple diamond
+            # We expect the CRB error variance components to be exactly equal to the originally input errors
+            comp1 = TDOAComponent(self.x, self.inv_sigma_td_sq, self.S[[0,1],:]) # Use left/right
+            comp2 = TDOAComponent(self.x, self.inv_sigma_td_sq, self.S[[2,3],:]) # use forward/backward
+            crb = CRB(constraints=np.array([0,0,1])) # Constrain to the plane
+            crb.addComponent(comp1).addComponent(comp2)
+
+            # Should be diagonal
+            self.assertEqual(
+                crb.compute()[0,0], crb.compute()[1,1]
+            )
+            # Z component should be 0 since constrained to plane
+            self.assertEqual(
+                crb.compute()[2,2], 0
+            )
+            # Non-zero components should be equal to the original sig_r squared
+            self.assertAlmostEqual(
+                crb.compute()[0,0],
+                self.sig_r**2
+            )
+            self.assertAlmostEqual(
+                crb.compute()[1,1],
+                self.sig_r**2
+            )
+
+        def test_3d_unconstrained_tdoa(self):
+            # We now have all 6 sensors in a 3d equidistant diamond/cube
+            # Similarly, CRB error variance components should be exactly equal to the originally input errors
+            comp1 = TDOAComponent(self.x, self.inv_sigma_td_sq, self.S[[0,1],:]) # Use left/right
+            comp2 = TDOAComponent(self.x, self.inv_sigma_td_sq, self.S[[2,3],:]) # use forward/backward
+            comp3 = TDOAComponent(self.x, self.inv_sigma_td_sq, self.S[[4,5],:]) # use top/bottom
+            crb = CRB()
+            crb.addComponent(comp1).addComponent(comp2).addComponent(comp3)
+
+            # Should be diagonal
+            self.assertEqual(
+                crb.compute()[0,0], crb.compute()[1,1]
+            )
+            self.assertEqual(
+                crb.compute()[0,0], crb.compute()[2,2] 
+            )
+            # Non-zero components should be equal to the original sig_r squared
+            self.assertAlmostEqual(
+                crb.compute()[0,0],
+                self.sig_r**2
+            )
+            self.assertAlmostEqual(
+                crb.compute()[1,1],
+                self.sig_r**2
+            )
+            self.assertAlmostEqual(
+                crb.compute()[2,2],
+                self.sig_r**2
+            )
+
 
     class TestAOA3DCRBComponent(unittest.TestCase):
         def expectedTrace(self, delta: float, length: float):

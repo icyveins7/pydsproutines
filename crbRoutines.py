@@ -173,7 +173,7 @@ class AOA3DCRBComponent(LocalizationCRBComponent):
         return np.vstack((dphi, dtheta))
 
 
-class TDOAComponent(LocalizationCRBComponent):
+class TDOACRBComponent(LocalizationCRBComponent):
     def __init__(
         self,
         x: np.ndarray,
@@ -320,9 +320,9 @@ if __name__ == "__main__":
 
     # sig_td = sig_r / speed_of_light
     # inv_sigma_td_sq = 1/sig_td**2
-    # comp1 = TDOAComponent(x, inv_sigma_td_sq, S.T[[0,1],:])
+    # comp1 = TDOACRBComponent(x, inv_sigma_td_sq, S.T[[0,1],:])
     # print(comp1.r)
-    # comp2 = TDOAComponent(x, inv_sigma_td_sq, S.T[[2,3],:])
+    # comp2 = TDOACRBComponent(x, inv_sigma_td_sq, S.T[[2,3],:])
     # print(comp2.r)
     # crb = CRB(constraints=np.array([0,0,1]))
     # crb.addComponent(comp1).addComponent(comp2)#.addComponent(comp3)
@@ -406,8 +406,8 @@ if __name__ == "__main__":
         def test_plane_constrained_tdoa(self):
             # Target and sensors all in the plane in an equidistant simple diamond
             # We expect the CRB error variance components to be exactly equal to the originally input errors
-            comp1 = TDOAComponent(self.x, self.inv_sigma_td_sq, self.S[[0,1],:]) # Use left/right
-            comp2 = TDOAComponent(self.x, self.inv_sigma_td_sq, self.S[[2,3],:]) # use forward/backward
+            comp1 = TDOACRBComponent(self.x, self.inv_sigma_td_sq, self.S[[0,1],:]) # Use left/right
+            comp2 = TDOACRBComponent(self.x, self.inv_sigma_td_sq, self.S[[2,3],:]) # use forward/backward
             crb = CRB(constraints=np.array([0,0,1])) # Constrain to the plane
             crb.addComponent(comp1).addComponent(comp2)
 
@@ -432,9 +432,9 @@ if __name__ == "__main__":
         def test_3d_unconstrained_tdoa(self):
             # We now have all 6 sensors in a 3d equidistant diamond/cube
             # Similarly, CRB error variance components should be exactly equal to the originally input errors
-            comp1 = TDOAComponent(self.x, self.inv_sigma_td_sq, self.S[[0,1],:]) # Use left/right
-            comp2 = TDOAComponent(self.x, self.inv_sigma_td_sq, self.S[[2,3],:]) # use forward/backward
-            comp3 = TDOAComponent(self.x, self.inv_sigma_td_sq, self.S[[4,5],:]) # use top/bottom
+            comp1 = TDOACRBComponent(self.x, self.inv_sigma_td_sq, self.S[[0,1],:]) # Use left/right
+            comp2 = TDOACRBComponent(self.x, self.inv_sigma_td_sq, self.S[[2,3],:]) # use forward/backward
+            comp3 = TDOACRBComponent(self.x, self.inv_sigma_td_sq, self.S[[4,5],:]) # use top/bottom
             crb = CRB()
             crb.addComponent(comp1).addComponent(comp2).addComponent(comp3)
 

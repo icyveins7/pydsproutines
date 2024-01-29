@@ -17,6 +17,14 @@ from plotRoutines import *
 from satelliteRoutines import *
 import skyfield.api
 
+from enum import Enum
+
+#%% WGS84 constants
+class WGS84Coefficients(Enum):
+    a = 6378137.0
+    b = 6356752.314245 # WGS84 constants, reference https://en.wikipedia.org/wiki/World_Geodetic_System
+
+
 #%% Coordinate transformations
 def geodeticLLA2ecef(lat_rad, lon_rad, h, checkRanges=False):
     # Some error checking

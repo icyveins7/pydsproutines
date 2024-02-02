@@ -907,5 +907,67 @@ def resampleFactorWizard(fs: int, rsfs: int):
     up = l // fs
     down = l // rsfs
     return int(up), int(down) # Enforce again in case
-    
 
+#%%
+filtkernels, _ = cupyModuleToKernelsLoader(
+    "filter.cu",
+    ["multiMovingAverage"]
+)
+_multiMovingAvgKernel, = filtkernels # Unpack
+
+def cupyMultiMovingAverage(
+    d_x: cp.ndarray,
+    avgLength: int,
+    numOutputPerBlock: int=32,
+    THREADS_PER_BLOCK: int=32
+):
+    cupyRequireDtype(cp.float32, d_x) 
+
+    # Make the output of same size
+    d_avg = cp.zeros_like(d_x, dtype=d_x.dtype)
+
+    # Define the 2d grid for this
+    GRID_X = cupyGetEnoughBlocks(d_x.shape[1], numOutputPerBlock)
+    NUM_BLKS = (GRID_X, d_x.shape[0])
+
+    # Calculate shared mem requirement
+    smReq = (avgLength + numOutputPerBlock - 1) * d_x.itemsize
+
+    # Execute kernel
+    _multiMovingAvgKernel(
+        NUM_BLKS, (THREADS_PER_BLOCK,),
+        (d_x, d_x.shape[0], d_x.shape[1],
+         avgLength, numOutputPerBlock,
+         d_avg),
+        shared_mem=smReq
+    )
+
+    return d_avg
+
+
+#%% Run unit tests
+if __name__ == "__main__":
+    import unittest
+
+    class TestMultiMovingAvgKernel(unittest.TestCase):
+        def setUp(self):
+            self.avgLength = 100
+        
+        def test_correctness(self):
+            # Create standard numpy data
+            x = np.random.randn(100, 200).astype(np.float32)
+            d_x = cp.asarray(x)
+            # Average in the CPU
+            check = np.zeros_like(x)
+            for i in range(x.shape[0]):
+                check[i,:] = sps.lfilter(
+                    np.ones(self.avgLength)/self.avgLength, 1,
+                    x[i,:]
+                )
+            # Average in the GPU
+            d_avg = cupyMultiMovingAverage(d_x, self.avgLength)
+            print(d_avg)
+            print(check)
+            self.assertTrue(np.allclose(d_avg.get().reshape(-1), check.reshape(-1)))
+
+    unittest.main()

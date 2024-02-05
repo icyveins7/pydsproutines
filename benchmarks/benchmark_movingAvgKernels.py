@@ -21,17 +21,17 @@ h_cpl = cpl.get()
 timer.end("cp_lfilter/cpsps.convolve")
 
 
-# # Run using our custom kernels? TODO: custom kernels only work with complex64 now
-# cpkf = CupyKernelFilter()
-# cpk = cpkf.filter_smtaps(
-#     x, avgTaps
-# )
-# timer.start()
-# cpk = cpkf.filter_smtaps(
-#     x, avgTaps
-# )
-# h_cpk = cpk.get()
-# timer.end()
+# Run using our custom kernels? TODO: custom kernels only work with complex64 now
+cpkf = CupyKernelFilter()
+cpk = cpkf.filter_smtaps_sminput(
+    x, avgTaps
+)
+timer.start()
+cpk = cpkf.filter_smtaps_sminput(
+    x, avgTaps
+)
+h_cpk = cpk.get()
+timer.end("cupy filter kernel")
 
 
 # Run it row-wise

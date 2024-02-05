@@ -88,6 +88,7 @@ class CupyKernelFilter:
         self.module = cp.RawModule(code=sourcecode)
         self.filter_smtaps_kernel = self.module.get_function("filter_smtaps")
         self.filter_smtaps_sminput_kernel = self.module.get_function("filter_smtaps_sminput")
+        self.filter_smtaps_sminput_real_kernel = self.module.get_function("filter_smtaps_sminput_real")
         
         with open(os.path.join(os.path.dirname(__file__), "custom_kernels/upfirdn.cu"), "r") as fid:
             sourcecode = fid.read()
@@ -405,7 +406,8 @@ class CupyKernelFilter:
     def filter_smtaps_sminput(self, d_x: cp.ndarray, d_taps: cp.ndarray, THREADS_PER_BLOCK: int=128, OUTPUT_PER_BLK: int=256):
         # Type checking
         cupyRequireDtype(cp.float32, d_taps)
-        cupyRequireDtype(cp.complex64, d_x)
+        # Input must be either float32 or complex64
+        cupyRequireDtype([cp.complex64, cp.float32], d_x)
         # Dimension checking
         if d_x.ndim != 1:
             raise ValueError("d_x must be 1D.")
@@ -413,7 +415,7 @@ class CupyKernelFilter:
             raise ValueError("d_taps must be 1D.")
         
         # Allocate output
-        d_out = cp.zeros(d_x.size, dtype=cp.complex64)
+        d_out = cp.zeros(d_x.size, dtype=d_x.dtype)
         
         # # Calculate the workspace available (we move in multiples of THREADS_PER_BLOCK)
         # workspaceFactor = ((48000 - d_taps.nbytes) - (d_taps.size-1) * 8) // 8 // THREADS_PER_BLOCK
@@ -424,23 +426,34 @@ class CupyKernelFilter:
         workspaceSize = OUTPUT_PER_BLK + d_taps.size - 1 
         
         # Calculate shared memory requirement
-        smReq = d_taps.nbytes + workspaceSize * 8
+        smReq = d_taps.nbytes + workspaceSize * d_x.itemsize
         cupyCheckExceedsSharedMem(smReq)
         
         # Calculate number of blocks required and the output size per block
         NUM_BLOCKS = d_x.size // OUTPUT_PER_BLK
         NUM_BLOCKS = NUM_BLOCKS + 1 if d_x.size % OUTPUT_PER_BLK != 0 else NUM_BLOCKS # +1 if remnants
         
-        # Run kernel
-        self.filter_smtaps_sminput_kernel(
-            (NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
-            (d_x, d_x.size,
-             d_taps, d_taps.size,
-             OUTPUT_PER_BLK,
-             workspaceSize,
-             d_out, d_out.size),
-            shared_mem=smReq
-        )
+        # Run kernel based on dtype
+        if d_x.dtype == cp.float32: # real
+            self.filter_smtaps_sminput_real_kernel(
+                (NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                (d_x, d_x.size,
+                d_taps, d_taps.size,
+                OUTPUT_PER_BLK,
+                workspaceSize,
+                d_out, d_out.size),
+                shared_mem=smReq
+            ) 
+        else: # complex
+            self.filter_smtaps_sminput_kernel(
+                (NUM_BLOCKS,),(THREADS_PER_BLOCK,), 
+                (d_x, d_x.size,
+                d_taps, d_taps.size,
+                OUTPUT_PER_BLK,
+                workspaceSize,
+                d_out, d_out.size),
+                shared_mem=smReq
+            )
         
         return d_out
 

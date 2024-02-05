@@ -918,26 +918,35 @@ _multiMovingAvgKernel, = filtkernels # Unpack
 def cupyMultiMovingAverage(
     d_x: cp.ndarray,
     avgLength: int,
-    numOutputPerBlock: int=32,
     THREADS_PER_BLOCK: int=32
 ):
     cupyRequireDtype(cp.float32, d_x) 
+    if d_x.ndim == 1:
+        raise ValueError("Input array must be 2D. For single arrays just use cupy's filter functions.")
+
+    # Shrink block size if the input row length is shorter than it
+    if d_x.shape[1] < THREADS_PER_BLOCK:
+        THREADS_PER_BLOCK = d_x.shape[1]
 
     # Make the output of same size
     d_avg = cp.zeros_like(d_x, dtype=d_x.dtype)
 
     # Define the 2d grid for this
-    GRID_X = cupyGetEnoughBlocks(d_x.shape[1], numOutputPerBlock)
+    GRID_X = cupyGetEnoughBlocks(d_x.shape[1], THREADS_PER_BLOCK)
     NUM_BLKS = (GRID_X, d_x.shape[0])
+    if d_x.shape[0] == 0:
+        raise ValueError("Input array must have at least one row.")
+    # print("Grid size is (.x %d, .y %d) " % (NUM_BLKS[0], NUM_BLKS[1]))
 
     # Calculate shared mem requirement
-    smReq = (avgLength + numOutputPerBlock - 1) * d_x.itemsize
+    smReq = (avgLength + THREADS_PER_BLOCK - 1) * d_x.itemsize
+    # print("sharedmemsize = %d bytes" % smReq)
 
     # Execute kernel
     _multiMovingAvgKernel(
         NUM_BLKS, (THREADS_PER_BLOCK,),
         (d_x, d_x.shape[0], d_x.shape[1],
-         avgLength, numOutputPerBlock,
+         avgLength, 
          d_avg),
         shared_mem=smReq
     )
@@ -951,11 +960,11 @@ if __name__ == "__main__":
 
     class TestMultiMovingAvgKernel(unittest.TestCase):
         def setUp(self):
-            self.avgLength = 100
+            self.avgLength = 32
         
         def test_correctness(self):
             # Create standard numpy data
-            x = np.random.randn(100, 200).astype(np.float32)
+            x = np.random.randn(1,32).astype(np.float32)
             d_x = cp.asarray(x)
             # Average in the CPU
             check = np.zeros_like(x)
@@ -966,8 +975,45 @@ if __name__ == "__main__":
                 )
             # Average in the GPU
             d_avg = cupyMultiMovingAverage(d_x, self.avgLength)
-            print(d_avg)
-            print(check)
+            # print(d_avg)
+            # print(check)
             self.assertTrue(np.allclose(d_avg.get().reshape(-1), check.reshape(-1)))
+        
+        def test_multiple_rows(self):
+            # Create standard numpy data
+            x = np.random.randn(32,32).astype(np.float32)
+            d_x = cp.asarray(x)
+            # Average in the CPU
+            check = np.zeros_like(x)
+            for i in range(x.shape[0]):
+                check[i,:] = sps.lfilter(
+                    np.ones(self.avgLength)/self.avgLength, 1,
+                    x[i,:]
+                )
+            # Average in the GPU
+            d_avg = cupyMultiMovingAverage(d_x, self.avgLength)
+            self.assertTrue(np.allclose(d_avg.get().reshape(-1), check.reshape(-1)))
+
+        def test_small_range_fuzz(self):
+            numFuzzes = 100
+            for f in range(numFuzzes):
+                # Define rows/cols
+                rows = np.random.randint(1, 64)
+                cols = np.random.randint(1, 64)
+                avgLength = np.random.randint(1, 64)
+
+                # Create standard numpy data
+                x = np.random.randn(rows,cols).astype(np.float32)
+                d_x = cp.asarray(x)
+                # Average in the CPU
+                check = np.zeros_like(x)
+                for i in range(x.shape[0]):
+                    check[i,:] = sps.lfilter(
+                        np.ones(avgLength)/avgLength, 1,
+                        x[i,:]
+                    )
+                # Average in the GPU
+                d_avg = cupyMultiMovingAverage(d_x, avgLength)
+                self.assertTrue(np.allclose(d_avg.get().reshape(-1), check.reshape(-1)))
 
     unittest.main()

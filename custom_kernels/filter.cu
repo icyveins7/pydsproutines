@@ -128,7 +128,7 @@ void filter_smtaps_sminput(
 
 /*
 Allocate a grid with (x,y) blocks such that gridDim.y == numRows.
-gridDim.x * numOutputPerBlock should be >= numCols.
+Each thread computes 1 output.
 
 Naive implementation:
 Each thread sums over its own window, and thread windows overlap.
@@ -137,13 +137,13 @@ Thread 0: 0 -> N-1
 Thread 1: 1 -> N
 Thread 2: 2 -> N+1
 ...
+Each block will have N threads, which works on N outputs of a particular row.
 */
 extern "C" __global__
 void multiMovingAverage(
     const float *d_x,
     const int numRows, const int numCols, // same dimensions for d_x and d_out
     const int avgLength, // moving average window size,
-    const int numOutputPerBlock, // make this at least 32, and in steps of warp sizes
     float *d_out
 ){
     // allocate shared memory
@@ -152,21 +152,20 @@ void multiMovingAverage(
     float *s_x = (float*)s; // (tapslen) floats
     /* Tally:  */
 
-    // Calculate this block's offset
+    // Calculate this block's ROW offset
     int blockOffset = blockIdx.y * numCols;
-    // Calculate shared memory usage
-    int sharedMemSize = numOutputPerBlock + avgLength - 1;
-    // Determine the first index from this block's output row
-    int o0 = blockIdx.x * numOutputPerBlock;
+    // Calculate shared memory usage (each thread computes 1 output)
+    int sharedMemSize = blockDim.x + avgLength - 1;
     // Determine the first index of this block's input row to start copying
-    int i0 = o0 - avgLength + 1; // this may be negative!
+    int i0 = blockIdx.x*blockDim.x - avgLength + 1; // this may be negative!
 
     // Copy the shared memory, setting 0s if it references a negative index
     for (int t = threadIdx.x; t < sharedMemSize; t += blockDim.x)
     {
+        // Evaluate the column index for this block to read from
         int idx = t + i0;
-        if (idx >= 0)
-            s_x[t] = d_x[blockOffset + i0];
+        if (idx >= 0 && idx < numCols)
+            s_x[t] = d_x[blockOffset + idx];
         else
             s_x[t] = 0;
     } 
@@ -174,17 +173,22 @@ void multiMovingAverage(
     __syncthreads();
 
     // Now compute
-    for (int t = threadIdx.x; t < numOutputPerBlock; t += blockDim.x)
+    for (int t = threadIdx.x; t < blockDim.x; t += blockDim.x)
     {
-        double sum = 0.0;
-
-        for (int i = 0; i < avgLength; i++)
+        // No writing out of bounds
+        if (blockIdx.x*blockDim.x + t < numCols)
         {
-            sum += s_x[t+i];
-        }
+            double sum = 0.0;
 
-        d_out[blockOffset + o0] = (float)(sum / (double)avgLength);
-    }
+            for (int i = 0; i < avgLength; i++)
+            {
+                sum += s_x[t+i];
+            }
+
+            d_out[blockOffset + blockIdx.x*blockDim.x + t] = (float)(sum / (double)avgLength);
+    
+        }
+   }
     
 
 }

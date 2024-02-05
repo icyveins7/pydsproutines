@@ -41,12 +41,26 @@ def cupyModuleToKernelsLoader(modulefilename: str, kernelNames: list, options: t
 
     return kernels, _module
 
-def cupyRequireDtype(dtype: type, var: cp.ndarray):
+def cupyRequireDtype(dtype: type | list, var: cp.ndarray):
     """
-    Example: cupyRequireDtype(cp.uint32, myarray)
+    Example: 
+    cupyRequireDtype(cp.uint32, myarray)
+    cupyRequireDtype([cp.uint32, cp.int32], myarray)
     """
-    if var.dtype != dtype:
-        raise TypeError("Must be %s, found %s" % (dtype, var.dtype))
+    if isinstance(dtype, list):
+        # Check one by one
+        passed = False
+        for dt in dtype:
+            if var.dtype == dt:
+                passed = True
+
+        if not passed:
+            raise TypeError("Must be one of %s, found %s" % (
+                ", ".join(dtype), var.dtype
+            ))
+    else:
+        if var.dtype != dtype:
+            raise TypeError("Must be %s, found %s" % (dtype, var.dtype))
     
 def cupyCheckExceedsSharedMem(requestedBytes: int, maximumBytes: int=48000):
     if requestedBytes > maximumBytes:

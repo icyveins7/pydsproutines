@@ -59,6 +59,68 @@ void filter_smtaps(
  
 }
 
+// Literally identical to above but for non-complex inputs
+extern "C" __global__
+void filter_smtaps_sminput_real(
+    const float *d_x, const int len,
+    const float *d_taps, const int tapslen,
+    const int outputPerBlk,
+    const int workspaceSize, // this must correspond to outputPerBlk + tapslen - 1
+    float *d_out, int outlen)
+{
+    // allocate shared memory
+    extern __shared__ double s[];
+    
+    float *s_taps = (float*)s; // (tapslen) floats
+    float *s_ws = (float*)&s_taps[tapslen]; // workspaceSize
+    /* Tally:  */
+
+    // load shared memory taps
+    for (int t = threadIdx.x; t < tapslen; t = t + blockDim.x){
+        s_taps[t] = d_taps[t];
+    }
+    // load the shared memory workspace
+    int i0 = blockIdx.x * outputPerBlk; // this is the first output index
+    int workspaceStart = i0 - tapslen + 1; // this is the first index that is required
+    // int workspaceEnd   = i0 + outputPerBlk; // this is the last index that is required (non-inclusive)
+    int i;
+    for (int t = threadIdx.x; t < workspaceSize; t = t + blockDim.x)
+    {
+        i = workspaceStart + t; // this is the input source index to copy
+        if (i < 0 || i >= outlen) // set to 0 if its out of range
+            s_ws[t] = 0;
+        else
+            s_ws[t] = d_x[i];
+    }
+    
+    __syncthreads();
+    
+    // Begin computations
+    float z; // stack-var for each thread
+    int wsi;
+    for (int t = threadIdx.x; t < outputPerBlk; t = t + blockDim.x)
+    {
+        z = 0; // reset before the output
+
+        i = blockIdx.x * outputPerBlk + t; // This is the output index
+        wsi = tapslen - 1 + t; // this is the 'equivalent' source index from shared memory
+
+        // Exit if we hit the end
+        if (i >= outlen)
+            break;
+
+        // Otherwise loop over the taps and the shared mem workspace
+        for (int j = 0; j < tapslen; j++)
+        {
+            // accumulate
+            z = z + s_ws[wsi - j] * s_taps[j];
+        }
+
+        // Coalesced writes
+        d_out[i] = z;
+    }
+ 
+}
 
 // ================
 // If the number of taps is small, we can allocate a workspace for the complex-valued inputs

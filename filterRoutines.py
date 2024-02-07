@@ -924,9 +924,9 @@ def resampleFactorWizard(fs: int, rsfs: int):
 #%%
 filtkernels, _ = cupyModuleToKernelsLoader(
     "filter.cu",
-    ["multiMovingAverage"]
+    ["multiMovingAverage", "movingAverage"]
 )
-_multiMovingAvgKernel, = filtkernels # Unpack
+_multiMovingAvgKernel, _movingAverageKernel = filtkernels # Unpack
 
 def cupyMultiMovingAverage(
     d_x: cp.ndarray,
@@ -965,6 +965,41 @@ def cupyMultiMovingAverage(
     )
 
     return d_avg
+
+def cupyMovingAverage(
+    x: cp.ndarray,
+    avgLength: int,
+    NUM_PER_THREAD: int=33,
+    THREADS_PER_BLK: int=32
+):
+    # Check types
+    cupyRequireDtype(cp.float32, x)
+
+    # Check NUM_PER_THREAD is not even
+    if NUM_PER_THREAD % 2 == 0:
+        raise ValueError("NUM_PER_THREAD must be odd.")
+    
+    # Calculate shared memory requirement
+    workspaceInputLength = (THREADS_PER_BLK * NUM_PER_THREAD + avgLength - 1) * x.itemsize
+    workspaceOutputLength = (THREADS_PER_BLK * NUM_PER_THREAD) * x.itemsize
+    smReq = workspaceInputLength + workspaceOutputLength
+
+    # Alloc output
+    d_out = cp.empty(x.shape, dtype=x.dtype)
+
+    # Invoke
+    NUM_BLKS = cupyGetEnoughBlocks(x.size, THREADS_PER_BLK * NUM_PER_THREAD)
+    _movingAverageKernel(
+        (NUM_BLKS,), (THREADS_PER_BLK,),
+        (
+            x, x.size,
+            avgLength, NUM_PER_THREAD,
+            d_out
+        ),
+        shared_mem=smReq
+    )
+
+    return d_out
 
 
 #%% Run unit tests
@@ -1029,4 +1064,32 @@ if __name__ == "__main__":
                 d_avg = cupyMultiMovingAverage(d_x, avgLength)
                 self.assertTrue(np.allclose(d_avg.get().reshape(-1), check.reshape(-1)))
 
-    unittest.main()
+
+    class TestMovingAverageKernel(unittest.TestCase):
+        def test_even_numPerThread_error(self):
+            x = np.random.randn(100).astype(np.float32)
+            d_x = cp.asarray(x)
+            self.assertRaises(
+                ValueError,
+                cupyMovingAverage,
+                d_x,
+                20,
+                32
+            )
+
+        def test_simple(self):
+            x = np.random.randn(100).astype(np.float32)
+            d_x = cp.asarray(x)
+            # Average in the CPU
+            avgLength = 20
+            onesTaps = np.ones(avgLength).astype(np.float32) / avgLength
+            check = sps.lfilter(onesTaps, 1, x)
+            # Average in the GPU
+            d_avg = cupyMovingAverage(d_x, avgLength)
+            self.assertTrue(np.allclose(d_avg.get(), check))
+            # This may fail sometimes, since the accumulator is float
+            # TODO: either template accumulator or just use double?
+
+        # TODO: test small range fuzz here too
+
+    unittest.main(verbosity=2)

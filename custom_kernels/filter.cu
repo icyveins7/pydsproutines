@@ -256,3 +256,112 @@ void multiMovingAverage(
 }
 
 
+/*
+This is a general moving average filter for a single long array.
+
+The design goal is to use shared memory in a way that allows each thread
+in the warp to ALWAYS use a unique shared memory bank.
+
+E.g.
+N = 31 (length of moving average window)
+
+Thread 0 | Thread 1 | Thread 2 ...
+0->30    | 33->63   | 66->96
+1->31    | ...
+...
+32->62   |
+
+As can be seen above, thread (i) starts on the i'th bank and ends on the i'th bank.
+On the first iteration, as the threads start reading forwards, each thread is always
+accessing a different bank, maximising our shared memory access.
+
+Doing it this way allows each thread to operate independently, and allows it to optimise
+the moving average in the standard (add new element, subtract oldest element) way,
+instead of having to synchronize with each other.
+
+Note that in the above scenario, each thread outputs 33 elements.
+This is not a required number! Other values are possible:
+
+E.g.
+NUM_PER_THREAD = 31
+
+Thread 0    | Thread 1     | Thread 2 ...
+0->30  (B00)| 31->61 (B31) | 62->92  (B28)
+1->31  (B01)| 32->62 (B00) | 
+...
+30->60 (B30)| 61->91 (B29) | 92->102 (B26)
+
+However, some values should be avoided, like 32 (for obvious reasons),
+but also all even numbers.
+Odd numbers will always exactly fill all available shared memory banks, whereas
+even numbers will always overlap in some memory banks.
+Simple check is via:
+
+```
+uset = set(np.arange(32))
+for i in range(1,34):
+    s = (np.arange(32)*i) % 32 # Defines the bank index for each thread
+    if set(s) != uset:
+        print(i)
+```
+*/
+extern "C" __global__
+void movingAverage(
+    const float *d_x,
+    const int xlen,
+    const int avgLength,
+    const int NUM_PER_THREAD, 
+    float *d_out // should also be xlen
+){
+    // Total length we have to read in from global mem
+    int workspaceInputLength = blockDim.x * NUM_PER_THREAD + avgLength - 1;
+    // And to output to global mem
+    int workspaceOutputLength = blockDim.x * NUM_PER_THREAD;
+    // Where we start reading from global mem for this block
+    int i0 = workspaceOutputLength * blockIdx.x - (avgLength - 1); // offset backwards
+    // Where to start writing to global mem for this block
+    int o0 = workspaceOutputLength * blockIdx.x;
+
+    // allocate shared memory
+    extern __shared__ double s[];
+
+    float *s_x = (float*)s; // (workspaceInputLength) floats
+    float *s_ws = (float*)&s_x[workspaceInputLength]; // (workspaceOutputLength) floats
+
+    for (int t = threadIdx.x; t < workspaceInputLength; t += blockDim.x)
+    {
+        // Only read if it's in range
+        int idx = t + i0;
+        if (idx >= 0 && idx < xlen)
+            s_x[t] = d_x[idx];
+        else
+            s_x[t] = 0;
+    }
+    __syncthreads();
+
+    // Now compute the 'first' average for each thread
+    float sum = 0.0f;
+    for (int i = 0; i < avgLength; i++)
+    {
+        sum += s_x[threadIdx.x * NUM_PER_THREAD + i];
+    }
+    s_ws[threadIdx.x * NUM_PER_THREAD] = sum / (float)avgLength;
+
+    // For the rest of it, compute the average by removing earliest and adding latest
+    for (int j = 1; j < NUM_PER_THREAD; j++)
+    {
+        sum -= s_x[threadIdx.x * NUM_PER_THREAD + j-1];
+        sum += s_x[threadIdx.x * NUM_PER_THREAD + avgLength + j-1];
+        s_ws[threadIdx.x * NUM_PER_THREAD + j] = sum / (float)avgLength;
+    }
+
+    // Finally write our output coalesced to global
+    for (int t = threadIdx.x; t < workspaceOutputLength; t += blockDim.x)
+    {
+        if (o0 + t < xlen)
+            d_out[o0 + t] = s_ws[t];
+    }
+
+}
+
+

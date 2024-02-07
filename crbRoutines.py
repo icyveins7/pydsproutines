@@ -219,7 +219,50 @@ class TDOACRBComponent(LocalizationCRBComponent):
         
         # Return the difference of the partials
         return r_dx[1] - r_dx[0]
-    
+
+
+class TOACRBComponent(LocalizationCRBComponent):
+    def __init__(self, x: np.ndarray, inv_sigma_tau_sq: float, S: np.ndarray):
+        """
+        Instantiate a TOA CRB component.
+        This corresponds to a single uncorrelated TOA measurement from 1 sensor.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Target position vector.
+        inv_sigma_tau_sq : float
+            Inverse uncertainty for the TOA measurement, in units of s^-2.
+            This will be internally converted to the appropriate range units required.
+        S : np.ndarray
+            A (3,) shape matrix, representing the sensor's position
+        """
+        # Check that there is exactly 1 sensor
+        if S.shape != (3,):
+            raise ValueError("S must be a (3,) shape matrix")
+
+        # Translate TDOA inv sigma value to RDOA inv sigma value
+        self.inv_sigma_roa_sq = inv_sigma_tau_sq/speed_of_light**2
+
+        self.r = np.linalg.norm(x - S)
+        super().__init__(x, self.inv_sigma_roa_sq, S)
+
+    def _differentiate(self):
+        """
+        Calculate the partial derivatives of the range.
+
+        Returns
+        -------
+        np.ndarray
+            (3, ) shape array for the partial derivatives.
+        """
+        # Partial for range
+        r_dx = (self.x - self.S) / self.r
+
+        # Return as is
+        return r_dx
+
+ 
 
 #%%
 class CRB:
@@ -539,6 +582,38 @@ if __name__ == "__main__":
                     )
                 )
 
+
+    class TestTOACRBComponent(unittest.TestCase):
+        def test_simple(self):
+            # We create a plane and two TOAs, equidistant
+            x = np.array([0,100,0], np.float64)
+            inv_sigma_tau_sq = 1/(1e-10)**2
+            s1 = np.array([100,0,100], np.float64)
+            s2 = np.array([-100,0,100], np.float64)
+            
+
+            # Construct CRB with x-y plane constraint
+            crb = CRB(constraints=np.array([0,0,1]))
+            crb.addComponent(
+                TOACRBComponent(
+                    x, inv_sigma_tau_sq, s1
+                )
+            ).addComponent(
+                TOACRBComponent(
+                    x, inv_sigma_tau_sq, s2
+                )
+            )
+
+            # Compute
+            crbmat = crb.compute()
+            u, s, vh = np.linalg.svd(crbmat)
+
+            # We expect the two eigenvalues to be equal
+            self.assertAlmostEqual(
+                s[0], s[1]
+            )
+            # The two eigenvectors can be in any direction at this point so it's irrelevant
+            # i.e. perfect circle on the plane
 
                 
 

@@ -554,8 +554,47 @@ def multiTemplateSlidingDotProduct(
 
     return d_templateIdx, d_qf2
 
-    
-    
+
+#%% Peak finding kernels
+peakfindingKernels, _ = cupyModuleToKernelsLoader(
+    "peakfinding.cu",
+    ["findLocalMaxima"]
+)
+_findLocalMaximaKernel, = peakfindingKernels # Unpack
+
+def cupyFindLocalMaxima(
+    x: cp.ndarray,
+    minHeight: float,
+    numOutputPerBlk: int=32,
+    THREADS_PER_BLK: int=32,
+    maxNumPeaks: int=10000
+):
+    # Check type
+    cupyRequireDtype(cp.float32, x)
+
+    # Make output
+    numPeaksFound = cp.zeros(1, cp.int32)
+    peakIndex = cp.zeros(maxNumPeaks, cp.int32)
+
+    # Shared mem req
+    smReq = (numOutputPerBlk+2) * x.itemsize
+
+    # Invoke
+    NUM_BLKS = cupyGetEnoughBlocks(x.size, numOutputPerBlk)
+    _findLocalMaximaKernel(
+        (NUM_BLKS,), (THREADS_PER_BLK,),
+        (
+            x, x.size,
+            np.float32(minHeight),  # You MUST CAST it like this, else it interprets it wrongly in the kernel
+            numOutputPerBlk,
+            peakIndex, numPeaksFound
+        ),
+        shared_mem=smReq
+    )
+
+    return peakIndex, numPeaksFound
+
+#%%    
 if __name__ == "__main__":
     from signalCreationRoutines import *
     from verifyRoutines import *
@@ -563,55 +602,76 @@ if __name__ == "__main__":
 
     timer = Timer()
 
-    # Create a short signal
-    x = randnoise(50, 1, 1, 1).astype(np.complex64)
-    # Create a long signal
-    y = randnoise(100000, 1, 1, 1).astype(np.complex64)
+    # Make some small signal
+    x = cp.zeros(50, cp.float32)
+    x[5] = 1.0
+    x[8] = 0.5
+    x[9] = 0.6
+    x[32+5] = 1.0
+    x[32+8] = 0.5
+    x[32+9] = 0.6
+    x += cp.asarray(np.abs(np.random.randn(x.size)*1e-3))
+    print(x)
 
-    # Run the sliding multiply on cpu
-    startIdx = 0
-    idxlen = y.size - x.size + 1
-    out = np.zeros((idxlen, x.size), dtype=np.complex64)
+    # Run the kernel?
+    peakIndex, numPeaksFound = cupyFindLocalMaxima(
+        x, 0.4
+    )
+    pki = peakIndex.get()
+    numPki = numPeaksFound.get()[0]
+    print(np.sort(pki[:numPki]))
+
+    # TODO: write peakfinding kernel unittests
+
+    # # Create a short signal
+    # x = randnoise(50, 1, 1, 1).astype(np.complex64)
+    # # Create a long signal
+    # y = randnoise(100000, 1, 1, 1).astype(np.complex64)
+
+    # # Run the sliding multiply on cpu
+    # startIdx = 0
+    # idxlen = y.size - x.size + 1
+    # out = np.zeros((idxlen, x.size), dtype=np.complex64)
     
-    # pre-compute x norm
-    xnorm = np.linalg.norm(x)
+    # # pre-compute x norm
+    # xnorm = np.linalg.norm(x)
 
-    timer.start()
-    for i in range(startIdx, idxlen):    
-        outnormsq = np.linalg.norm(y[i:i+x.size])
-        out[i,:] = y[i:i+x.size] * x / outnormsq / xnorm
-    timer.end("numpy")
+    # timer.start()
+    # for i in range(startIdx, idxlen):    
+    #     outnormsq = np.linalg.norm(y[i:i+x.size])
+    #     out[i,:] = y[i:i+x.size] * x / outnormsq / xnorm
+    # timer.end("numpy")
     
-    # Run the sliding multiply on gpu
-    d_x = cp.asarray(x)
-    d_y = cp.asarray(y)
+    # # Run the sliding multiply on gpu
+    # d_x = cp.asarray(x)
+    # d_y = cp.asarray(y)
 
-    # Use the custom kernel
-    timer.start()
-    d_pdts = multiplySlidesNormalised(
-        d_x,
-        d_y,
-        startIdx,
-        idxlen,
-        THREADS_PER_BLOCK=32
-    )
-    timer.end("kernel")
+    # # Use the custom kernel
+    # timer.start()
+    # d_pdts = multiplySlidesNormalised(
+    #     d_x,
+    #     d_y,
+    #     startIdx,
+    #     idxlen,
+    #     THREADS_PER_BLOCK=32
+    # )
+    # timer.end("kernel")
 
-    compareValues(
-        d_pdts.get().flatten(),
-        out.flatten()
-    )
+    # compareValues(
+    #     d_pdts.get().flatten(),
+    #     out.flatten()
+    # )
 
 
-    # Testing the magn sq kernel
-    d_cp_yAbsSq = cp.abs(d_y)**2
-    print(d_cp_yAbsSq.dtype)
-    d_yAbsSq = cupyComplexMagnSq(d_y)
-    print(d_yAbsSq.dtype)
+    # # Testing the magn sq kernel
+    # d_cp_yAbsSq = cp.abs(d_y)**2
+    # print(d_cp_yAbsSq.dtype)
+    # d_yAbsSq = cupyComplexMagnSq(d_y)
+    # print(d_yAbsSq.dtype)
 
-    compareValues(
-        d_yAbsSq.get().flatten(),
-        d_cp_yAbsSq.get().flatten()
-    )
+    # compareValues(
+    #     d_yAbsSq.get().flatten(),
+    #     d_cp_yAbsSq.get().flatten()
+    # )
 
 

@@ -340,7 +340,7 @@ void movingAverage(
     __syncthreads();
 
     // Now compute the 'first' average for each thread
-    float sum = 0.0f;
+    float sum = 0.0f; // Note that accumulating using a float like this is prone to truncation errors as the avgLength gets large
     for (int i = 0; i < avgLength; i++)
     {
         sum += s_x[threadIdx.x * NUM_PER_THREAD + i];

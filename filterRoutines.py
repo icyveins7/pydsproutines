@@ -1066,29 +1066,29 @@ if __name__ == "__main__":
 
 
     class TestMovingAverageKernel(unittest.TestCase):
+        def setUp(self):
+            self.x = np.random.randn(100).astype(np.float32)
+            self.d_x = cp.asarray(self.x)
+
         def test_even_numPerThread_error(self):
-            x = np.random.randn(100).astype(np.float32)
-            d_x = cp.asarray(x)
             self.assertRaises(
                 ValueError,
                 cupyMovingAverage,
-                d_x,
+                self.d_x,
                 20,
                 32
             )
 
         def test_simple(self):
-            x = np.random.randn(100).astype(np.float32)
-            d_x = cp.asarray(x)
             # Average in the CPU
             avgLength = 20
             onesTaps = np.ones(avgLength).astype(np.float32) / avgLength
-            check = sps.lfilter(onesTaps, 1, x)
+            check = sps.lfilter(onesTaps, 1, self.x)
             # Average in the GPU
-            d_avg = cupyMovingAverage(d_x, avgLength)
-            self.assertTrue(np.allclose(d_avg.get(), check))
-            # This may fail sometimes, since the accumulator is float
-            # TODO: either template accumulator or just use double?
+            d_avg = cupyMovingAverage(self.d_x, avgLength)
+            h_avg = d_avg.get()
+            for i in range(self.x.shape[0]):
+                self.assertAlmostEqual(h_avg[i], check[i], places=5)
 
         # TODO: test small range fuzz here too
 

@@ -586,7 +586,7 @@ def plotPossibleConstellations(
         ax[i//cols, i%cols].set_title('%d::%d' % (i, osr))
     return ax
 
-def plotFreqz(taps: np.ndarray | list, cutoff: float | list=None):
+def plotFreqz(taps: np.ndarray | list, cutoff: float=None, showPhase: bool=False):
     """
     Plots filter response for given taps array (or list of arrays).
 
@@ -594,7 +594,7 @@ def plotFreqz(taps: np.ndarray | list, cutoff: float | list=None):
     ----------
     taps : np.ndarray | list
         Taps vectors or list of it.
-    cutoff : float | list, optional
+    cutoff : float, optional
         Cutoff for the filter taps, by default None.
         Will plot a vertical line to indicate the desired
         lowpass band if supplied.
@@ -608,20 +608,31 @@ def plotFreqz(taps: np.ndarray | list, cutoff: float | list=None):
     """
     if not isinstance(taps, list):
         taps = [taps]
-    if cutoff is None:
-        cutoff = [None] * len(taps)
-    elif not isinstance(cutoff, list):
-        cutoff = [cutoff]
 
-    fig, ax = plt.subplots(1,1,num="Filter performance")
+    numPlotRows = 2 if showPhase else 1
+    fig, ax = plt.subplots(numPlotRows,1,num="Filter performance",sharex=True)
+    aax = ax[0] if showPhase else ax
+    pax = ax[1] if showPhase else None
     for i, vtaps in enumerate(taps):
         w, h = sps.freqz(vtaps, 1, vtaps.size)
-        ax.plot(w/np.pi, 20*np.log10(np.abs(h)), label="%d: %d taps" % (i, vtaps.size))
-        cutoff_i = cutoff[i]
-        if cutoff_i is not None:
-            yl = ax.get_ylim()
-            ax.vlines([cutoff_i], yl[0], yl[1], colors='k', linestyle='dashed')
-    ax.legend()
+        aax.plot(w/np.pi, 20*np.log10(np.abs(h)), label="%d: %d taps" % (i, vtaps.size))
+        if showPhase:
+            pax.plot(w/np.pi, np.unwrap(np.angle(h)), label="%d: %d taps" % (i, vtaps.size))
+
+    aax.legend()
+    aax.set_xlabel('Normalised Frequency')
+    aax.set_ylabel('Amplitude (dB)')
+    if showPhase:
+        pax.legend()
+        pax.set_xlabel('Normalised Frequency')
+        pax.set_ylabel('Phase (radians)')
+
+    if cutoff is not None:
+        yl = aax.get_ylim()
+        aax.vlines([cutoff], yl[0], yl[1], colors='k', linestyle='dashed')
+        if showPhase:
+            pax.vlines([cutoff], yl[0], yl[1], colors='k', linestyle='dashed')    
+
     
     return fig, ax
 

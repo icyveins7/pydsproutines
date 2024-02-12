@@ -598,6 +598,8 @@ def plotFreqz(taps: np.ndarray | list, cutoff: float=None, showPhase: bool=False
         Cutoff for the filter taps, by default None.
         Will plot a vertical line to indicate the desired
         lowpass band if supplied.
+    showPhase : bool, optional
+        Plots the phase response if True. Defaults to False.
 
     Returns
     -------

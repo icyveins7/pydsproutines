@@ -586,13 +586,42 @@ def plotPossibleConstellations(
         ax[i//cols, i%cols].set_title('%d::%d' % (i, osr))
     return ax
 
-def plotFreqz(taps, cutoff=None):
-    fig, ax = plt.subplots(1,1,num="Filter performance (%d taps)" % taps.size)
-    w, h = sps.freqz(taps, 1, taps.size)
-    ax.plot(w/np.pi, 20*np.log10(np.abs(h)))
-    if cutoff is not None:
-        yl = ax.get_ylim()
-        ax.vlines([cutoff], yl[0], yl[1], colors='k', linestyle='dashed')
+def plotFreqz(taps: np.ndarray | list, cutoff: float | list=None):
+    """
+    Plots filter response for given taps array (or list of arrays).
+
+    Parameters
+    ----------
+    taps : np.ndarray | list
+        Taps vectors or list of it.
+    cutoff : float | list, optional
+        Cutoff for the filter taps, by default None.
+        Will plot a vertical line to indicate the desired
+        lowpass band if supplied.
+
+    Returns
+    -------
+    fig : Matplotlib.pyplot figure 
+        Figure that you can use for other plotting.
+    ax : Matplotlib.pyplot axes
+        Axes that you can use for other plotting.
+    """
+    if not isinstance(taps, list):
+        taps = [taps]
+    if cutoff is None:
+        cutoff = [None] * len(taps)
+    elif not isinstance(cutoff, list):
+        cutoff = [cutoff]
+
+    fig, ax = plt.subplots(1,1,num="Filter performance")
+    for i, vtaps in enumerate(taps):
+        w, h = sps.freqz(vtaps, 1, vtaps.size)
+        ax.plot(w/np.pi, 20*np.log10(np.abs(h)), label="%d: %d taps" % (i, vtaps.size))
+        cutoff_i = cutoff[i]
+        if cutoff_i is not None:
+            yl = ax.get_ylim()
+            ax.vlines([cutoff_i], yl[0], yl[1], colors='k', linestyle='dashed')
+    ax.legend()
     
     return fig, ax
 

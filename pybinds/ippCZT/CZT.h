@@ -19,22 +19,9 @@ int next_fast_len(int len);
 
 struct IppCZT32fc
 {
-    IppCZT32fc() {}
-    IppCZT32fc(int len, double f1, double f2, double fstep, double fs)
-        : m_N{len},
-        m_k{static_cast<int>((f2-f1)/fstep + 1)},
-        m_nfft{next_fast_len(len + m_k - 1)}, // important for nfft to be after len and k
-        m_dft{(size_t)m_nfft}, // important for dft to be after nfft
-        m_f1{f1},
-        m_f2{f2},
-        m_fstep{fstep},
-        m_fs{fs},
-        m_ws{(size_t)m_nfft}, // again, important to be after m_nfft
-        m_ws2{(size_t)m_nfft}
-    {
-        prepare();
-    }
-    ~IppCZT32fc() {}
+    IppCZT32fc();
+    IppCZT32fc(int len, double f1, double f2, double fstep, double fs);
+   ~IppCZT32fc();
 
     //
     void prepare();

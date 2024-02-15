@@ -2,16 +2,16 @@
 
 int main()
 {
-    int testlen = 110923; // expect next one to be 111132
+    int testlen = 101; // expect next one to be 111132
     int nextfastlen = next_fast_len(testlen);
     printf("nextfastlen from %d = %d\n", testlen, nextfastlen);
 
     // Test the class itself
-    int N = 10;
+    int N = 10; // testlen;
     Ipp32f f1 = -1000.0f;
     Ipp32f f2 = 1000.0f;
     Ipp32f fstep = 1.0f;
-    Ipp32f fs = (Ipp32f)N;
+    Ipp32f fs =  10000.0f;
 
     // IppCZT32fc czt(11, -0.1f, 0.1f, 0.01f, 1.0f);
     IppCZT32fc czt;
@@ -21,6 +21,7 @@ int main()
     catch(std::exception &e)
     {
         printf("Caught ctor error: %s\n", e.what());
+        return -1;
     }
     ippe::vector<Ipp32fc> in(N);
     for (int i = 0; i < N; i++)
@@ -47,12 +48,12 @@ int main()
     }
     printf("\n\n");
 
-    // // validated.
-    // for (int i = 0; i < czt.m_fv.size(); i++)
-    // {
-    //     printf("fv[%d] = %f, %f\n", i, czt.m_fv[i].re, czt.m_fv[i].im);
-    // }
-    // printf("\n\n");
+    // validated.
+    for (int i = 0; i < czt.m_fv.size(); i++)
+    {
+        printf("fv[%d] = %f, %f\n", i, czt.m_fv[i].re, czt.m_fv[i].im);
+    }
+    printf("\n\n");
 
     try{
         czt.runRaw(in.data(), out.data());
@@ -68,6 +69,6 @@ int main()
     // {
     //     printf("out[%d]= %f, %f\n", i, out.at(i).re, out.at(i).im);
     // }
-
+    printf("Ok\n");
     return 0;
 }

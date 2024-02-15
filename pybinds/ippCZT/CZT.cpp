@@ -174,7 +174,7 @@ void IppCZT32fc::prepare()
 
 void IppCZT32fc::runRaw(const Ipp32fc* in, Ipp32fc* out)
 {
-    try{
+    //try{
         // Zero our workspace
         m_ws.zero();
         // Copy input to the front of workspace
@@ -188,11 +188,11 @@ void IppCZT32fc::runRaw(const Ipp32fc* in, Ipp32fc* out)
         // Perform the FFT
         // printf("m_dft size: %zd\n", m_dft.getLength());
         // printf("m_ws2 size: %zd\n", m_ws2.size());
-  //      printf("m_ws (%4zd): %p\n", m_ws.size(), m_ws.data());
-  //      printf("m_ws2(%4zd): %p\n", m_ws.size(), m_ws2.data());
-  //      printf("%p\n%p\n", m_dft.getDFTSpec().data(), m_dft.getDFTBuf().data());
-  //      printf("%zd\n%zd\n", m_dft.getDFTSpec().size(), m_dft.getDFTBuf().size());
-		//printf("%zd\n%zd\n", m_dft.getDFTSpec().capacity(), m_dft.getDFTBuf().capacity());
+        printf("m_ws (%4zd): %p\n", m_ws.size(), m_ws.data());
+        printf("m_ws2(%4zd): %p\n", m_ws.size(), m_ws2.data());
+        printf("%p\n%p\n", m_dft.getDFTSpec().data(), m_dft.getDFTBuf().data());
+        printf("%zd\n%zd\n", m_dft.getDFTSpec().size(), m_dft.getDFTBuf().size());
+		printf("%zd\n%zd\n", m_dft.getDFTSpec().capacity(), m_dft.getDFTBuf().capacity());
         m_dft.fwd(m_ws.data(), m_ws2.data());
         
         // Multiply with the chirpfilter FFT
@@ -207,11 +207,11 @@ void IppCZT32fc::runRaw(const Ipp32fc* in, Ipp32fc* out)
         ippe::math::Mul(
             &m_ws.at(m_N-1), &m_ww.at(m_N-1), out, m_k
         );
-    }
-    catch(std::exception &e){
-        printf("Error caught in runRaw(): %s\n", e.what());
-        throw e;
-    }
+    //}
+    //catch(std::exception &e){
+    //    printf("Error caught in runRaw(): %s\n", e.what());
+    //    throw e;
+    //}
     
 }
 

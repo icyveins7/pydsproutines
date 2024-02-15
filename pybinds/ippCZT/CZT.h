@@ -24,7 +24,7 @@ struct IppCZT32fc
     ~IppCZT32fc();
 
     IppCZT32fc(const IppCZT32fc& other) = delete;
-    void operator=(const IppCZT32fc& other) = delete;
+    //void operator=(const IppCZT32fc& other) = delete;
 
     //
     void prepare();

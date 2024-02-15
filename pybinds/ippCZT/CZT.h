@@ -21,7 +21,7 @@ struct IppCZT32fc
 {
     IppCZT32fc();
     IppCZT32fc(int len, double f1, double f2, double fstep, double fs);
-   ~IppCZT32fc();
+    ~IppCZT32fc();
 
     //
     void prepare();

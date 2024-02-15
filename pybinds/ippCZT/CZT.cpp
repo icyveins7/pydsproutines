@@ -178,6 +178,7 @@ void IppCZT32fc::runRaw(const Ipp32fc* in, Ipp32fc* out)
         // Zero our workspace
         m_ws.zero();
         // Copy input to the front of workspace
+        // printf("m_ws size: %zd\nin length: %d\n", m_ws.size(), m_N);
         ippe::Copy<Ipp32fc>(in, m_ws.data(), m_N); // only length N
         // Perform the multiply with our array of coefficients
         ippe::math::Mul_I(
@@ -185,6 +186,13 @@ void IppCZT32fc::runRaw(const Ipp32fc* in, Ipp32fc* out)
         );
 
         // Perform the FFT
+        // printf("m_dft size: %zd\n", m_dft.getLength());
+        // printf("m_ws2 size: %zd\n", m_ws2.size());
+        printf("m_ws : %p\n", m_ws.data());
+        printf("m_ws2: %p\n", m_ws2.data());
+        printf("%p\n%p\n", m_dft.getDFTSpec().data(), m_dft.getDFTBuf().data());
+        printf("%zd\n%zd\n", m_dft.getDFTSpec().size(), m_dft.getDFTBuf().size());
+		printf("%zd\n%zd\n", m_dft.getDFTSpec().capacity(), m_dft.getDFTBuf().capacity());
         m_dft.fwd(m_ws.data(), m_ws2.data());
         
         // Multiply with the chirpfilter FFT

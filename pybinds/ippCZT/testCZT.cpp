@@ -1,4 +1,5 @@
 #include "CZT.h"
+#include <vector>
 
 int main()
 {
@@ -14,15 +15,17 @@ int main()
     Ipp32f fs =  10000.0f;
 
     // IppCZT32fc czt(11, -0.1f, 0.1f, 0.01f, 1.0f);
-    IppCZT32fc czt;
-    try{
-        czt = IppCZT32fc(N, f1, f2, fstep, fs);
-    }
-    catch(std::exception &e)
-    {
-        printf("Caught ctor error: %s\n", e.what());
-        return -1;
-    }
+    IppCZT32fc czt(N+10, f1, f2, fstep, fs);
+    czt = IppCZT32fc(N, f1, f2, fstep, fs);
+    // IppCZT32fc czt;
+    // try{
+    //     czt = IppCZT32fc(N, f1, f2, fstep, fs);
+    // }
+    // catch(std::exception &e)
+    // {
+    //     printf("Caught ctor error: %s\n", e.what());
+    //     return -1;
+    // }
     ippe::vector<Ipp32fc> in(N);
     for (int i = 0; i < N; i++)
     {
@@ -34,26 +37,26 @@ int main()
     printf("output length = %zd\n", out.size());
     printf("m_nfft = %zd\n", czt.m_dft.getLength());
 
-    // validated.
-    for (int i = 0; i < czt.m_ww.size(); i++)
-    {
-        printf("ww[%d] = %f, %f\n", i, czt.m_ww[i].re, czt.m_ww[i].im);
-    }
-    printf("\n\n");
+    // // validated.
+    // for (int i = 0; i < czt.m_ww.size(); i++)
+    // {
+    //     printf("ww[%d] = %f, %f\n", i, czt.m_ww[i].re, czt.m_ww[i].im);
+    // }
+    // printf("\n\n");
 
-    // validated.
-    for (int i = 0; i < czt.m_aa.size(); i++)
-    {
-        printf("aa[%d] = %f, %f\n", i, czt.m_aa[i].re, czt.m_aa[i].im);
-    }
-    printf("\n\n");
+    // // validated.
+    // for (int i = 0; i < czt.m_aa.size(); i++)
+    // {
+    //     printf("aa[%d] = %f, %f\n", i, czt.m_aa[i].re, czt.m_aa[i].im);
+    // }
+    // printf("\n\n");
 
-    // validated.
-    for (int i = 0; i < czt.m_fv.size(); i++)
-    {
-        printf("fv[%d] = %f, %f\n", i, czt.m_fv[i].re, czt.m_fv[i].im);
-    }
-    printf("\n\n");
+    // // validated.
+    // for (int i = 0; i < czt.m_fv.size(); i++)
+    // {
+    //     printf("fv[%d] = %f, %f\n", i, czt.m_fv[i].re, czt.m_fv[i].im);
+    // }
+    // printf("\n\n");
 
     try{
         czt.runRaw(in.data(), out.data());
@@ -63,6 +66,11 @@ int main()
         printf("Caught runRaw error: %s\n", e.what());
     }
     
+
+    // Testing a vector of objects
+    std::vector<IppCZT32fc> cztvec;
+    cztvec.push_back(czt);
+    cztvec.push_back(czt);
 
     // // all correct!
     // for (int i = 0; i < out.size(); i++)

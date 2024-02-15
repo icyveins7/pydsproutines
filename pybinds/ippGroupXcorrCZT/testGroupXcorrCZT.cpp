@@ -114,6 +114,7 @@ int main(int argc, char *argv[])
         true
     );
     try{
+        printf("Attempting xcorrRaw with threads\n");
         gxc4.xcorrRaw(
             data.data(), shiftStart, shiftStep, numShifts, out.data()
         );

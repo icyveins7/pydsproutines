@@ -11,7 +11,7 @@ if sys.platform.startswith('win32'):
     import os
     os.add_dll_directory(os.path.join(os.environ['IPPROOT'], "redist", "intel64"))
 
-from pbIppGroupXcorrCZT import pbIppGroupXcorrCZT
+from ippGroupXcorrCZT.pbIppGroupXcorrCZT import pbIppGroupXcorrCZT
 
 
 def benchmark(*args, **kwargs):
@@ -38,7 +38,7 @@ def benchmark(*args, **kwargs):
                         np.zeros(groupStarts.size, dtype=np.int32) + groupLength,
                         f1, f2, fstep, fs)
     timer.evt("Preparing py group xcorr czt object")
-    shiftStart = 80
+    shiftStart = firstGroupStart - 20
     shiftStep = 1
     numShifts = 41
     results, cztfreq = gxc.xcorr(x, np.arange(shiftStart, shiftStart+numShifts, shiftStep))

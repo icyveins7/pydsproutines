@@ -23,6 +23,9 @@ struct IppCZT32fc
     IppCZT32fc(int len, double f1, double f2, double fstep, double fs);
     ~IppCZT32fc();
 
+    IppCZT32fc(const IppCZT32fc& other) = delete;
+    void operator=(const IppCZT32fc& other) = delete;
+
     //
     void prepare();
     void runRaw(const Ipp32fc* in, Ipp32fc* out);

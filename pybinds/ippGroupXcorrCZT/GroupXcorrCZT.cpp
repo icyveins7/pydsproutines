@@ -1,5 +1,20 @@
 #include "GroupXcorrCZT.h"
 
+GroupXcorrCZT::GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs)
+    : m_maxlen(maxlen), m_f1(f1), m_f2(f2), m_fstep(fstep), m_fs(fs), m_threads{1}
+{
+
+}
+
+
+GroupXcorrCZT::GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs, size_t NUM_THREADS)
+    : m_maxlen(maxlen), m_f1(f1), m_f2(f2), m_fstep(fstep), m_fs(fs), m_threads{NUM_THREADS}
+{
+
+}
+
+
+
 void GroupXcorrCZT::addGroup(int start, int length, Ipp32fc *group, bool autoConj)
 {
     // Before we add the group, check that it doesn't overlap with any existing groups
@@ -18,9 +33,11 @@ void GroupXcorrCZT::addGroup(int start, int length, Ipp32fc *group, bool autoCon
                 std::to_string(gEnd) + ")"
             );
     }
-    // Make sure the length doesn't exceed the max length
-    if (length > m_czts.at(0).m_N)
-        throw std::range_error("Length of group exceeds maximum length");
+
+    // TODO: change this
+    // // Make sure the length doesn't exceed the max length
+    // if (length > m_czts.at(0).m_N)
+    //     throw std::range_error("Length of group exceeds maximum length");
         
     // If okay, then add the indices
     m_groupStarts.push_back(start);
@@ -169,7 +186,8 @@ void GroupXcorrCZT::correlateGroups(
     int t, int NUM_THREADS
 ){
     // Retrieve the CZT object used by this thread
-    IppCZT32fc &m_czt = m_czts.at(t);
+    // IppCZT32fc &m_czt = m_czts.at(t);
+    IppCZT32fc m_czt(m_maxlen, m_f1, m_f2, m_fstep, m_fs);
 
     // Define the shifts that this thread works on
     int NUM_PER_THREAD = numShifts / NUM_THREADS;
@@ -291,17 +309,18 @@ void GroupXcorrCZT::correlateGroups(
 void GroupXcorrCZT::computeGroupPhaseCorrections(int t, int NUM_THREADS)
 {
     // retrieve the czt object for the thread
-    IppCZT32fc &m_czt = m_czts.at(t);
+    // IppCZT32fc &m_czt = m_czts.at(t);
 
     // Phase correction for each frequency of CZT
-    ippe::vector<Ipp64f> freq(m_czt.m_k);
-    ippe::vector<Ipp64f> phase(m_czt.m_k);
+    int k = static_cast<int>((m_f2-m_f1)/m_fstep + 1);
+    ippe::vector<Ipp64f> freq(k);
+    ippe::vector<Ipp64f> phase(k);
     // Set the frequency slope of the CZT
     ippe::generator::Slope(
         freq.data(),
         (int)freq.size(),
-        m_czt.m_f1,
-        m_czt.m_fstep
+        m_f1,
+        m_fstep
     );
 
     ippe::vector<Ipp64fc> correction(phase.size()); // temporary 64-bit vector
@@ -313,7 +332,7 @@ void GroupXcorrCZT::computeGroupPhaseCorrections(int t, int NUM_THREADS)
         // Compute -2pi * f * groupStart / fs
         ippe::math::MulC(
             freq.data(),
-            -IPP_2PI * (Ipp64f)m_groupStarts.at(i) / m_czt.m_fs, // remember to normalise by fs!
+            -IPP_2PI * (Ipp64f)m_groupStarts.at(i) / m_fs, // remember to normalise by fs!
             phase.data(),
             (int)phase.size()
         );
@@ -345,7 +364,7 @@ py::array_t<float_t, py::array::c_style> GroupXcorrCZT::xcorr(
         throw std::range_error("Input must be 1d");
 
     // Make the output
-    py::array_t<float, py::array::c_style> out({numShifts, m_czts.at(0).m_k});
+    py::array_t<float, py::array::c_style> out({numShifts, static_cast<int>((m_f2-m_f1)/m_fstep + 1)});
 
     try{
         Ipp32fc* iptr = reinterpret_cast<Ipp32fc*>(buffer_info.ptr);

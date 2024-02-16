@@ -1,3 +1,11 @@
+/*
+This entire test file appears to crash semi-consistently (more often on Release, less often on Debug, never when -fsanitize=address?)
+but only on AMD chips.
+
+Running it on an Intel chip appears to cause zero crashes. It is too difficult to pin down if this is a bug or not.
+
+*/
+
 #include "CZT.h"
 #include <vector>
 

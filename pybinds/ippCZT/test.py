@@ -14,14 +14,16 @@ x = x.astype(np.complex64) # Cast
 
 
 length = x.size
-f1 = -1000.0
-f2 = 1000.0
-fstep = 1.0
+f1 = -1.0
+f2 = 1.0
+fstep = 0.1
 fs = float(length)
 
 for i in range(x.size):
     x[i] = i + i*1j
 
+pbczt = pbIppCZT32fc(x.size//2, f1, f2, fstep, fs)
+y = pbczt.run(x[:x.size//2])
 
 pbczt = pbIppCZT32fc(x.size, f1, f2, fstep, fs)
 y = pbczt.run(x)

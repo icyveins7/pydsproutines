@@ -84,12 +84,12 @@ int main(int argc, char *argv[])
     // Try to xcorr with threads instead
     out.zero();
     printf("Running with threads\n");
-    GroupXcorrCZT gxc4(
+    gxc = GroupXcorrCZT(
         12, -0.1, 0.1, 0.1, 100.0, 4
     );
     printf("Instantiated\n");
     try{
-        gxc4.xcorrRaw(
+        gxc.xcorrRaw(
             data.data(), shiftStart, shiftStep, numShifts, out.data()
         );
     }
@@ -97,24 +97,24 @@ int main(int argc, char *argv[])
         printf("Expected exception: %s\n", e.what());
     }
 
-    gxc4.addGroup(
+    gxc.addGroup(
         0, 10, &data.at(10), // use from 10 to 20 (exclusive), not the maxlength
         true
     );
-    gxc4.addGroup(
+    gxc.addGroup(
         60, 12, &data.at(70), // use from 70 to 82 (exclusive), max length
         true
     );
-    gxc4.addGroup(
+    gxc.addGroup(
         10, 12, &data.at(20), // use from 20 to 32 (exclusive), max length
         true
     );
-    gxc4.addGroup(
+    gxc.addGroup(
         30, 10, &data.at(40), // use from 40 to 52 (exclusive), max length
         true
     );
     try{
-        gxc4.xcorrRaw(
+        gxc.xcorrRaw(
             data.data(), shiftStart, shiftStep, numShifts, out.data()
         );
     }
@@ -132,12 +132,12 @@ int main(int argc, char *argv[])
     }
 
     // Add a group that is way out of range
-    gxc4.addGroup(
+    gxc.addGroup(
         100, 10, &data.at(10), true
     );
 
     try{
-        gxc4.xcorrRaw(
+        gxc.xcorrRaw(
             data.data(), shiftStart, shiftStep, numShifts, out.data(), data.size()
         );
     }
@@ -148,13 +148,13 @@ int main(int argc, char *argv[])
     // Use the convenience multi group adder method for safety
     int starts[4] = {10, 70, 20, 40};
     int lengths[4] = {10, 12, 12, 10};
-    gxc4.resetGroups();
-    gxc4.addGroupsFromArray(
+    gxc.resetGroups();
+    gxc.addGroupsFromArray(
         starts, lengths, 4, data.data()
     );
     out.zero();
     try{
-        gxc4.xcorrRaw(
+        gxc.xcorrRaw(
             data.data(), shiftStart, shiftStep, numShifts, out.data(), data.size()
         );
     }

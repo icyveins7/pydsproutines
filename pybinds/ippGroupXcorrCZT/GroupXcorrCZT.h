@@ -20,19 +20,10 @@ namespace py = pybind11;
 class GroupXcorrCZT
 {
 public:
-    GroupXcorrCZT(){}
-    GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs)
-        : m_threads{1}
-    {
-        m_czts.emplace_back(maxlen, f1, f2, fstep, fs);
-    }
-    GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs, size_t NUM_THREADS)
-        : m_threads{NUM_THREADS}//, m_czts{NUM_THREADS}
-    {
-        if (NUM_THREADS < 1) throw std::invalid_argument("Number of threads must be greater than 0");
-        for (size_t i = 0; i < NUM_THREADS; ++i)
-            m_czts.emplace_back(maxlen, f1, f2, fstep, fs); // instantiate the vector of CZTs
-    }
+    GroupXcorrCZT();
+    GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs);
+    GroupXcorrCZT(int maxlen, double f1, double f2, double fstep, double fs, size_t NUM_THREADS);
+
 
     /// @brief Adds a group to use for correlation.
     /// @param start Defines the relative start index of the group.
@@ -61,7 +52,7 @@ public:
     );
 
     // Some getters
-    int getCZTdimensions(){ return m_czts.at(0).m_k; }
+    int getCZTdimensions(){ return m_k; }
     size_t getNumThreads(){ return m_threads.size(); }
 
     // Debugging?
@@ -101,7 +92,15 @@ private:
 
     std::vector<std::thread> m_threads;
 
-    std::vector<IppCZT32fc> m_czts;
+    // std::vector<IppCZT32fc> m_czts;
+    // Keeping vector of CZT objects seems to cause crashes when creating more than 1 object??
+    // Instead keep the czt parameters
+    int m_N;
+    int m_k;
+    double m_f1;
+    double m_f2;
+    double m_fstep;
+    double m_fs;
 
     // These are the main runtime methods invoked by xcorr(), in order
     void computeGroupPhaseCorrections(int t=0, int NUM_THREADS=1);

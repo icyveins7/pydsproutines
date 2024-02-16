@@ -39,42 +39,50 @@ if sys.platform.startswith('win32'):
 from pbIppGroupXcorrCZT import pbIppGroupXcorrCZT
 
 # Create the pybind obj
-pbgxc = pbIppGroupXcorrCZT(12, -0.1, 0.1, 0.1, 100)
-print("pybind Numthreads = %d" % (pbgxc.getNumThreads()))
+# pbgxc = pbIppGroupXcorrCZT(12, -0.1, 0.1, 0.1, 100)
+# print(pbgxc)
+# print("pybind numthreads = %d" % (pbgxc.getNumThreads()))
+
+# NOTE: Creating more than 1 object causes crashes TODO: fix this
+pbgxc4 = pbIppGroupXcorrCZT(12, -0.1, 0.1, 0.1, 100, 1)
+print(pbgxc4)
+print("pybind Numthreads = %d" % (pbgxc4.getNumThreads()))
+
+pbgxc4 = pbIppGroupXcorrCZT(12, -0.1, 0.1, 0.1, 100, 4)
+print(pbgxc4)
+print("pybind Numthreads = %d" % (pbgxc4.getNumThreads()))
 
 
-pbgxc = pbIppGroupXcorrCZT(12, -0.1, 0.1, 0.1, 100, 4)
-print("pybind Numthreads = %d" % (pbgxc.getNumThreads()))
 
 # Add the groups
-pbgxc.addGroup(
+pbgxc4.addGroup(
     0, data[10:20]
 )
-pbgxc.addGroup(
+pbgxc4.addGroup(
     60, data[70:82]
 )
 try:
-    pbgxc.addGroup(
+    pbgxc4.addGroup(
         65, data[75:85]
     )
 except Exception as e:
     print("Expected error: %s" % str(e))
 
 
-pbgxc.printGroups()
+pbgxc4.printGroups()
 
-pbresults = pbgxc.xcorr(data, 9, 1, 3)
+pbresults = pbgxc4.xcorr(data, 9, 1, 3)
 print(pbresults)
 # print(type(pbresults))
 
 
 #%% Clear the groups and use the convenience method to add instead
-pbgxc.resetGroups()
-pbgxc.addGroupsFromArray(
+pbgxc4.resetGroups()
+pbgxc4.addGroupsFromArray(
     np.array([10, 70]), np.array([10, 12]), data
 )
-pbgxc.printGroups()
-pbresults = pbgxc.xcorr(data, 9, 1, 3)
+pbgxc4.printGroups()
+pbresults = pbgxc4.xcorr(data, 9, 1, 3)
 print(pbresults)
 
 

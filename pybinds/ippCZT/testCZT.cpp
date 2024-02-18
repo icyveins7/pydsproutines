@@ -32,7 +32,7 @@ int main()
     int numLoops = 100;
     for (int l = 0; l < numLoops; l++)
     {
-        // Test the class itself
+        // Test the class itselfq
         int N = 10; // testlen;
         Ipp32f f1 = -1000.0f;
         Ipp32f f2 = 1000.0f;
@@ -42,19 +42,19 @@ int main()
         // IppCZT32fc czt(11, -0.1f, 0.1f, 0.01f, 1.0f);
         IppCZT32fc czt(N + 10, f1, f2, fstep, fs);
         // print for this first
+        printf("m_nfft = %zd\n", czt.m_dft.getLength());
         printf("m_ws (%4zd): %p->%p\n", czt.m_ws.size(), czt.m_ws.data(), &czt.m_ws.back());
         printf("m_ws2(%4zd): %p->%p\n", czt.m_ws.size(), czt.m_ws2.data(), &czt.m_ws2.back());
         printf("%p\n%p\n", czt.m_dft.getDFTSpec().data(), czt.m_dft.getDFTBuf().data());
-        printf("%zd\n%zd\n", czt.m_dft.getDFTSpec().size(), czt.m_dft.getDFTBuf().size());
-        printf("%zd\n%zd\n", czt.m_dft.getDFTSpec().capacity(), czt.m_dft.getDFTBuf().capacity());
+        printf("%zd/%zd\n%zd/%zd\n", czt.m_dft.getDFTSpec().size(), czt.m_dft.getDFTSpec().capacity(), czt.m_dft.getDFTBuf().size(), czt.m_dft.getDFTBuf().capacity());
 
         czt = IppCZT32fc(N, f1, f2, fstep, fs);
         // then for this
+        printf("m_nfft = %zd\n", czt.m_dft.getLength());
         printf("m_ws (%4zd): %p\n", czt.m_ws.size(), czt.m_ws.data());
         printf("m_ws2(%4zd): %p\n", czt.m_ws.size(), czt.m_ws2.data());
         printf("%p\n%p\n", czt.m_dft.getDFTSpec().data(), czt.m_dft.getDFTBuf().data());
-        printf("%zd\n%zd\n", czt.m_dft.getDFTSpec().size(), czt.m_dft.getDFTBuf().size());
-        printf("%zd\n%zd\n", czt.m_dft.getDFTSpec().capacity(), czt.m_dft.getDFTBuf().capacity());
+        printf("%zd/%zd\n%zd/%zd\n", czt.m_dft.getDFTSpec().size(), czt.m_dft.getDFTSpec().capacity(), czt.m_dft.getDFTBuf().size(), czt.m_dft.getDFTBuf().capacity());
 
 
         //IppCZT32fc czt(N, f1, f2, fstep, fs);
@@ -76,7 +76,7 @@ int main()
         }
         ippe::vector<Ipp32fc> out(czt.m_k);
         printf("output length = %zd\n", out.size());
-        printf("m_nfft = %zd\n", czt.m_dft.getLength());
+
 
         // // validated.
         // for (int i = 0; i < czt.m_ww.size(); i++)

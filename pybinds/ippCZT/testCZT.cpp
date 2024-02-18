@@ -4,6 +4,20 @@ but only on AMD chips.
 
 Running it on an Intel chip appears to cause zero crashes. It is too difficult to pin down if this is a bug or not.
 
+Theory 1:
+I have rerun this test on a separate Intel-based computer and confirmed that compiling it via linking
+ippcore.lib, ipps.lib (as i always do) works completely fine.
+
+However, this led me to try the trick I've used for getting IPP to work on Apple Silicon;
+compile with ippcoremt.lib, ippsmt.lib and ippvmmt.lib (not including this causes the static build to fail)
+
+It seems that linking with these static libs, on a non Intel-based computer,
+allows this test executable to work.
+
+NOTE: previously, it would compile successfully but crash. So compiler will not throw errors;
+it is likely to be something with IPP's internal dispatch mechanism that relies on some Intel shenanigans.
+
+
 */
 
 #include "CZT.h"

@@ -36,7 +36,7 @@ try:
             raise MemoryError("Not enough memory with this batch. Try lowering the batch value.")
         
         # need both to be same type, maintain the type throughout
-        if cutout.dtype is not rx.dtype:
+        if cutout.dtype != rx.dtype:
             raise Exception("Cutout and Rx must be same type, please cast one of them manually.")
         
         if shifts is None:

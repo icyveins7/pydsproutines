@@ -642,7 +642,7 @@ class LiveReader(FolderReader):
     def getNext(self):
         fp = os.path.join(self.folderpath, "%d%s" % (self.ftnow,self.extension))
         # Check if it exists and is correct file size
-        if os.path.isfile(fp) and os.path.getsize(fp) == self.expectedFileSize:
+        if os.path.isfile(fp) and os.path.getsize(fp) >= self.expectedFileSize:
             # Read the file
             alldata = simpleBinRead(fp, self.numSampsPerFile, self.in_dtype, self.out_dtype)
         

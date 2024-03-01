@@ -293,6 +293,11 @@ class EditSignalsTab(EditConfigTab):
         for name in existingKeys:
             self.cfg.removeSignal(name)
 
+        # # Debugging
+        # for key, signal in self.cfg.allSignals.items():
+        #     print(key)
+        #     print(signal)
+
 #%%
 class EditSourcesTab(EditConfigTab):
     columns = [
@@ -438,3 +443,6 @@ class EditWorkspacesTab(EditConfigTab):
                 callback=self._createRow
             )
 
+    def _writeToConfig(self):
+        print("Workspaces _writeToConfig()")
+        # TODO

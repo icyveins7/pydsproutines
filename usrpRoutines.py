@@ -614,7 +614,9 @@ class LiveReader(FolderReader):
 
     """
     def __init__(self, folderpath, numSampsPerFile, extension=".bin", in_dtype=np.int16, out_dtype=np.complex64):
-        super().__init__(folderpath, numSampsPerFile, extension, in_dtype, out_dtype)
+        # We set the ignore insuffient to false here, because we 
+        # want to perform the check on only the current file, not the folder contents
+        super().__init__(folderpath, numSampsPerFile, extension, in_dtype, out_dtype, ignoreInsufficientData=False)
         # Track by the current filetime
         self.ftnow = int(0)
         # Timeouts

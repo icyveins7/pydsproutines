@@ -1,4 +1,5 @@
 import dearpygui.dearpygui as dpg
+from .._core import DSPConfig
 
 #%%
 def centreModal(modalId):
@@ -27,13 +28,15 @@ def getAppropriateInput(type, *args, **kwargs):
         float: dpg.add_input_double,
         str: dpg.add_input_text,
         bool: dpg.add_checkbox,
-        list: TextInputWithComboWidget
+        list: TextInputWithComboWidget,
+        ProcessList: ProcessList
     }
     return inputWidgets[type](*args, **kwargs)
 
 def setValueIfNotNone(widget, value):
     if value is not None:
         dpg.set_value(widget, value)
+
 
 
 ###############################
@@ -119,3 +122,38 @@ class CheckboxEnabledWidget:
             value = None
 
         return (isChecked, value)
+
+
+#%% Used for workspace displays
+class ProcessList:
+    def __init__(self, cfg: DSPConfig, *args, **kwargs):
+        self.cfg = cfg
+        self.processList = dpg.add_listbox()
+
+        with dpg.group(horizontal=True):
+            dpg.add_button(
+                label="+",
+                callback=self.add_process
+            )
+            dpg.add_button(
+                label="-",
+                callback=self.remove_process
+            )
+            self.processSelection = dpg.add_combo()
+
+        self._populateProcessSelection()
+
+    def _populateProcessSelection(self):
+        # Retrieve all processes from the cfg
+        dpg.configure_item(self.processSelection, items=list(self.cfg.allProcesses.keys()))
+
+    def add_process(self, sender, app_data, user_data):
+        processName = dpg.get_value(self.processSelection)
+        currentProcessListConfig = dpg.get_item_configuration(self.processList)
+        print(currentProcessListConfig)
+        # dpg.configure_item(self.processList, )
+
+        # self._populateProcessSelection()
+
+    def remove_process(self, sender, app_data, user_data):
+        pass

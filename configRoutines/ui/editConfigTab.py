@@ -3,7 +3,7 @@ import dearpygui.dearpygui as dpg
 
 from .._core import *
 from .helpers import getAppropriateInput, setValueIfNotNone
-from .helpers import CheckboxEnabledWidget, TextInputWithComboWidget
+from .helpers import CheckboxEnabledWidget, TextInputWithComboWidget, ProcessList
 
 class ConfigPairedWidget(CheckboxEnabledWidget):
     def __init__(self, type: type, *args, **kwargs):
@@ -91,6 +91,7 @@ class EditConfigTab:
                 # Then add the field-specific ones
                 for col in self.columns:
                     dpg.add_table_column(label=col[0])
+                    print("Added column for %s" % (col[0]))
 
                 # Render rows if asked for
                 if renderRows:
@@ -408,41 +409,112 @@ class EditProcessesTab(EditConfigTab):
 # Will have to customise a bit more
 
 class EditWorkspacesTab(EditConfigTab):
+    columns = [
+        ('processes', ProcessList)
+    ]
+
     def __init__(self, tab_bar: int, cfg: DSPConfig):
         super().__init__("Workspaces", tab_bar, [], cfg)
+        print("Workspaces columns: ", self.columns)
         self._renderTab(self.cfg.allWorkspaces, renderRows=True)
 
-    def _renderTab(self, content: dict, renderRows: bool=False):
-        with dpg.tab(label=self.tabLabel, parent=self.tab_bar):
-            # Create a table for the signals
-            # Refer to SignalSectionProxy for details
-            with dpg.table(
-                resizable=True,
-                # don't use row_background=True otherwise the alternating colours is not clear
-                borders_outerH=True, borders_innerH=True,
-                borders_innerV=True, borders_outerV=True
-            ) as table:
-                # Store this widget into container for reference later
-                self.widgets['table'] = table
+    # def _renderTab(self, content: dict, renderRows: bool=False):
+    #     with dpg.tab(label=self.tabLabel, parent=self.tab_bar):
+    #         # Create a table for the signals
+    #         # Refer to SignalSectionProxy for details
+    #         with dpg.table(
+    #             resizable=True,
+    #             # don't use row_background=True otherwise the alternating colours is not clear
+    #             borders_outerH=True, borders_innerH=True,
+    #             borders_innerV=True, borders_outerV=True
+    #         ) as table:
+    #             # Store this widget into container for reference later
+    #             self.widgets['table'] = table
 
-                # Add the fixed columns separately
-                dpg.add_table_column() # For buttons
-                dpg.add_table_column(label="name") # For section name
-                # Then add the field-specific ones
-                for col in self.columns:
-                    dpg.add_table_column(label=col[0])
+    #             # Add the fixed columns separately
+    #             dpg.add_table_column() # For buttons
+    #             dpg.add_table_column(label="name") # For section name
+    #             # Then add the field-specific ones
+    #             for col in self.columns:
+    #                 dpg.add_table_column(label=col[0])
 
-                # Render rows if asked for
-                if renderRows:
-                    self._renderRows(content)
+    #             # Render rows if asked for
+    #             if renderRows:
+    #                 self._renderRows(content)
 
-            # Row button adder
-            dpg.add_button(
-                label="Add Row",
-                width=-1,
-                callback=self._createRow
-            )
+    #         # Row button adder
+    #         dpg.add_button(
+    #             label="Add Row",
+    #             width=-1,
+    #             callback=self._createRow
+    #         )
 
     def _writeToConfig(self):
         print("Workspaces _writeToConfig()")
         # TODO
+
+    def _createRow(self) -> dict:
+        # Create as per normal
+        rowWidgets = super()._createRow()
+
+        # # Set the dropdowns' items
+        # dpg.configure_item(
+        #     rowWidgets['processes'].widget.dropdown, # Extract the actual dpg combo widget 
+        #     items=list(self.cfg.allSources.keys())
+        # )
+
+        return rowWidgets # Remember to return at the end
+
+
+    def _createRow(self) -> dict:       
+        rowWidgets = dict()
+        with dpg.table_row(parent=self.widgets['table']) as row:
+            # Save rows for reference
+            try:
+                self.widgets['rows'].append(row)
+            except KeyError:
+                self.widgets['rows'] = [row]  
+
+            # Make cell for buttons
+            with dpg.table_cell(parent=row) as cell:
+                deleteBtn = dpg.add_button(
+                    label="Delete",
+                    callback=self._deleteRow
+                    # Set user_data at the end
+                )
+                dpg.bind_item_theme(deleteBtn, self.delBtn_theme)
+                rowWidgets['deleteBtn'] = deleteBtn
+                dupBtn = dpg.add_button(
+                    label="Duplicate",
+                    callback=self._duplicateRow
+                    # Set user_data at the end
+                )
+                dpg.bind_item_theme(dupBtn, self.dupBtn_theme)
+                rowWidgets['dupBtn'] = dupBtn
+
+            # Make cell for name first, always there
+            with dpg.table_cell(parent=row) as cell:
+                inputWidget = getAppropriateInput(str, width=-1, parent=cell)
+                rowWidgets['name'] = inputWidget
+
+            # Make paired widgets for each column
+            with dpg.table_cell(parent=row):
+                rowWidgets['processes'] = ProcessList(self.cfg)
+
+            print(rowWidgets)
+       
+            # Attach entire row to buttons' user data
+            dpg.set_item_user_data(
+                deleteBtn, [row, rowWidgets]
+            )
+            dpg.set_item_user_data(
+                dupBtn, [row, rowWidgets]
+            )
+
+        try:
+            self.widgets['cells'].append(rowWidgets)
+        except KeyError:
+            self.widgets['cells'] = [rowWidgets]
+        
+        return rowWidgets
+

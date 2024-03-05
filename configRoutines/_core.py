@@ -220,6 +220,10 @@ class ProcessingSectionProxy(SectionProxy):
     def target_osr(self):
         return self.getint('target_osr')
     
+    @property
+    def threshold(self):
+        return self.getfloat('threshold')
+    
 #%%
 class WorkspaceSectionProxy(SectionProxy):
     def __repr__(self):
@@ -324,24 +328,31 @@ class DSPConfig(DirectSingleConfig):
                 
             else:
                 self._proxies[key] = WorkspaceSectionProxy(self._proxies[key]._parser, self._proxies[key]._name)
-    
-    def _keyPrefix(self, key: str):
+
+
+    @staticmethod 
+    def _keyPrefix(key: str):
         return key[:4]
 
-    def _keySuffix(self, key: str):
+    @staticmethod
+    def _keySuffix(key: str):
         return key[4:]          
-      
-    def _isSourceSection(self, key: str):
-        return self._keyPrefix(key) == 'src_'
-            
-    def _isSignalSection(self, key: str):
-        return self._keyPrefix(key) == 'sig_'
-    
-    def _isProcessingSection(self, key: str):
-        return self._keyPrefix(key) == 'pro_'
-    
-    def _isWorkspaceSection(self, key: str):
-        if not (self._isSourceSection(key) or self._isSignalSection(key) or self._isProcessingSection(key)):
+
+    @staticmethod
+    def _isSourceSection(key: str):
+        return DSPConfig._keyPrefix(key) == 'src_'
+
+    @staticmethod
+    def _isSignalSection(key: str):
+        return DSPConfig._keyPrefix(key) == 'sig_'
+
+    @staticmethod 
+    def _isProcessingSection(key: str):
+        return DSPConfig._keyPrefix(key) == 'pro_'
+
+    @staticmethod 
+    def _isWorkspaceSection(key: str):
+        if not (DSPConfig._isSourceSection(key) or DSPConfig._isSignalSection(key) or DSPConfig._isProcessingSection(key) or key=="DEFAULT"):
             return True
         else:
             return False

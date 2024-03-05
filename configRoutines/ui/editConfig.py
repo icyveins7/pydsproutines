@@ -48,8 +48,12 @@ class EditConfigWindow:
                 callback=self._resetConfig
             )
         dpg.add_separator(parent=self.window)
+
+        self.childwindow = dpg.add_child_window(
+            parent=self.window
+        )
         
-        self.tab_bar = dpg.add_tab_bar(parent=self.window)
+        self.tab_bar = dpg.add_tab_bar(parent=self.childwindow)
         # Add the different tab objects
         self.signalsTab = EditSignalsTab(self.tab_bar, self.cfg)
         self.sourcesTab = EditSourcesTab(self.tab_bar, self.cfg)
@@ -62,7 +66,7 @@ class EditConfigWindow:
         self.signalsTab._writeToConfig()
         self.sourcesTab._writeToConfig()
         self.processesTab._writeToConfig()
-        # TODO: workspacesTab
+        self.workspacesTab._writeToConfig()
 
         # Dump to file
         with open(self.cfgpath, 'w') as cfgfile:
@@ -76,6 +80,6 @@ class EditConfigWindow:
         self.signalsTab._renderRows(self.cfg.allSignals, clearBefore=True)
         self.sourcesTab._renderRows(self.cfg.allSources, clearBefore=True)
         self.processesTab._renderRows(self.cfg.allProcesses, clearBefore=True)
-        # TODO: workspacesTab
+        self.workspacesTab._renderRows(self.cfg.allWorkspaces, clearBefore=True)
 
     

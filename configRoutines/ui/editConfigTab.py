@@ -91,7 +91,7 @@ class EditConfigTab:
                 # Then add the field-specific ones
                 for col in self.columns:
                     dpg.add_table_column(label=col[0])
-                    print("Added column for %s" % (col[0]))
+                    # print("Added column for %s" % (col[0]))
 
                 # Render rows if asked for
                 if renderRows:
@@ -417,40 +417,41 @@ class EditWorkspacesTab(EditConfigTab):
         super().__init__("Workspaces", tab_bar, self.columns, cfg)
         self._renderTab(self.cfg.allWorkspaces, renderRows=True)
 
-    # def _renderTab(self, content: dict, renderRows: bool=False):
-    #     with dpg.tab(label=self.tabLabel, parent=self.tab_bar):
-    #         # Create a table for the signals
-    #         # Refer to SignalSectionProxy for details
-    #         with dpg.table(
-    #             resizable=True,
-    #             # don't use row_background=True otherwise the alternating colours is not clear
-    #             borders_outerH=True, borders_innerH=True,
-    #             borders_innerV=True, borders_outerV=True
-    #         ) as table:
-    #             # Store this widget into container for reference later
-    #             self.widgets['table'] = table
-
-    #             # Add the fixed columns separately
-    #             dpg.add_table_column() # For buttons
-    #             dpg.add_table_column(label="name") # For section name
-    #             # Then add the field-specific ones
-    #             for col in self.columns:
-    #                 dpg.add_table_column(label=col[0])
-
-    #             # Render rows if asked for
-    #             if renderRows:
-    #                 self._renderRows(content)
-
-    #         # Row button adder
-    #         dpg.add_button(
-    #             label="Add Row",
-    #             width=-1,
-    #             callback=self._createRow
-    #         )
-
     def _writeToConfig(self):
-        print("Workspaces _writeToConfig()")
-        # TODO
+        # Overload to get sources
+        existingKeys = list(self.cfg.allWorkspaces.keys())
+        # Read each row of the widgets
+        for cellRow in self.widgets['cells']:
+            # Check if the name exists
+            name = dpg.get_value(cellRow['name'])
+
+            # Create new one if it doesn't
+            if name not in existingKeys:
+                self.cfg.addWorkspace(name)
+                # If it's a new one we add everything
+                processes = cellRow['processes'].items()
+                self.cfg[name] = {
+                    process: None for process in processes
+                }
+
+            # Mark those that have been found
+            else: # else-statement so that it will not try to remove if it's not present at first
+                existingKeys.remove(name)
+                # Edit these workspaces
+                # Retrieve the processes
+                processes = cellRow['processes'].items()
+                # Change the processes to this list exactly
+                self.cfg[name] = {
+                    process: None for process in processes
+                }
+
+            
+        # Finally, remove those that no longer exist
+        # These are the remainders from existingKeys
+        for name in existingKeys:
+            self.cfg.removeWorkspace(name)
+
+
 
     def _createRow(self) -> dict:       
         rowWidgets = dict()
@@ -487,8 +488,6 @@ class EditWorkspacesTab(EditConfigTab):
             with dpg.table_cell(parent=row) as cell:
                 rowWidgets['processes'] = ProcessList(self.cfg, parent=cell)
 
-            print(rowWidgets)
-       
             # Attach entire row to buttons' user data
             dpg.set_item_user_data(
                 deleteBtn, [row, rowWidgets]
@@ -511,18 +510,36 @@ class EditWorkspacesTab(EditConfigTab):
         dpg.set_value(rowWidgets['name'], name)
 
         # Here is where we deviate from other tabs' logic
+        # We just append to the ProcessList from the content
+        for key in content:
+            # Check if the key is a process
+            if self.cfg._isProcessingSection(key):
+                rowWidgets['processes'].add_process_to_list(key)
 
-        # for col in self.columns:
-        #     key, castType = col
-        #     castType = str if castType == list else castType # Lists are to be regarded as str types
-        #     # If key exists, we enable it
-        #     try:
-        #         rawval = content.get(key)
-        #         enabled = False if rawval is None else True
-        #         val = castType(rawval)
-        #     except (KeyError, TypeError):
-        #         val = None
-        #         enabled = False
+    def _duplicateRow(self, sender, app_data, user_data):
+        """
+        Callback to duplicate a row.
+        All columns should be identical, except the name column,
+        which has '_copy' appended to it.
+        """
+        row, rowWidgets = user_data
+        # Create a new row
+        newRowWidgets = self._createRow()
+        # Set the values by extracting them from the UI
+        # We cannot extract from the config because the row may have been changed and
+        # we haven't flushed the changes to the file yet
+        content = dict()
 
-        #     rowWidgets[key].set_value(enabled, val)
+        # just read directly from the processes list, make a key
+        for key in rowWidgets['processes'].items():
+            content[key] = None
+        
+        # Set the new widget values
+        self._setRowValues(
+            dpg.get_value(rowWidgets['name']) + "_copy",
+            content,
+            newRowWidgets
+        )
+        # No need to save them as we saved them during creation
 
+ 

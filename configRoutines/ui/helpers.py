@@ -143,12 +143,19 @@ class ProcessList:
 
         self._populateProcessSelection()
 
+    def items(self) -> list:
+        return dpg.get_item_configuration(self.processList)['items']
+
     def _populateProcessSelection(self):
         # Retrieve all processes from the cfg
-        dpg.configure_item(self.processSelection, items=list(self.cfg.allProcesses.keys()))
+        processes_prepended = [key for key in self.cfg.keys() if self.cfg._isProcessingSection(key)]
+        dpg.configure_item(
+            self.processSelection, 
+            items=processes_prepended)
 
-    def add_process(self, sender, app_data, user_data):
-        processName = dpg.get_value(self.processSelection)
+
+    def add_process_to_list(self, processName):
+        """Strictly just to add a string to the listbox."""
         currentProcessListConfig = dpg.get_item_configuration(self.processList)
         amendedItems = [processName]
         amendedItems.extend(currentProcessListConfig['items'])
@@ -158,6 +165,18 @@ class ProcessList:
             items=amendedItems
         )
 
+    def add_process(self, sender, app_data, user_data):
+        """Button callback to retrieve process name from dropdown, then add it to the listbox."""
+        processName = dpg.get_value(self.processSelection)
+        self.add_process_to_list(processName)
+
+
     def remove_process(self, sender, app_data, user_data):
         toRemove = dpg.get_value(self.processList)
-        print(toRemove)
+        currentProcessListConfig = dpg.get_item_configuration(self.processList)
+        amendedItems = currentProcessListConfig['items']
+        amendedItems.remove(toRemove)
+        dpg.configure_item(
+            self.processList,
+            items=amendedItems
+        )

@@ -325,6 +325,29 @@ def timeSliceSignal(x: np.ndarray, tstart: float, tstop: float, fs: float):
     """
     return x[int(tstart*fs):int(tstop*fs)]
 
+
+def freqshiftSignal(x: np.ndarray, freq: float, fs: float=1.0) -> np.ndarray:
+    """
+    Convenience function apply frequency shift to a signal.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Input signal
+    freq : float
+        Frequency shift to apply, in Hz.
+    fs : float, optional
+        Sampling rate of input, by default 1.0.
+
+    Returns
+    -------
+    shifted : np.ndarray
+        x * np.exp(1j*2*np.pi*freq*t)
+    """
+    tone = np.exp(1j*2*np.pi*freq*np.arange(x.size)/fs)
+    shifted = tone*x
+    return shifted
+
 #%%
 try:
     import cupy as cp

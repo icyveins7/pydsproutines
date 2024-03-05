@@ -126,18 +126,18 @@ class CheckboxEnabledWidget:
 
 #%% Used for workspace displays
 class ProcessList:
-    def __init__(self, cfg: DSPConfig, *args, **kwargs):
+    def __init__(self, cfg: DSPConfig, parent):
         self.cfg = cfg
-        self.processList = dpg.add_listbox()
+        self.processList = dpg.add_listbox(parent=parent)
 
-        with dpg.group(horizontal=True):
+        with dpg.group(horizontal=True, parent=parent):
             dpg.add_button(
                 label="+",
-                callback=self.add_process
+                callback=self.add_process,
             )
             dpg.add_button(
                 label="-",
-                callback=self.remove_process
+                callback=self.remove_process,
             )
             self.processSelection = dpg.add_combo()
 
@@ -150,10 +150,14 @@ class ProcessList:
     def add_process(self, sender, app_data, user_data):
         processName = dpg.get_value(self.processSelection)
         currentProcessListConfig = dpg.get_item_configuration(self.processList)
-        print(currentProcessListConfig)
-        # dpg.configure_item(self.processList, )
-
-        # self._populateProcessSelection()
+        amendedItems = [processName]
+        amendedItems.extend(currentProcessListConfig['items'])
+        amendedItems = list(set(amendedItems)) # Ensure uniques
+        dpg.configure_item(
+            self.processList,
+            items=amendedItems
+        )
 
     def remove_process(self, sender, app_data, user_data):
-        pass
+        toRemove = dpg.get_value(self.processList)
+        print(toRemove)

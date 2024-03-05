@@ -414,8 +414,7 @@ class EditWorkspacesTab(EditConfigTab):
     ]
 
     def __init__(self, tab_bar: int, cfg: DSPConfig):
-        super().__init__("Workspaces", tab_bar, [], cfg)
-        print("Workspaces columns: ", self.columns)
+        super().__init__("Workspaces", tab_bar, self.columns, cfg)
         self._renderTab(self.cfg.allWorkspaces, renderRows=True)
 
     # def _renderTab(self, content: dict, renderRows: bool=False):
@@ -453,19 +452,6 @@ class EditWorkspacesTab(EditConfigTab):
         print("Workspaces _writeToConfig()")
         # TODO
 
-    def _createRow(self) -> dict:
-        # Create as per normal
-        rowWidgets = super()._createRow()
-
-        # # Set the dropdowns' items
-        # dpg.configure_item(
-        #     rowWidgets['processes'].widget.dropdown, # Extract the actual dpg combo widget 
-        #     items=list(self.cfg.allSources.keys())
-        # )
-
-        return rowWidgets # Remember to return at the end
-
-
     def _createRow(self) -> dict:       
         rowWidgets = dict()
         with dpg.table_row(parent=self.widgets['table']) as row:
@@ -498,8 +484,8 @@ class EditWorkspacesTab(EditConfigTab):
                 rowWidgets['name'] = inputWidget
 
             # Make paired widgets for each column
-            with dpg.table_cell(parent=row):
-                rowWidgets['processes'] = ProcessList(self.cfg)
+            with dpg.table_cell(parent=row) as cell:
+                rowWidgets['processes'] = ProcessList(self.cfg, parent=cell)
 
             print(rowWidgets)
        
@@ -517,4 +503,26 @@ class EditWorkspacesTab(EditConfigTab):
             self.widgets['cells'] = [rowWidgets]
         
         return rowWidgets
+
+    def _setRowValues(self, name: str, content: SectionProxy, rowWidgets: dict):
+        # Reference the order of the columns given at class definition
+        # Ignore the button column for obvious reasons
+        # Set the values of the row
+        dpg.set_value(rowWidgets['name'], name)
+
+        # Here is where we deviate from other tabs' logic
+
+        # for col in self.columns:
+        #     key, castType = col
+        #     castType = str if castType == list else castType # Lists are to be regarded as str types
+        #     # If key exists, we enable it
+        #     try:
+        #         rawval = content.get(key)
+        #         enabled = False if rawval is None else True
+        #         val = castType(rawval)
+        #     except (KeyError, TypeError):
+        #         val = None
+        #         enabled = False
+
+        #     rowWidgets[key].set_value(enabled, val)
 

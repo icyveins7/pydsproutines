@@ -810,14 +810,19 @@ try:
             # Allocate output
             if outLength is None:
                 outLength = symsLength
+                # print("Using outLength = %d" % (outLength))
             if d_out is None:
                 d_out = cp.zeros((numRows, outLength), dtype=cp.uint8)
+                # print("Allocated output size %d, %d" % (numRows, outLength))
 
             # Invoke kernel
             NUM_BLKS = numRows
+            # print("numRows = %d" % (NUM_BLKS))
             if alsoReturnWrittenCounts:
                 if d_count is None:
                     d_count = cp.zeros(numRows, dtype=cp.uint32)
+                
+                # print("outLength = %d" % (outLength))
                 cutAndRotate_gray_kernel(
                     (NUM_BLKS,), (THREADS_PER_BLK,),
                     (

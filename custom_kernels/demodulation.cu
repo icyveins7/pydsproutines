@@ -83,7 +83,10 @@ void cutAndRotatePSKSymbolsFromPossiblePreambles_Gray(
     unsigned char *out = &d_out[outLength * blockIdx.x];
     // Compute the offset for this block
     const unsigned int offset = keyLength + sampleStart;
-    unsigned int totalWrite = sampleStop - offset;
+    int totalWrite = sampleStop - offset;
+    // We check if it's illogical to proceed
+    if (totalWrite < 0)
+        return;
     // Extract, rotate, and write
     unsigned char val;
     // Gray mapping

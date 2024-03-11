@@ -654,10 +654,20 @@ def calcQF2(x: np.ndarray, y: np.ndarray):
     '''
     Simple one-line function to calculate QF2 for two equal length arrays (already aligned).
     '''
-    x_energy = np.linalg.norm(x)**2
-    y_energy = np.linalg.norm(y)**2
-    qf2 = np.abs(np.vdot(x,y))**2 / x_energy / y_energy
-    return qf2
+    if x.ndim == 1 and y.ndim == 1:
+        x_energy = np.linalg.norm(x)**2
+        y_energy = np.linalg.norm(y)**2
+        qf2 = np.abs(np.vdot(x,y))**2 / x_energy / y_energy
+        return qf2
+    
+    elif x.ndim == 2 and y.ndim == 2:
+        # Assume row-wise
+        x_energy = np.linalg.norm(x, axis=1)**2
+        y_energy = np.linalg.norm(y, axis=1)**2
+        qf2 = np.abs(np.sum(x * y.conj(), axis=1))**2 / x_energy / y_energy
+        return qf2
+
+
 
 
 #%%

@@ -3,9 +3,14 @@ import ctypes as ct
 import os
 
 os.environ["PATH"] = (
-    os.environ["PATH"] + os.pathsep + os.path.dirname(os.path.realpath(__file__))
+    os.environ["PATH"] + os.pathsep +
+    os.path.dirname(os.path.realpath(__file__))
 )
-os.add_dll_directory(os.path.join(os.environ["IPPROOT"], "redist", "intel64"))
+try:
+    os.add_dll_directory(os.path.join(
+        os.environ["IPPROOT"], "redist", "intel64"))
+except KeyError:
+    raise ImportError("Couldn't find IPPROOT env var.")
 
 
 def cpu_threaded_wola(y, f_tap, fftlen, Dec, NUM_THREADS=4):
@@ -49,13 +54,15 @@ def cpu_threaded_wola(y, f_tap, fftlen, Dec, NUM_THREADS=4):
     ]
 
     siglen = len(y)
-    out = np.empty(int(siglen / Dec * fftlen), dtype=np.complex64)  # make the output
+    out = np.empty(int(siglen / Dec * fftlen),
+                   dtype=np.complex64)  # make the output
 
     retcode = _libmc.cpuWola(
         y, f_tap, fftlen, Dec, int(siglen / Dec), len(f_tap), out, NUM_THREADS
     )  # run the dll function
 
-    out = out.reshape((int(siglen / Dec), fftlen))  # reshape to channels in columns
+    # reshape to channels in columns
+    out = out.reshape((int(siglen / Dec), fftlen))
 
     return out, retcode
 

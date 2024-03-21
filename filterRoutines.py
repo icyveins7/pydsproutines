@@ -11,7 +11,6 @@ import scipy as sp
 import scipy.signal as sps
 import cupy as cp
 import cupyx.scipy.signal as cpsps
-import cpuWola as cpw
 from plotRoutines import *
 import scipy.cluster.vq as spc
 from cupyExtensions import *
@@ -38,14 +37,14 @@ def cp_lfilter(ftap: cp.ndarray, x: cp.ndarray, chunksize: int = None):
             block = min(x.size - ptr, chunksize)
             if ptr == 0:
                 # Perform full convolution in order to zero-pad
-                c[ptr : ptr + block] = cpsps.convolve(
+                c[ptr: ptr + block] = cpsps.convolve(
                     ftap, x[:block], mode="full", method="direct"
                 )[:block]
             else:
                 # Perform in valid range, but cut necessary previous samples for filter, no need to clip
-                c[ptr : ptr + block] = cpsps.convolve(
+                c[ptr: ptr + block] = cpsps.convolve(
                     ftap,
-                    x[ptr - ftap.size + 1 : ptr + block],
+                    x[ptr - ftap.size + 1: ptr + block],
                     mode="valid",
                     method="direct",
                 )
@@ -81,10 +80,10 @@ class CupyFilter:
         c = cpsps.convolve(self.taps, xp)
 
         # Set the new delay
-        self.delay[:] = c[self.taps.size + x.size :]
+        self.delay[:] = c[self.taps.size + x.size:]
 
         # Return the filtered values
-        cf = c[self.taps.size : self.taps.size + x.size]
+        cf = c[self.taps.size: self.taps.size + x.size]
 
         return cf
 
@@ -96,7 +95,8 @@ class CupyFilter:
 class CupyKernelFilter:
     def __init__(self, memory: int = None, memory_dtype: type = cp.complex64):
         with open(
-            os.path.join(os.path.dirname(__file__), "custom_kernels/filter.cu"), "r"
+            os.path.join(os.path.dirname(__file__),
+                         "custom_kernels/filter.cu"), "r"
         ) as fid:
             sourcecode = fid.read()
         self.module = cp.RawModule(code=sourcecode)
@@ -109,7 +109,8 @@ class CupyKernelFilter:
         )
 
         with open(
-            os.path.join(os.path.dirname(__file__), "custom_kernels/upfirdn.cu"), "r"
+            os.path.join(os.path.dirname(__file__),
+                         "custom_kernels/upfirdn.cu"), "r"
         ) as fid:
             sourcecode = fid.read()
         self.module = cp.RawModule(code=sourcecode)
@@ -209,7 +210,8 @@ class CupyKernelFilter:
         else:
             if d_out.shape != (d_x.shape[0], outlen):
                 raise ValueError(
-                    "d_out must have dimensions (%d, %d)." % (d_x.shape[0], outlen)
+                    "d_out must have dimensions (%d, %d)." % (
+                        d_x.shape[0], outlen)
                 )
             cupyRequireDtype(cp.complex64, d_out)
 
@@ -248,7 +250,8 @@ class CupyKernelFilter:
             self.upfirdn_sm_kernel(
                 (NUM_BLOCKS,),
                 (THREADS_PER_BLOCK,),
-                (d_x, d_x.shape[1], d_taps, d_taps.size, up, down, d_out, outlen, 0),
+                (d_x, d_x.shape[1], d_taps, d_taps.size,
+                 up, down, d_out, outlen, 0),
                 shared_mem=smReq,
             )
 
@@ -332,7 +335,8 @@ class CupyKernelFilter:
                 if d_outabs.dtype != cp.float32:
                     raise TypeError("d_outabs must be float32.")
                 if d_outabs.size < outlen:
-                    raise ValueError("d_outabs must be at least length %d" % (outlen))
+                    raise ValueError(
+                        "d_outabs must be at least length %d" % (outlen))
 
             # Run kernel
             self.upfirdn_naive_kernel(
@@ -402,13 +406,13 @@ class CupyKernelFilter:
         d_out = self.upfirdn_naive(d_xext, d_taps, up, down, THREADS_PER_BLOCK)
 
         # Copy the new delay into the holding array
-        self.delay[:] = d_x[-self.delay.size :]
+        self.delay[:] = d_x[-self.delay.size:]
 
         # Skip the delay part, and only return the necessary length
         length2return = int(d_x.size * up // down)
         skip = int(self.delay.size * up // down)
 
-        return d_out[skip : skip + length2return]
+        return d_out[skip: skip + length2return]
 
     def filter_smtaps(
         self,
@@ -488,10 +492,11 @@ class CupyKernelFilter:
             )
 
         # Run the filter (with the delay)
-        d_out = self.filter_smtaps(d_x, d_taps, THREADS_PER_BLOCK, OUTPUT_PER_BLK, True)
+        d_out = self.filter_smtaps(
+            d_x, d_taps, THREADS_PER_BLOCK, OUTPUT_PER_BLK, True)
 
         # Extract the delay from this invocation
-        self.delay[:] = d_x[-self.delay.size :]
+        self.delay[:] = d_x[-self.delay.size:]
 
         return d_out
 
@@ -612,7 +617,8 @@ def wola(f_tap, x, Dec, N=None, dtype=np.complex64):
         for a in range(N):
             for b in range(int(L / N)):
                 if n - (b * N + a) >= 0:
-                    dft_in[a] = dft_in[a] + x[n - (b * N + a)] * f_tap[b * N + a]
+                    dft_in[a] = dft_in[a] + \
+                        x[n - (b * N + a)] * f_tap[b * N + a]
 
         out[nprime] = (
             np.fft.ifft(dft_in) * N
@@ -626,56 +632,64 @@ def wola(f_tap, x, Dec, N=None, dtype=np.complex64):
 
 
 # %%
-class Channeliser:
-    """
-    Wrapper for WOLA output, with internal memory to account for filter delay;
-    similar to lfilter's 'zi' argument which specifies delay.
+try:
+    import cpuWola as cpw
 
-    Instead, we pad the input vectors at the front and copy the ending
-    samples after every filter invocation.
+    class Channeliser:
+        """
+        Wrapper for WOLA output, with internal memory to account for filter delay;
+        similar to lfilter's 'zi' argument which specifies delay.
 
-    Internally uses the cpuWola dll.
-    """
+        Instead, we pad the input vectors at the front and copy the ending
+        samples after every filter invocation.
 
-    def __init__(self, numTaps, numChannels, Dec, NUM_THREADS=4, f_tap=None):
-        if f_tap is None:
-            self.f_tap = sps.firwin(numTaps, 1.0 / Dec).astype(np.float32)
-        else:
-            self.f_tap = f_tap.astype(np.float32)
+        Internally uses the cpuWola dll.
+        """
 
-        self.numChannels = int(numChannels)
-        self.Dec = int(Dec)
-        self.NUM_THREADS = int(NUM_THREADS)
+        def __init__(self, numTaps, numChannels, Dec, NUM_THREADS=4, f_tap=None):
+            if f_tap is None:
+                self.f_tap = sps.firwin(numTaps, 1.0 / Dec).astype(np.float32)
+            else:
+                self.f_tap = f_tap.astype(np.float32)
 
-        self.reset()
-        self.jump = int(self.f_tap.size / self.Dec)
+            self.numChannels = int(numChannels)
+            self.Dec = int(Dec)
+            self.NUM_THREADS = int(NUM_THREADS)
 
-    def reset(self):
-        self.delay = np.zeros(self.f_tap.size, dtype=np.complex64)
+            self.reset()
+            self.jump = int(self.f_tap.size / self.Dec)
 
-    def channelise(self, x):
-        y = np.hstack((self.delay, x))
-        channels, _ = cpw.cpu_threaded_wola(
-            y, self.f_tap, self.numChannels, self.Dec, NUM_THREADS=self.NUM_THREADS
-        )
-        self.delay[:] = x[-self.delay.size :]  # copy the ending samples into delay
+        def reset(self):
+            self.delay = np.zeros(self.f_tap.size, dtype=np.complex64)
 
-        return channels[
-            self.jump :, :
-        ]  # only return the valid parts ie skip the delay/Dec samples
+        def channelise(self, x):
+            y = np.hstack((self.delay, x))
+            channels, _ = cpw.cpu_threaded_wola(
+                y, self.f_tap, self.numChannels, self.Dec, NUM_THREADS=self.NUM_THREADS
+            )
+            # copy the ending samples into delay
+            self.delay[:] = x[-self.delay.size:]
 
-    def channelFreqs(self, fs: float = 1.0):
-        """Returns the centre frequency for each channel."""
-        return makeFreq(self.numChannels, fs)
+            return channels[
+                self.jump:, :
+            ]  # only return the valid parts ie skip the delay/Dec samples
 
-    def channelFs(self, fs: float = 1.0):
-        """Returns the new sampling rate for each channel."""
-        return fs / self.Dec
+        def channelFreqs(self, fs: float = 1.0):
+            """Returns the centre frequency for each channel."""
+            return makeFreq(self.numChannels, fs)
+
+        def channelFs(self, fs: float = 1.0):
+            """Returns the new sampling rate for each channel."""
+            return fs / self.Dec
+
+except ImportError as e:
+    print("Skipping Channeliser class import: %s" % str(e))
 
 
 # %%
 with open(
-    os.path.join(os.path.dirname(__file__), "custom_kernels", "thresholding.cu"), "r"
+    os.path.join(os.path.dirname(__file__),
+                 "custom_kernels", "thresholding.cu"), "r"
 ) as fid:
     _thresholdingModule = cp.RawModule(code=fid.read())
     _thresholdEdgesKernel = _thresholdingModule.get_function("thresholdEdges")
@@ -688,7 +702,8 @@ def cupyThresholdEdges(
     d_x: cp.ndarray,
     threshold: float,
     THREADS_PER_BLOCK: int = 128,
-    edgesMaxPerBlock: int = None,  # Generally can set it to half the threads per block or even less
+    # Generally can set it to half the threads per block or even less
+    edgesMaxPerBlock: int = None,
     ignoreEdgesCountCheck: bool = True,
 ):
     # Enforce types
@@ -1046,7 +1061,8 @@ def energyDetection(
     if noiseIndices is None:
         noiseIndices = np.arange(100000)
         print(
-            "Noise indices defaulting to [%d, %d]" % (noiseIndices[0], noiseIndices[-1])
+            "Noise indices defaulting to [%d, %d]" % (
+                noiseIndices[0], noiseIndices[-1])
         )
 
     # Medfilt in gpu as it's usually 1000x faster (not exaggeration)
@@ -1147,7 +1163,9 @@ def cupyMultiMovingAverage(
 
 
 def cupyMovingAverage(
-    x: cp.ndarray, avgLength: int, NUM_PER_THREAD: int = 33, THREADS_PER_BLK: int = 32
+    x: cp.ndarray, avgLength: int,
+    NUM_PER_THREAD: int = 33, THREADS_PER_BLK: int = 32,
+    sumInstead: bool = False
 ):
     # Check types
     cupyRequireDtype(cp.float32, x)
@@ -1171,7 +1189,7 @@ def cupyMovingAverage(
     _movingAverageKernel(
         (NUM_BLKS,),
         (THREADS_PER_BLK,),
-        (x, x.size, avgLength, NUM_PER_THREAD, d_out),
+        (x, x.size, avgLength, NUM_PER_THREAD, d_out, sumInstead),
         shared_mem=smReq,
     )
 
@@ -1200,7 +1218,8 @@ if __name__ == "__main__":
             d_avg = cupyMultiMovingAverage(d_x, self.avgLength)
             # print(d_avg)
             # print(check)
-            self.assertTrue(np.allclose(d_avg.get().reshape(-1), check.reshape(-1)))
+            self.assertTrue(np.allclose(
+                d_avg.get().reshape(-1), check.reshape(-1)))
 
         def test_multiple_rows(self):
             # Create standard numpy data
@@ -1214,7 +1233,8 @@ if __name__ == "__main__":
                 )
             # Average in the GPU
             d_avg = cupyMultiMovingAverage(d_x, self.avgLength)
-            self.assertTrue(np.allclose(d_avg.get().reshape(-1), check.reshape(-1)))
+            self.assertTrue(np.allclose(
+                d_avg.get().reshape(-1), check.reshape(-1)))
 
         def test_small_range_fuzz(self):
             numFuzzes = 100
@@ -1235,7 +1255,8 @@ if __name__ == "__main__":
                     )
                 # Average in the GPU
                 d_avg = cupyMultiMovingAverage(d_x, avgLength)
-                self.assertTrue(np.allclose(d_avg.get().reshape(-1), check.reshape(-1)))
+                self.assertTrue(np.allclose(
+                    d_avg.get().reshape(-1), check.reshape(-1)))
 
     class TestMovingAverageKernel(unittest.TestCase):
         def setUp(self):
@@ -1244,6 +1265,10 @@ if __name__ == "__main__":
 
         def test_even_numPerThread_error(self):
             self.assertRaises(ValueError, cupyMovingAverage, self.d_x, 20, 32)
+
+        def test_not_float32_error(self):
+            self.assertRaises(TypeError, cupyMovingAverage,
+                              self.d_x.astype(cp.float64), 21)
 
         def test_simple(self):
             # Average in the CPU
@@ -1255,6 +1280,17 @@ if __name__ == "__main__":
             h_avg = d_avg.get()
             for i in range(self.x.shape[0]):
                 self.assertAlmostEqual(h_avg[i], check[i], places=5)
+
+        def test_movingSum(self):
+            # Average in the CPU
+            avgLength = 20
+            onesTaps = np.ones(avgLength).astype(np.float32)
+            check = sps.lfilter(onesTaps, 1, self.x)
+            # Average in the GPU
+            d_sum = cupyMovingAverage(self.d_x, avgLength, sumInstead=True)
+            h_sum = d_sum.get()
+            for i in range(self.x.shape[0]):
+                self.assertAlmostEqual(h_sum[i], check[i], places=5)
 
         # TODO: test small range fuzz here too
 

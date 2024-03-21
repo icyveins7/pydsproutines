@@ -5,8 +5,7 @@ import numpy as np
 import os
 
 
-
-#%%
+# %%
 if __name__ == "__main__":
     from verifyRoutines import compareValues
 
@@ -19,31 +18,37 @@ if __name__ == "__main__":
     # Hence if the length is 4096 then elements_per_thread must be at least 4.
 
     (cf, cfiltconv), cfModule = cupyModuleToKernelsLoader(
-        "cufftdxKernels.cu", 
-        ["test_kernel", "filter_sm_convolution"], 
+        "cufftdxKernels.cu",
+        ["test_kernel", "filter_sm_convolution"],
         options=(
-            '-std=c++17', 
-            '-I%s' % (os.environ['CUFFTDX_INCLUDE_DIR']),
-            '-DFFT_SIZE=%d' % (FFT_SIZE), # on-demand compilation for a particular length
-            '-DFFT_EPT=%d' % (ELEMENTS_PER_THREAD),
-            '-DFFT_PER_BLK=%d' % (FFT_PER_BLK),
-        )
+            "-std=c++17",
+            "-I%s" % (os.environ["CUFFTDX_INCLUDE_DIR"]),
+            "-DFFT_SIZE=%d"
+            % (FFT_SIZE),  # on-demand compilation for a particular length
+            "-DFFT_EPT=%d" % (ELEMENTS_PER_THREAD),
+            "-DFFT_PER_BLK=%d" % (FFT_PER_BLK),
+        ),
     )
     # Extract kernel parameters from the compilation
-    block_dim = cp.ndarray((3,), cp.uint32, cfModule.get_global('fft_block_dim'))
+    block_dim = cp.ndarray((3,), cp.uint32, cfModule.get_global("fft_block_dim"))
     print(block_dim)
-    smReq = cp.ndarray((1,), cp.uint32, cfModule.get_global('fft_shared_memory'))
+    smReq = cp.ndarray((1,), cp.uint32, cfModule.get_global("fft_shared_memory"))
     print(smReq)
-    requires_workspace = cp.ndarray((1,), cp.uint8, cfModule.get_global('fft_requires_workspace'))
+    requires_workspace = cp.ndarray(
+        (1,), cp.uint8, cfModule.get_global("fft_requires_workspace")
+    )
     print(requires_workspace)
 
     numFFTs = 2
-    data = cp.arange(2*FFT_SIZE).astype(cp.complex64)
+    data = cp.arange(2 * FFT_SIZE).astype(cp.complex64)
     h_data = data.get()
 
     # Invoke kernel
     cf(
-        (numFFTs//FFT_PER_BLK,),tuple(block_dim.get()),(data),shared_mem=smReq.get()[0]
+        (numFFTs // FFT_PER_BLK,),
+        tuple(block_dim.get()),
+        (data),
+        shared_mem=smReq.get()[0],
     )
 
     print(data)
@@ -51,7 +56,6 @@ if __name__ == "__main__":
     print(h_out)
 
     compareValues(data.get(), h_out.reshape(-1))
-
 
     ########################### Testing the filter conv kernel
     FFT_PER_BLK = 1
@@ -62,22 +66,25 @@ if __name__ == "__main__":
     # Hence if the length is 4096 then elements_per_thread must be at least 4.
 
     (cf, cfiltconv), cfModule = cupyModuleToKernelsLoader(
-        "cufftdxKernels.cu", 
-        ["test_kernel", "filter_sm_convolution"], 
+        "cufftdxKernels.cu",
+        ["test_kernel", "filter_sm_convolution"],
         options=(
-            '-std=c++17', 
-            '-I%s' % (os.environ['CUFFTDX_INCLUDE_DIR']),
-            '-DFFT_SIZE=%d' % (FFT_SIZE), # on-demand compilation for a particular length
-            '-DFFT_EPT=%d' % (ELEMENTS_PER_THREAD),
-            '-DFFT_PER_BLK=%d' % (FFT_PER_BLK),
-        )
+            "-std=c++17",
+            "-I%s" % (os.environ["CUFFTDX_INCLUDE_DIR"]),
+            "-DFFT_SIZE=%d"
+            % (FFT_SIZE),  # on-demand compilation for a particular length
+            "-DFFT_EPT=%d" % (ELEMENTS_PER_THREAD),
+            "-DFFT_PER_BLK=%d" % (FFT_PER_BLK),
+        ),
     )
     # Extract kernel parameters from the compilation
-    block_dim = cp.ndarray((3,), cp.uint32, cfModule.get_global('fft_block_dim'))
+    block_dim = cp.ndarray((3,), cp.uint32, cfModule.get_global("fft_block_dim"))
     print(block_dim)
-    smReq = cp.ndarray((1,), cp.uint32, cfModule.get_global('fft_shared_memory'))
+    smReq = cp.ndarray((1,), cp.uint32, cfModule.get_global("fft_shared_memory"))
     print(smReq)
-    requires_workspace = cp.ndarray((1,), cp.uint8, cfModule.get_global('fft_requires_workspace'))
+    requires_workspace = cp.ndarray(
+        (1,), cp.uint8, cfModule.get_global("fft_requires_workspace")
+    )
     print(requires_workspace)
     if requires_workspace.get()[0] == 1:
         raise ValueError("This test requires a workspace")
@@ -85,7 +92,8 @@ if __name__ == "__main__":
     numFFTs = 1
 
     import scipy.signal as sps
-    taps = sps.firwin(32, 1/2.0)
+
+    taps = sps.firwin(32, 1 / 2.0)
     tapsfft = np.fft.fft(taps).astype(np.complex64)
     d_tapsfft = cp.array(tapsfft)
 
@@ -102,5 +110,5 @@ if __name__ == "__main__":
         (NUM_BLKS,),
         tuple(block_dim.get()),
         (data, data.size, d_tapsfft, d_tapsfft.size, out),
-        shared_mem=smReq.get()[0]
+        shared_mem=smReq.get()[0],
     )

@@ -14,17 +14,17 @@ from concurrent.futures import ThreadPoolExecutor
 def burstFFT(x, length):
     # first check if length is a multiple of the original length
     if len(x) % length != 0:
-        alpha = int(np.ceil(len(x)/length))
+        alpha = int(np.ceil(len(x) / length))
         N = alpha * length
-        
+
     else:
-        alpha = int(len(x)/length)
+        alpha = int(len(x) / length)
         N = len(x)
-     
-   # overlap add
-    xp = np.pad(x, [0, N-len(x)])
-    x_rs = xp.reshape((-1,length))
-    
+
+    # overlap add
+    xp = np.pad(x, [0, N - len(x)])
+    x_rs = xp.reshape((-1, length))
+
     t1 = time.time()
     x_rs_sum = np.sum(x_rs, axis=0)
     t2 = time.time()
@@ -32,18 +32,19 @@ def burstFFT(x, length):
     out = np.fft.fft(x_rs_sum)
     t3 = time.time()
     # print("Took %f s for sum\nTook %f s for fft." % (t2-t1,t3-t2))
-    
+
     return out
 
-#%% deprecated
+
+# %% deprecated
 # def burstFFT_thread(t, x, startIdxs, length, alpha, N, mini_out, NUM_THREADS):
 #     for i in np.arange(t, len(startIdxs), NUM_THREADS):
 #         xs = x[startIdxs[i]:startIdxs[i] + length]
-        
+
 #         xsfft = np.fft.fft(xs)
-        
+
 #         tone = np.exp(-1j*2*np.pi*alpha*startIdxs[i]/N * np.arange(length))
-        
+
 #         mini_out[t] = mini_out[t] + xsfft * tone
 
 
@@ -52,11 +53,11 @@ def burstFFT(x, length):
 #     if len(x) % length != 0:
 #         alpha = int(np.ceil(len(x)/length))
 #         N = alpha * length
-        
+
 #     else:
 #         alpha = int(len(x)/length)
 #         N = len(x)
-     
+
 
 #     # allocate output
 #     out = np.zeros(length,dtype=x.dtype)
@@ -68,5 +69,5 @@ def burstFFT(x, length):
 #             executor.submit(burstFFT_thread, t, x, startIdxs, length, alpha, N, mini_out, NUM_THREADS)
 #     # sum over mini_out
 #     out = np.sum(mini_out,axis=0)
-    
+
 #     return out

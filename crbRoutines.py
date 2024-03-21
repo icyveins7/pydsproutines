@@ -4,12 +4,7 @@ from scipy.constants import speed_of_light
 
 
 class LocalizationCRBComponent:
-    def __init__(
-        self,
-        x: np.ndarray,
-        inv_sigma_sq: float | np.ndarray,
-        S: np.ndarray
-    ):
+    def __init__(self, x: np.ndarray, inv_sigma_sq: float | np.ndarray, S: np.ndarray):
         """
         A general CRB component for localization.
         This usually corresponds to a single localization measurement.
@@ -17,7 +12,7 @@ class LocalizationCRBComponent:
         see the subclasses instead.
 
         Note: in the event that multiple measurement scalars are correlated,
-        all these scalars should be within 1 subclass. The sigma argument should then 
+        all these scalars should be within 1 subclass. The sigma argument should then
         necessarily be supplied as a matrix of shape (numScalars, numScalars).
 
         Otherwise, it is sufficient to split each measurement scalar into separate subclasses,
@@ -42,7 +37,9 @@ class LocalizationCRBComponent:
         if x.shape != (3,):
             raise ValueError("x must be a length 3, 1D vector i.e shape (3,)")
         self.x = x
-        if not isinstance(inv_sigma_sq, np.ndarray) and not isinstance(inv_sigma_sq, float): 
+        if not isinstance(inv_sigma_sq, np.ndarray) and not isinstance(
+            inv_sigma_sq, float
+        ):
             raise TypeError("inv_sigma_sq must be a scalar float if not an array")
         self.inv_sigma_sq = inv_sigma_sq
         self.S = S
@@ -57,7 +54,7 @@ class LocalizationCRBComponent:
 
         The subclassed method should return an np.ndarray of an appropriate shape.
         Some measurements may include two or more partial derivatives at once, which should
-        be stacked using vstack(). 
+        be stacked using vstack().
 
         Raises
         ------
@@ -65,7 +62,7 @@ class LocalizationCRBComponent:
             Throws this error if this method is not implemented in the subclass.
         """
         raise NotImplementedError("_differentiate() only implemented in subclasses.")
-    
+
     def fim(self) -> np.ndarray:
         """
         Calculates and returns the FIM for this measurement/component.
@@ -77,50 +74,45 @@ class LocalizationCRBComponent:
             3x3 matrix of the FIM.
         """
         # Create the row vectors (last matrix)
-        J = self.partials.reshape((-1,3)) # This is in case it's ndim=1
+        J = self.partials.reshape((-1, 3))  # This is in case it's ndim=1
 
         if isinstance(self.inv_sigma_sq, np.ndarray):
             return J.T @ self.inv_sigma_sq.T @ J
         else:
             return J.T @ J * self.inv_sigma_sq
-    
+
 
 class AOA3DCRBComponent(LocalizationCRBComponent):
-    def __init__(
-        self,
-        x: np.ndarray,
-        delta: float,
-        S: np.ndarray 
-    ):
+    def __init__(self, x: np.ndarray, delta: float, S: np.ndarray):
         """
-        CRB component for angle of arrival in 3D, which corresponds to
-        2 measurement angles: theta (elevation) and phi (azimuth).
-        The coordinate system is such that theta is the angle away from the x-y plane;
-        theta = (-pi/2, pi/2).
+         CRB component for angle of arrival in 3D, which corresponds to
+         2 measurement angles: theta (elevation) and phi (azimuth).
+         The coordinate system is such that theta is the angle away from the x-y plane;
+         theta = (-pi/2, pi/2).
 
-        Parameters
-       ----------
-        x : np.ndarray
-            Target position vector.
-        delta : float
-            The mean squared angular error for this measurement, in radians.
-            This subclass assumes an isotropic angular error (cone
-            around the direction vector). The sigma_phi and sigma_theta values
-            are back-calculated from this value.
-        S : np.ndarray
-            Length 3, 1D vector, representing the sensor's position. 
- 
-        Raises
-        ------
-        ValueError
-            Thrown if S is not a length 3, 1D vector i.e. shape (3,)
+         Parameters
+        ----------
+         x : np.ndarray
+             Target position vector.
+         delta : float
+             The mean squared angular error for this measurement, in radians.
+             This subclass assumes an isotropic angular error (cone
+             around the direction vector). The sigma_phi and sigma_theta values
+             are back-calculated from this value.
+         S : np.ndarray
+             Length 3, 1D vector, representing the sensor's position.
+
+         Raises
+         ------
+         ValueError
+             Thrown if S is not a length 3, 1D vector i.e. shape (3,)
         """
         # Create the direction vector before performing differentials
-        if S.shape != (3, ):
+        if S.shape != (3,):
             raise ValueError("S must be a length 3, 1D vector i.e shape (3,)")
 
-        self.uf = x - S # Original direction vector
-        self.u = self.uf / np.linalg.norm(self.uf) # Normalised direction vector
+        self.uf = x - S  # Original direction vector
+        self.u = self.uf / np.linalg.norm(self.uf)  # Normalised direction vector
 
         # Calculate the direction vector's phi and theta
         self.phi = np.arctan2(self.u[1], self.u[0])
@@ -129,18 +121,18 @@ class AOA3DCRBComponent(LocalizationCRBComponent):
         # Calculate the sigma_phi and sigma_theta values
         self.delta = delta
         sigma_theta_sq = delta**2 / 2
-        sigma_phi_sq = delta**2 / (2 * np.cos(self.theta)**2)
+        sigma_phi_sq = delta**2 / (2 * np.cos(self.theta) ** 2)
 
         # Perform differentials by calling the parent class
-        super().__init__(x, 
-                         np.array([[1/sigma_phi_sq, 0],[0, 1/sigma_theta_sq]]), 
-                         S)
+        super().__init__(
+            x, np.array([[1 / sigma_phi_sq, 0], [0, 1 / sigma_theta_sq]]), S
+        )
 
     @property
     def dphi(self) -> np.ndarray:
         """Extracts the partial derivatives of phi from self.partials."""
         return self.partials[0]
-    
+
     @property
     def dtheta(self) -> np.ndarray:
         """Extracts the partial derivatives of theta from self.partials."""
@@ -156,8 +148,8 @@ class AOA3DCRBComponent(LocalizationCRBComponent):
             2 x 3 array with dphi and dtheta partial derivatives.
         """
         # Some small optimizations
-        x2y2 = self.uf[0]**2 + self.uf[1]**2 # Used a lot below
-        
+        x2y2 = self.uf[0] ** 2 + self.uf[1] ** 2  # Used a lot below
+
         # Calculate phi derivatives
         dphi = np.zeros(3, np.float64)
         dphi[0] = -self.uf[1] / (x2y2)
@@ -166,20 +158,19 @@ class AOA3DCRBComponent(LocalizationCRBComponent):
 
         # Calculate theta derivatives
         dtheta = np.zeros(3, np.float64)
-        dtheta[0] = - self.uf[2]*self.uf[0] / (np.linalg.norm(self.uf)**2 * np.sqrt(x2y2))
-        dtheta[1] = - self.uf[2]*self.uf[1] / (np.linalg.norm(self.uf)**2 * np.sqrt(x2y2))
-        dtheta[2] = np.sqrt(x2y2) / np.linalg.norm(self.uf)**2
+        dtheta[0] = (
+            -self.uf[2] * self.uf[0] / (np.linalg.norm(self.uf) ** 2 * np.sqrt(x2y2))
+        )
+        dtheta[1] = (
+            -self.uf[2] * self.uf[1] / (np.linalg.norm(self.uf) ** 2 * np.sqrt(x2y2))
+        )
+        dtheta[2] = np.sqrt(x2y2) / np.linalg.norm(self.uf) ** 2
 
         return np.vstack((dphi, dtheta))
 
 
 class TDOACRBComponent(LocalizationCRBComponent):
-    def __init__(
-        self,
-        x: np.ndarray,
-        inv_sigma_td_sq: float,
-        S: np.ndarray
-    ):
+    def __init__(self, x: np.ndarray, inv_sigma_td_sq: float, S: np.ndarray):
         """
         Instantiate a TDOA CRB component.
         This corresponds to a single uncorrelated TDOA measurement between 2 sensors.
@@ -200,9 +191,11 @@ class TDOACRBComponent(LocalizationCRBComponent):
             raise ValueError("S must be a (2,3) shape matrix")
 
         # Translate TDOA inv sigma value to RDOA inv sigma value
-        self.inv_sigma_rdoa_sq = inv_sigma_td_sq/speed_of_light**2
+        self.inv_sigma_rdoa_sq = inv_sigma_td_sq / speed_of_light**2
 
-        self.r = np.linalg.norm(x - S, axis=1) # This is the ranges to each sensor, length 2
+        self.r = np.linalg.norm(
+            x - S, axis=1
+        )  # This is the ranges to each sensor, length 2
         super().__init__(x, self.inv_sigma_rdoa_sq, S)
 
     def _differentiate(self) -> np.ndarray:
@@ -215,8 +208,10 @@ class TDOACRBComponent(LocalizationCRBComponent):
             (3, ) shape array for the partial derivatives.
         """
         # Calculate the partials for the individual ranges
-        r_dx = (self.x - self.S) / self.r.reshape((-1,1)) # Need to reshape to column to broadcast divides
-        
+        r_dx = (self.x - self.S) / self.r.reshape(
+            (-1, 1)
+        )  # Need to reshape to column to broadcast divides
+
         # Return the difference of the partials
         return r_dx[1] - r_dx[0]
 
@@ -242,7 +237,7 @@ class TOACRBComponent(LocalizationCRBComponent):
             raise ValueError("S must be a (3,) shape matrix")
 
         # Translate TDOA inv sigma value to RDOA inv sigma value
-        self.inv_sigma_roa_sq = inv_sigma_tau_sq/speed_of_light**2
+        self.inv_sigma_roa_sq = inv_sigma_tau_sq / speed_of_light**2
 
         self.r = np.linalg.norm(x - S)
         super().__init__(x, self.inv_sigma_roa_sq, S)
@@ -262,11 +257,10 @@ class TOACRBComponent(LocalizationCRBComponent):
         # Return as is
         return r_dx
 
- 
 
-#%%
+# %%
 class CRB:
-    def __init__(self, constraints: np.ndarray=None):
+    def __init__(self, constraints: np.ndarray = None):
         """
         Container for CRB components.
         Instantiate this and then use addComponent()
@@ -284,7 +278,9 @@ class CRB:
         self.constraints = constraints
         if self.constraints is not None:
             if self.constraints.ndim == 1:
-                self.constraints = self.constraints.reshape((1, -1)) # make it into a row
+                self.constraints = self.constraints.reshape(
+                    (1, -1)
+                )  # make it into a row
 
     def addComponent(self, component: LocalizationCRBComponent):
         """
@@ -315,7 +311,7 @@ class CRB:
             Fisher information matrix.
         """
         # Calculate FIMs for each component
-        fim_mat = np.zeros((3,3), np.float64)
+        fim_mat = np.zeros((3, 3), np.float64)
         for component in self.components:
             fim_mat += component.fim()
 
@@ -332,7 +328,7 @@ class CRB:
         """
         fim = self.fim()
 
-        # Compute FIM 
+        # Compute FIM
         if self.constraints is not None:
             U = sp.linalg.null_space(self.constraints)
             crb = U @ np.linalg.inv(U.T @ fim @ U) @ U.T
@@ -342,7 +338,7 @@ class CRB:
         return crb
 
 
-#%%
+# %%
 if __name__ == "__main__":
     # from localizationRoutines import *
     # x = np.zeros(3)
@@ -354,7 +350,7 @@ if __name__ == "__main__":
     # ]).T
 
     # sig_r = 1e-6
-    # crb_old, fim_old = calcCRB_TD(x, S, np.ones(2)*sig_r, 
+    # crb_old, fim_old = calcCRB_TD(x, S, np.ones(2)*sig_r,
     #                               pairs=np.array([[1,0],[3,2]]),
     #                               cmat=np.array([0,0,1]).reshape((-1,1)))
     # print(fim_old)
@@ -391,10 +387,11 @@ if __name__ == "__main__":
             self.assertRaises(
                 ValueError,
                 LocalizationCRBComponent,
-                np.zeros(3).reshape((-1,1)),
+                np.zeros(3).reshape((-1, 1)),
                 1.0,
-                np.ones(3) 
+                np.ones(3),
             )
+
         def test_unimplemented_base_differentiate(self):
             # Create the non subclass one and show that it throws
             self.assertRaises(
@@ -402,17 +399,13 @@ if __name__ == "__main__":
                 LocalizationCRBComponent,
                 np.zeros(3),
                 1.0,
-                np.ones(3) 
+                np.ones(3),
             )
 
         def test_sigma_type_error(self):
             # Must throw type error if sigma is not float/np.ndarray
             self.assertRaises(
-                TypeError,
-                LocalizationCRBComponent,
-                np.zeros(3),
-                1,
-                np.ones(3) 
+                TypeError, LocalizationCRBComponent, np.zeros(3), 1, np.ones(3)
             )
 
     class TestBasicCRB(unittest.TestCase):
@@ -422,86 +415,73 @@ if __name__ == "__main__":
             crb = CRB(constraint)
             self.assertEqual(crb.constraints.shape, (1, 3))
 
-
         def test_chained_adds(self):
             # Show that addComponent() is able to chain calls
             crb = CRB()
             comp1 = AOA3DCRBComponent(np.zeros(3), 1.0, np.ones(3))
-            comp2 = AOA3DCRBComponent(np.ones(3), 1.0, 2*np.ones(3))
+            comp2 = AOA3DCRBComponent(np.ones(3), 1.0, 2 * np.ones(3))
             crb.addComponent(comp1).addComponent(comp2)
 
     class TestTDOACRBComponent(unittest.TestCase):
         def setUp(self):
             self.x = np.zeros(3)
-            self.S = np.array([
-                [1, 0, 0], # Right
-                [-1, 0, 0], # Left
-                [0, 1, 0], # Forward
-                [0, -1, 0], # Backward
-                [0, 0, 1], # Top
-                [0, 0, -1] # Bottom
-            ])
+            self.S = np.array(
+                [
+                    [1, 0, 0],  # Right
+                    [-1, 0, 0],  # Left
+                    [0, 1, 0],  # Forward
+                    [0, -1, 0],  # Backward
+                    [0, 0, 1],  # Top
+                    [0, 0, -1],  # Bottom
+                ]
+            )
 
             self.sig_r = 1e-6
             self.sig_td = self.sig_r / speed_of_light
-            self.inv_sigma_td_sq = 1/self.sig_td**2
+            self.inv_sigma_td_sq = 1 / self.sig_td**2
 
         def test_plane_constrained_tdoa(self):
             # Target and sensors all in the plane in an equidistant simple diamond
             # We expect the CRB error variance components to be exactly equal to the originally input errors
-            comp1 = TDOACRBComponent(self.x, self.inv_sigma_td_sq, self.S[[0,1],:]) # Use left/right
-            comp2 = TDOACRBComponent(self.x, self.inv_sigma_td_sq, self.S[[2,3],:]) # use forward/backward
-            crb = CRB(constraints=np.array([0,0,1])) # Constrain to the plane
+            comp1 = TDOACRBComponent(
+                self.x, self.inv_sigma_td_sq, self.S[[0, 1], :]
+            )  # Use left/right
+            comp2 = TDOACRBComponent(
+                self.x, self.inv_sigma_td_sq, self.S[[2, 3], :]
+            )  # use forward/backward
+            crb = CRB(constraints=np.array([0, 0, 1]))  # Constrain to the plane
             crb.addComponent(comp1).addComponent(comp2)
 
             # Should be diagonal
-            self.assertEqual(
-                crb.compute()[0,0], crb.compute()[1,1]
-            )
+            self.assertEqual(crb.compute()[0, 0], crb.compute()[1, 1])
             # Z component should be 0 since constrained to plane
-            self.assertEqual(
-                crb.compute()[2,2], 0
-            )
+            self.assertEqual(crb.compute()[2, 2], 0)
             # Non-zero components should be equal to the original sig_r squared
-            self.assertAlmostEqual(
-                crb.compute()[0,0],
-                self.sig_r**2
-            )
-            self.assertAlmostEqual(
-                crb.compute()[1,1],
-                self.sig_r**2
-            )
+            self.assertAlmostEqual(crb.compute()[0, 0], self.sig_r**2)
+            self.assertAlmostEqual(crb.compute()[1, 1], self.sig_r**2)
 
         def test_3d_unconstrained_tdoa(self):
             # We now have all 6 sensors in a 3d equidistant diamond/cube
             # Similarly, CRB error variance components should be exactly equal to the originally input errors
-            comp1 = TDOACRBComponent(self.x, self.inv_sigma_td_sq, self.S[[0,1],:]) # Use left/right
-            comp2 = TDOACRBComponent(self.x, self.inv_sigma_td_sq, self.S[[2,3],:]) # use forward/backward
-            comp3 = TDOACRBComponent(self.x, self.inv_sigma_td_sq, self.S[[4,5],:]) # use top/bottom
+            comp1 = TDOACRBComponent(
+                self.x, self.inv_sigma_td_sq, self.S[[0, 1], :]
+            )  # Use left/right
+            comp2 = TDOACRBComponent(
+                self.x, self.inv_sigma_td_sq, self.S[[2, 3], :]
+            )  # use forward/backward
+            comp3 = TDOACRBComponent(
+                self.x, self.inv_sigma_td_sq, self.S[[4, 5], :]
+            )  # use top/bottom
             crb = CRB()
             crb.addComponent(comp1).addComponent(comp2).addComponent(comp3)
 
             # Should be diagonal
-            self.assertEqual(
-                crb.compute()[0,0], crb.compute()[1,1]
-            )
-            self.assertEqual(
-                crb.compute()[0,0], crb.compute()[2,2] 
-            )
+            self.assertEqual(crb.compute()[0, 0], crb.compute()[1, 1])
+            self.assertEqual(crb.compute()[0, 0], crb.compute()[2, 2])
             # Non-zero components should be equal to the original sig_r squared
-            self.assertAlmostEqual(
-                crb.compute()[0,0],
-                self.sig_r**2
-            )
-            self.assertAlmostEqual(
-                crb.compute()[1,1],
-                self.sig_r**2
-            )
-            self.assertAlmostEqual(
-                crb.compute()[2,2],
-                self.sig_r**2
-            )
-
+            self.assertAlmostEqual(crb.compute()[0, 0], self.sig_r**2)
+            self.assertAlmostEqual(crb.compute()[1, 1], self.sig_r**2)
+            self.assertAlmostEqual(crb.compute()[2, 2], self.sig_r**2)
 
     class TestAOA3DCRBComponent(unittest.TestCase):
         def expectedTrace(self, delta: float, length: float):
@@ -509,29 +489,37 @@ if __name__ == "__main__":
 
         def setUp(self):
             # Create the base x-axis aligned vectors
-            self.x = np.array([1,0,0], np.float64)
+            self.x = np.array([1, 0, 0], np.float64)
             self.S = np.zeros(3, np.float64)
-            self.delta = np.random.rand() * 0.01 # Use randomised delta from 0 to 0.01 radians (about 0.573 deg)
+            self.delta = (
+                np.random.rand() * 0.01
+            )  # Use randomised delta from 0 to 0.01 radians (about 0.573 deg)
             # DEV NOTE: using delta = 0.1 means that you must raise the rtol to 0.01 (1%);
             # This corresponds to how we are making many small angle approximations and dropping higher order terms
             # Hence the approximation becomes worse as the error becomes bigger.
-        
-            # Create some arbitrary random rotations 
-            self.numRots = 100 # Number of randomised rotations to test
+
+            # Create some arbitrary random rotations
+            self.numRots = 100  # Number of randomised rotations to test
             phi_rots = np.random.rand(self.numRots) * 2 * np.pi
-            theta_rots = np.random.rand(self.numRots) * np.pi - np.pi/2
+            theta_rots = np.random.rand(self.numRots) * np.pi - np.pi / 2
             # Twist around z-axis to get phi
-            phi_rotmats = [R.from_rotvec([0,0,phi_rot]).as_matrix() for phi_rot in phi_rots] 
+            phi_rotmats = [
+                R.from_rotvec([0, 0, phi_rot]).as_matrix() for phi_rot in phi_rots
+            ]
             # Twist around y-axis to get theta
-            theta_rotmats = [R.from_rotvec([0,theta_rot,0]).as_matrix() for theta_rot in theta_rots]
+            theta_rotmats = [
+                R.from_rotvec([0, theta_rot, 0]).as_matrix() for theta_rot in theta_rots
+            ]
             self.rotmats = [
                 phi_rotmats[i] @ theta_rotmats[i] for i in range(self.numRots)
-            ] # We do theta rotation first to achieve the actual theta from pre-defined x-vector
+            ]  # We do theta rotation first to achieve the actual theta from pre-defined x-vector
 
-            self.rtol = 0.001 # What we expect our approximation to be equal to
-            print("Delta = %f rad (%f deg), Using relative tolerance of %f" % (
-                self.delta, self.delta/np.pi*180.0, self.rtol))
-           
+            self.rtol = 0.001  # What we expect our approximation to be equal to
+            print(
+                "Delta = %f rad (%f deg), Using relative tolerance of %f"
+                % (self.delta, self.delta / np.pi * 180.0, self.rtol)
+            )
+
         def test_3d_rotations(self):
             for rotmat in self.rotmats:
                 rotated_x = rotmat @ self.x
@@ -543,11 +531,12 @@ if __name__ == "__main__":
                 crb.addComponent(aoacrb)
                 self.assertTrue(
                     np.allclose(
-                        np.trace(crb.compute())**0.5, 
-                        self.expectedTrace(self.delta, np.linalg.norm(aoacrb.uf)), rtol=self.rtol
+                        np.trace(crb.compute()) ** 0.5,
+                        self.expectedTrace(self.delta, np.linalg.norm(aoacrb.uf)),
+                        rtol=self.rtol,
                     )
                 )
-        
+
         def test_scaling_alone(self):
             for i in range(self.numRots):
                 scale = np.random.rand() * 100000
@@ -560,8 +549,9 @@ if __name__ == "__main__":
                 crb.addComponent(aoacrb)
                 self.assertTrue(
                     np.allclose(
-                        np.trace(crb.compute())**0.5, 
-                        self.expectedTrace(self.delta, np.linalg.norm(aoacrb.uf)), rtol=self.rtol
+                        np.trace(crb.compute()) ** 0.5,
+                        self.expectedTrace(self.delta, np.linalg.norm(aoacrb.uf)),
+                        rtol=self.rtol,
                     )
                 )
 
@@ -577,31 +567,24 @@ if __name__ == "__main__":
                 crb.addComponent(aoacrb)
                 self.assertTrue(
                     np.allclose(
-                        np.trace(crb.compute())**0.5, 
-                        self.expectedTrace(self.delta, np.linalg.norm(aoacrb.uf)), rtol=self.rtol
+                        np.trace(crb.compute()) ** 0.5,
+                        self.expectedTrace(self.delta, np.linalg.norm(aoacrb.uf)),
+                        rtol=self.rtol,
                     )
                 )
-
 
     class TestTOACRBComponent(unittest.TestCase):
         def test_simple(self):
             # We create a plane and two TOAs, equidistant
-            x = np.array([0,100,0], np.float64)
-            inv_sigma_tau_sq = 1/(1e-10)**2
-            s1 = np.array([100,0,100], np.float64)
-            s2 = np.array([-100,0,100], np.float64)
-            
+            x = np.array([0, 100, 0], np.float64)
+            inv_sigma_tau_sq = 1 / (1e-10) ** 2
+            s1 = np.array([100, 0, 100], np.float64)
+            s2 = np.array([-100, 0, 100], np.float64)
 
             # Construct CRB with x-y plane constraint
-            crb = CRB(constraints=np.array([0,0,1]))
-            crb.addComponent(
-                TOACRBComponent(
-                    x, inv_sigma_tau_sq, s1
-                )
-            ).addComponent(
-                TOACRBComponent(
-                    x, inv_sigma_tau_sq, s2
-                )
+            crb = CRB(constraints=np.array([0, 0, 1]))
+            crb.addComponent(TOACRBComponent(x, inv_sigma_tau_sq, s1)).addComponent(
+                TOACRBComponent(x, inv_sigma_tau_sq, s2)
             )
 
             # Compute
@@ -609,16 +592,9 @@ if __name__ == "__main__":
             u, s, vh = np.linalg.svd(crbmat)
 
             # We expect the two eigenvalues to be equal
-            self.assertAlmostEqual(
-                s[0], s[1]
-            )
+            self.assertAlmostEqual(s[0], s[1])
             # The two eigenvectors can be in any direction at this point so it's irrelevant
             # i.e. perfect circle on the plane
 
-                
-
     # Run tests
     unittest.main(verbosity=2)
-
-
-

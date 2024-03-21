@@ -1,9 +1,11 @@
-
 import cupy as cp
 import os
 
-#%% Convenience functions
-def cupyModuleToKernelsLoader(modulefilename: str, kernelNames: list, options: tuple=('-std=c++17',)):
+
+# %% Convenience functions
+def cupyModuleToKernelsLoader(
+    modulefilename: str, kernelNames: list, options: tuple = ("-std=c++17",)
+):
     """
     Helper function to generate the CuPy kernel objects from a module.
     The module is expected to reside in the custom_kernels folder.
@@ -33,17 +35,21 @@ def cupyModuleToKernelsLoader(modulefilename: str, kernelNames: list, options: t
     if isinstance(kernelNames, str):
         kernelNames = [kernelNames]
     kernels = []
-    with open(os.path.join(os.path.dirname(__file__), "custom_kernels", modulefilename), "r") as fid:
-        _module = cp.RawModule(code=fid.read(), options=options,
-                               name_expressions=kernelNames)
+    with open(
+        os.path.join(os.path.dirname(__file__), "custom_kernels", modulefilename), "r"
+    ) as fid:
+        _module = cp.RawModule(
+            code=fid.read(), options=options, name_expressions=kernelNames
+        )
         for kernelName in kernelNames:
             kernels.append(_module.get_function(kernelName))
 
     return kernels, _module
 
+
 def cupyRequireDtype(dtype: type | list, var: cp.ndarray):
     """
-    Example: 
+    Example:
     cupyRequireDtype(cp.uint32, myarray)
     cupyRequireDtype([cp.uint32, cp.int32], myarray)
     """
@@ -55,21 +61,27 @@ def cupyRequireDtype(dtype: type | list, var: cp.ndarray):
                 passed = True
 
         if not passed:
-            raise TypeError("Must be one of %s, found %s" % (
-                ", ".join(dtype), var.dtype
-            ))
+            raise TypeError(
+                "Must be one of %s, found %s" % (", ".join(dtype), var.dtype)
+            )
     else:
         if var.dtype != dtype:
             raise TypeError("Must be %s, found %s" % (dtype, var.dtype))
-    
-def cupyCheckExceedsSharedMem(requestedBytes: int, maximumBytes: int=48000):
+
+
+def cupyCheckExceedsSharedMem(requestedBytes: int, maximumBytes: int = 48000):
     if requestedBytes > maximumBytes:
-        raise MemoryError("Shared memory requested %d bytes exceeds maximum %d bytes" % (requestedBytes, maximumBytes))
+        raise MemoryError(
+            "Shared memory requested %d bytes exceeds maximum %d bytes"
+            % (requestedBytes, maximumBytes)
+        )
+
 
 def requireCupyArray(var: cp.ndarray):
     if not isinstance(var, cp.ndarray):
         raise TypeError("Must be cupy array.")
-    
+
+
 def cupyGetEnoughBlocks(length: int, computedPerBlock: int):
     """
     Gets just enough blocks to cover a certain length.
@@ -78,4 +90,3 @@ def cupyGetEnoughBlocks(length: int, computedPerBlock: int):
     NUM_BLKS = length // computedPerBlock
     NUM_BLKS = NUM_BLKS if length % computedPerBlock == 0 else NUM_BLKS + 1
     return NUM_BLKS
-

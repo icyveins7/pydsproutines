@@ -10,29 +10,34 @@ import re
 import datetime as dt
 
 from sgp4.api import Satrec, SatrecArray, jday
- # Apparently, generating satellite positions with WGS72 is more accurate, as that is what the TLEs are generated from
+
+# Apparently, generating satellite positions with WGS72 is more accurate, as that is what the TLEs are generated from
 from sgp4.api import WGS72OLD, WGS72, WGS84
 from sgp4.api import SGP4_ERRORS
 from skyfield.positionlib import Geocentric
 
-#%% Wrapper over skyfield's EarthSatellite, to restore constants functionality
+# %% Wrapper over skyfield's EarthSatellite, to restore constants functionality
 from skyfield.api import EarthSatellite, load, wgs84
 from skyfield.framelib import itrs
+
 
 class Satellite(EarthSatellite):
     """
     Refer to the source code on github to confirm that these are the only changes necessary.
-    
+
     This can then be used as a drop in replacement for skyfield.
     """
+
     def __init__(self, line1, line2, name=None, ts=None, const=WGS72):
-        super().__init__(line1, line2, name=name, ts=ts) # This ignores the const
+        super().__init__(line1, line2, name=name, ts=ts)  # This ignores the const
         # So remake the satrec with the const now
         self.model = Satrec.twoline2rv(line1, line2, const)
         self._setup(self.model)
 
-#%% Below we list some common functionality in wrapped functions
+
+# %% Below we list some common functionality in wrapped functions
 # They are more of a quick reference so we don't have to look it up in the docs.
+
 
 def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float):
     """
@@ -59,10 +64,13 @@ def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float):
         dd = [dt.datetime.fromtimestamp(i, tz=dt.timezone.utc) for i in gpstime]
     else:
         raise TypeError("gpstime must be float or iterable")
-    t = ts.from_datetimes(dd) # Array container, this lets you avoid multiple .at() calls
+    t = ts.from_datetimes(
+        dd
+    )  # Array container, this lets you avoid multiple .at() calls
     return satellite.at(t)
 
-def sf_geocentric_to_itrs(geocentric: Geocentric, returnVelocity: bool=False):
+
+def sf_geocentric_to_itrs(geocentric: Geocentric, returnVelocity: bool = False):
     """
     Convert a geocentric position/velocity to ITRS.
 
@@ -86,28 +94,27 @@ def sf_geocentric_to_itrs(geocentric: Geocentric, returnVelocity: bool=False):
         return geocentric.frame_xyz(itrs)
 
 
-
-#%% Testing
+# %% Testing
 if __name__ == "__main__":
-    s = '1 25544U 98067A   19343.69339541  .00001764  00000-0  38792-4 0  9991'
-    t = '2 25544  51.6439 211.2001 0007417  17.6667  85.6398 15.50103472202482'
+    s = "1 25544U 98067A   19343.69339541  .00001764  00000-0  38792-4 0  9991"
+    t = "2 25544  51.6439 211.2001 0007417  17.6667  85.6398 15.50103472202482"
     satellite = Satrec.twoline2rv(s, t, WGS72)
     print(satellite.jdsatepoch)
     print(satellite.jdsatepochF)
-    
+
     jd, fr = jday(2019, 12, 9, 12, 0, 0)
     e, r, v = satellite.sgp4(jd, fr)
     print(e)
     print(r)
     print(v)
-    
+
     jd = np.array((2458826, 2458826, 2458826, 2458826))
     fr = np.array((0.0001, 0.0002, 0.0003, 0.0004))
     e, r, v = satellite.sgp4_array(jd, fr)
     print(e)
     print(r)
     print(v)
-    
+
     satellites = SatrecArray([satellite, satellite])
     e, r, v = satellites.sgp4(jd, fr)
     print(e)
@@ -117,6 +124,7 @@ if __name__ == "__main__":
     ### Create Satellite object
     print("===================================")
     from timingRoutines import Timer
+
     timer = Timer()
 
     sat = Satellite(s, t, const=WGS84)
@@ -126,12 +134,19 @@ if __name__ == "__main__":
     # Go to LLA using skyfield
     timer.start()
     satgc_geog = wgs84.geographic_position_of(satgc)
-    satgc_lla = np.vstack((satgc_geog.latitude.degrees, satgc_geog.longitude.degrees, satgc_geog.elevation.m))
+    satgc_lla = np.vstack(
+        (
+            satgc_geog.latitude.degrees,
+            satgc_geog.longitude.degrees,
+            satgc_geog.elevation.m,
+        )
+    )
     timer.end("direct to geodetic LLA")
     print(satgc_lla)
 
     # Go to LLA using ITRS first, then custom conversion
     from localizationRoutines import *
+
     timer.start()
     satecef = sf_geocentric_to_itrs(satgc)
     timer.evt("to ITRS")
@@ -139,5 +154,3 @@ if __name__ == "__main__":
     satecef_lla = ecef2geodeticLLA(satecef.m)
     timer.end("then to geodetic LLA")
     print(satecef_lla)
-    
-    

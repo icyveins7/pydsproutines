@@ -18,8 +18,8 @@ numBitsPerBurst = 48
 baud = 16000
 numBursts = 20
 numBitsTotal = numBitsPerBurst * numBursts
-m = 2 # m-ary
-h = 1.0/m
+m = 2  # m-ary
+h = 1.0 / m
 up = 8
 
 # create bits
@@ -28,7 +28,7 @@ bits = randBits(numBitsTotal, m)
 # create cpfsk signal
 # syms0, fs, data = makeCPFSKsyms(bits, baud, up = up) # syms0 will be the template
 
-gflat = np.ones(up)/(2*up)
+gflat = np.ones(up) / (2 * up)
 # syms0, fs, data = makePulsedCPFSKsyms(bits, baud, g = gflat, up = up) # new method of creation
 
 # # check on pulsed vs non-pulsed
@@ -41,61 +41,67 @@ gflat = np.ones(up)/(2*up)
 # pwp_2.plot(np.imag(syms0p), pen=None, symbolPen = 'r', symbol='x')
 
 # create SRC4 CPFSK symbols
-gSRC4 = makeSRC4(np.arange(4 * up)/up,1)
-gSRC4 = makeScaledSRC4(up, 1.0)/up
-pwg = pg.plot(title='SRC4')
-pwg.plot(np.arange(4*up)/up, gSRC4, symbol='x', symbolPen='r')
-syms0, fs, data = makePulsedCPFSKsyms(bits, baud, g = gSRC4, up = up) # new method of creation
+gSRC4 = makeSRC4(np.arange(4 * up) / up, 1)
+gSRC4 = makeScaledSRC4(up, 1.0) / up
+pwg = pg.plot(title="SRC4")
+pwg.plot(np.arange(4 * up) / up, gSRC4, symbol="x", symbolPen="r")
+syms0, fs, data = makePulsedCPFSKsyms(
+    bits, baud, g=gSRC4, up=up
+)  # new method of creation
 
 
 # shift signal?
 fshift_idx = 123
-fshift = fshift_idx * fs / len(syms0) # in order to clip to an index of the fft search, for now
-print('fshift index = %i, corresponding to frequency %fHz' % (fshift_idx, fshift))
+fshift = (
+    fshift_idx * fs / len(syms0)
+)  # in order to clip to an index of the fft search, for now
+print("fshift index = %i, corresponding to frequency %fHz" % (fshift_idx, fshift))
 
 # check spectrum
 freq = makeFreq(len(syms0), fs)
 fftsyms = np.fft.fft(syms0)
 
 # plot spectrum
-pw = pg.GraphicsWindow(title='cpfsk spectrum (fft vs cm20)')
-pw_1 = pw.addPlot(0,0)
-pw_1.plot(freq, 20*np.log10(np.abs(fftsyms)), name='fft')
+pw = pg.GraphicsWindow(title="cpfsk spectrum (fft vs cm20)")
+pw_1 = pw.addPlot(0, 0)
+pw_1.plot(freq, 20 * np.log10(np.abs(fftsyms)), name="fft")
 
 # test rabbit ears
 cm20 = syms0**2.0
 fftcm20 = np.fft.fft(cm20)
-pw_2 = pw.addPlot(1,0)
-pw_2.plot(freq, 20*np.log10(np.abs(fftcm20)), pen='r', name='cm20')
+pw_2 = pw.addPlot(1, 0)
+pw_2.plot(freq, 20 * np.log10(np.abs(fftcm20)), pen="r", name="cm20")
 
 # add noise
 startIdx = len(syms0)
-noise, rx, tone = addSigToNoise(3 * len(syms0), startIdx, syms0, baud, fs, 1000, sigPwr = 1.0, fshift = fshift)
+noise, rx, tone = addSigToNoise(
+    3 * len(syms0), startIdx, syms0, baud, fs, 1000, sigPwr=1.0, fshift=fshift
+)
 
 # plot new spectrum and rabbit ears?
 freqrx = makeFreq(len(rx), fs)
 fftrx = np.fft.fft(rx)
 
-pw2 = pg.GraphicsWindow(title='cpfsk with noise (fft vs cm20)')
-pw2_1 = pw2.addPlot(0,0)
-pw2_1.plot(freqrx, 20*np.log10(np.abs(fftrx)), name='fft')
+pw2 = pg.GraphicsWindow(title="cpfsk with noise (fft vs cm20)")
+pw2_1 = pw2.addPlot(0, 0)
+pw2_1.plot(freqrx, 20 * np.log10(np.abs(fftrx)), name="fft")
 
 rxcm20 = rx**2.0
 fftrxcm20 = np.fft.fft(rxcm20)
-pw2_2 = pw2.addPlot(1,0)
-pw2_2.plot(freqrx, 20*np.log10(np.abs(fftrxcm20)), pen='r', name='cm20')
+pw2_2 = pw2.addPlot(1, 0)
+pw2_2.plot(freqrx, 20 * np.log10(np.abs(fftrxcm20)), pen="r", name="cm20")
 
 # perform xcorr with original
 shift_lim = 80
-shifts=np.arange(startIdx - shift_lim, startIdx + shift_lim + 1)
+shifts = np.arange(startIdx - shift_lim, startIdx + shift_lim + 1)
 freqcutout = makeFreq(len(syms0), fs)
 
 ## xcorr with no freq scan
-#xc = fastXcorr(syms, rx, shifts = shifts)
-#xc_mi = np.argmax(xc)
-#print('Xcorr max at %i, val = %f' % (xc_mi, xc[xc_mi]))
-#pw3 = pg.plot(title='fast xcorr (no freq shifts)')
-#pw3.plot(shifts, xc)
+# xc = fastXcorr(syms, rx, shifts = shifts)
+# xc_mi = np.argmax(xc)
+# print('Xcorr max at %i, val = %f' % (xc_mi, xc[xc_mi]))
+# pw3 = pg.plot(title='fast xcorr (no freq shifts)')
+# pw3.plot(shifts, xc)
 
 # # xcorr with freq scan
 # xc, freqlist = fastXcorr(syms0, rx, freqsearch=True, shifts=shifts)
@@ -129,39 +135,66 @@ freqcutout = makeFreq(len(syms0), fs)
 
 ## add a second signal
 pw7p = []
-si = np.arange(12,18)
-pw7 = pg.GraphicsWindow(title = 'tdoa flattened, two peaks')
+si = np.arange(12, 18)
+pw7 = pg.GraphicsWindow(title="tdoa flattened, two peaks")
 
 for i in range(len(si)):
-    
-    noise2, rx2, _ = addSigToNoise(3 * len(syms0), startIdx + si[i], syms0, baud, fs, 100000, sigPwr = 1.0, fshift = fshift)
+
+    noise2, rx2, _ = addSigToNoise(
+        3 * len(syms0),
+        startIdx + si[i],
+        syms0,
+        baud,
+        fs,
+        100000,
+        sigPwr=1.0,
+        fshift=fshift,
+    )
     rx_c = rx2 + rx
-    
+
     # # correct it with reversed freq tone
     # rx_c = rx_c * tone.conj()
-    
+
     # xcorr again with new CAF
     xc_c = fastXcorr(syms0, rx_c, freqsearch=True, outputCAF=True, shifts=shifts)
     fdsolvedidx = np.argmax(xc_c[shift_lim])
     fdsolved = freqcutout[fdsolvedidx]
-    print('fdsolved = ' + str(fdsolved))
-    xc_c_tdflatten = xc_c[:,fdsolvedidx]
-    
+    print("fdsolved = " + str(fdsolved))
+    xc_c_tdflatten = xc_c[:, fdsolvedidx]
+
     # # xcorr again without CAF, direct to td only
     # xc_c_tdflatten, xc_c_flist = fastXcorr(syms0, rx_c, freqsearch=True, outputCAF=False, shifts=shifts)
-    
+
     # add to plot
-    pw7p.append(pw7.addPlot(row=int(i)/4, col=int(i)%4))
-    pw7p[i].plot((shifts-startIdx)/fs, xc_c_tdflatten)
+    pw7p.append(pw7.addPlot(row=int(i) / 4, col=int(i) % 4))
+    pw7p[i].plot((shifts - startIdx) / fs, xc_c_tdflatten)
 
 ## add second and third signals
 pw8p = []
-pw8 = pg.GraphicsWindow(title = 'tdoa flattened, 3 peaks')
-ssi = np.vstack((np.arange(12,18), np.arange(12,18)))
+pw8 = pg.GraphicsWindow(title="tdoa flattened, 3 peaks")
+ssi = np.vstack((np.arange(12, 18), np.arange(12, 18)))
 for i in range(ssi.shape[1]):
     for j in range(ssi.shape[1]):
-        noise2, rx2, _ = addSigToNoise(3 * len(syms0), startIdx + ssi[0][i], syms0, baud, fs, 1000000, sigPwr=1.0, fshift = fshift)
-        noise3, rx3, _ = addSigToNoise(3 * len(syms0), startIdx + ssi[0][i] + ssi[1][j], syms0, baud, fs, 1000000, sigPwr=1.0, fshift = fshift)
+        noise2, rx2, _ = addSigToNoise(
+            3 * len(syms0),
+            startIdx + ssi[0][i],
+            syms0,
+            baud,
+            fs,
+            1000000,
+            sigPwr=1.0,
+            fshift=fshift,
+        )
+        noise3, rx3, _ = addSigToNoise(
+            3 * len(syms0),
+            startIdx + ssi[0][i] + ssi[1][j],
+            syms0,
+            baud,
+            fs,
+            1000000,
+            sigPwr=1.0,
+            fshift=fshift,
+        )
         rx_cc = rx3 + rx2 + rx
 
         # xcorr again with new CAF
@@ -173,4 +206,3 @@ for i in range(ssi.shape[1]):
         # add to plot
         pw8p.append(pw8.addPlot(row=int(i), col=int(j)))
         pw8p[-1].plot(shifts - startIdx, xc_cc_tdflatten)
-

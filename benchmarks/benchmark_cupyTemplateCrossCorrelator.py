@@ -32,8 +32,9 @@ def benchmark(
     correlator = TemplateCrossCorrelator(dcutouts, dx.size)
     out, ti = correlator.correlate(dx, returnMax=True)
 
-    # Run second time
-    out, ti = correlator.correlate(dx, returnMax=True)
+    # Run a few more times
+    for i in range(3):
+        out, ti = correlator.correlate(dx, returnMax=True)
 
     if plotOn:
         fig, ax = plt.subplots(2, 1, sharex=True)

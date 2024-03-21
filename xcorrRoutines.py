@@ -5,6 +5,7 @@ Created on Sat Mar  7 17:03:53 2020
 @author: Seo
 """
 
+import os
 import numpy as np
 import scipy as sp
 import scipy.signal as sps
@@ -22,6 +23,7 @@ try:
     import cupy as cp
     from cupyExtensions import *
     from spectralRoutines import CZTCachedGPU
+    from filterRoutines import cupyMovingAverage
 
     def cp_fastXcorr(
         cutout,
@@ -270,11 +272,105 @@ try:
         else:
             return d_out
 
+    #####################################
     class TemplateCrossCorrelator:
-        def __init__(self, templates: np.ndarray):
-            pass
+        """
+        This is designed specifically to search for multiple templates,
+        but without frequency scanning.
 
-except:
+        As such it will pre-compute the (conjugate) FFTs of the templates,
+        and then store them so they can be reused later.
+
+        This method returns QF, not QF^2, unlike the defaults in other
+        classes and functions. It does the normalisation for QF in the
+        expected way, dividing by both the template energy and the input energy.
+        """
+
+        def __init__(self, templates: cp.ndarray, inputSize: int):
+            self._inputSize = inputSize
+
+            # Verify type and shape
+            requireCupyArray(templates)
+            if not templates.ndim == 2:
+                raise ValueError("Templates must be a 2D array; 1 row for 1 template.")
+
+            # Save the original template length
+            self._templateOrigLength = templates.shape[1]
+
+            # Calculate original template normalisations
+            self._templateNorms = cp.linalg.norm(templates, axis=1)
+            # print(self._templateNorms)
+
+            # Pad the templates to input size
+            padded = cp.pad(
+                templates,
+                ((0, 0), (0, inputSize-templates.shape[1]))
+            )
+            self._templatefftsconj = cp.fft.fft(padded, axis=1).conj()  # Row-wise FFTs
+
+        def correlate(
+            self,
+            x: cp.ndarray,
+            returnMax: bool = False
+        ):
+            """
+            Main runtime method.
+
+            Parameters
+            ---------
+            x : cp.ndarray
+                Complex-valued input array to correlate against.
+                Must be of the input size used to instantiate this class.
+
+            returnMax : bool
+                Returns a 2D full complex-valued matrix if False (default).
+                Returns 2 separate 1D arrays if True:
+                1) The real-valued QF values.
+                2) The associated template index for the maximised QF.
+            """
+            # Check cupy array
+            requireCupyArray(x)
+            # Check dimension
+            if x.ndim != 1 or x.size != self._inputSize:
+                raise ValueError("x must be 1D of length %d" % self._inputSize)
+
+            # Compute FFT of input
+            xfft = cp.fft.fft(x)
+
+            # Compute rolling sum over the input
+            xpower = cupyComplexMagnSq(x, out_dtype=cp.float32)
+            xmovingEnergy = cupyMovingAverage(
+                xpower,
+                self._templateOrigLength,
+                sumInstead=True
+            )
+            xmovingNorms = xmovingEnergy**0.5
+            # print(xmovingNorms[self._templateOrigLength-1:])
+
+            # Perform correlation for each template in 1 op
+            out = cp.fft.ifft(xfft * self._templatefftsconj, axis=1)
+
+            # Normalise final output by rolling input norms
+            nout = out[:, :-self._templateOrigLength+1] / xmovingNorms[self._templateOrigLength-1:]
+            # Then normalise each row by associated template norms
+            nout = nout / self._templateNorms.reshape((-1, 1))
+
+            # Diverge depending on whether we want maximised 1D
+            # or the full 'CAF-like' output
+            if not returnMax:
+                return nout
+
+            else:
+                # Take the maximums down each column
+                nout = cp.abs(nout)
+                templateIdx = cp.argmax(nout, axis=0, keepdims=True)
+                # Use the indices to extract out of each column, then flatten
+                nout = cp.take_along_axis(nout, templateIdx, 0).reshape(-1)
+
+                return nout, templateIdx.reshape(-1)
+
+
+except ModuleNotFoundError:
     print("Failed to load cupy?")
 
 
@@ -390,7 +486,7 @@ def fastXcorr(
             for i in range(len(shifts)):
                 s = shifts[i]
                 result[i] = (
-                    sp.absolute(np.vdot(rx[s : s + len(cutout)], cutout)) ** 2.0
+                    np.abs(np.vdot(rx[s : s + len(cutout)], cutout)) ** 2.0
                 )  # vdot already takes conj of first arg
                 rxNormPartSq = np.linalg.norm(rx[s : s + len(cutout)]) ** 2.0
                 result[i] = result[i] / cutoutNormSq / rxNormPartSq
@@ -1958,12 +2054,13 @@ except:
 
 
 # %% Cythonised classes
-import os
-
 if os.name == "nt":  # Load the directory on windows
-    os.add_dll_directory(
-        os.path.join(os.environ["IPPROOT"], "redist", "intel64")
-    )  # Configure IPP dll reliance
+    try:
+        os.add_dll_directory(
+            os.path.join(os.environ["IPPROOT"], "redist", "intel64")
+        )  # Configure IPP dll reliance
+    except KeyError:
+        print("Unable to find IPPROOT env var.")
 
 try:
     from cython_ext.CyGroupXcorrFFT import CyGroupXcorrFFT
@@ -2020,3 +2117,127 @@ def computeGroupXcorrCZTcomplexity(m: int, L: int, n: int, K: int = 1):
     """
     Lc = next_fast_len(L + n)
     return K * m * 2 * Lc * np.log2(Lc)
+
+
+# Unit testing
+if __name__ == "__main__":
+    import unittest
+    from verifyRoutines import compareValues
+    from signalCreationRoutines import randPSKsyms
+
+    class TestCupyTemplateCorrelator(unittest.TestCase):
+        def setUp(self):
+            self.x, _ = randPSKsyms(100, 4, dtype=np.complex64)
+            self.dx = cp.asarray(self.x)
+
+            # Remember to copy! otherwise it just references and
+            # changes the original x array... made this mistake twice already
+            self.template = self.x[20:40].copy()
+            self.template2 = self.x[40:60].copy()
+            # We scale it arbitrarily to show that the QF will work
+            self.template *= 1.234
+            self.template2 *= 2.345
+            self.dtemplate = cp.asarray(self.template)
+            self.dtemplates = cp.asarray(
+                np.vstack((
+                    self.template,
+                    self.template2
+                ))
+            )
+
+        def test_instantiate_errors(self):
+            # Create and run the correlator
+            self.assertRaises(
+                TypeError,
+                TemplateCrossCorrelator,
+                self.template,
+                self.x.size
+            )  # Throws when it isn't cupy array
+            self.assertRaises(
+                ValueError,
+                TemplateCrossCorrelator,
+                self.dtemplate,
+                self.x.size
+            )  # Throws when it isn't 2-D
+
+        def test_single_template(self):
+            # We finally create it properly
+            correlator = TemplateCrossCorrelator(
+                self.dtemplate.reshape((1, -1)),
+                self.x.size
+            )
+
+            # We then run it against x
+            out, templateIdx = correlator.correlate(self.dx, returnMax=True)
+
+            # We upgrade to 64-bit for better precision
+            x64 = self.x.astype(np.complex128)
+            template64 = self.template.astype(np.complex128)
+
+            # Check that it's identical to older xcorr methods
+            check = fastXcorr(template64, x64)
+            # Note this is QF2 not QF
+            check = check**0.5
+
+            # Check that the output length is correctly clipped
+            self.assertEqual(check.size, out.size)
+            # Only 1 template, so all should be 0
+            self.assertTrue(np.all(templateIdx.get() == 0))
+
+            # # We can also manually perform the calculations
+            # checkmanual = np.fft.ifft(
+            #     np.fft.fft(x64) * np.fft.fft(template64, x64.size).conj()
+            # )
+            # checkmanual = np.abs(checkmanual) / np.linalg.norm(x64[:template64.size]) / np.linalg.norm(template64)
+            #
+            # You can print this to check if you'd like
+            # print(np.vstack((checkmanual[:check.size], check, out.get())).T)
+            # compareValues(checkmanual[:check.size], check)
+            # compareValues(out.get(), check)
+
+            np.testing.assert_array_almost_equal(check, out.get())
+
+        def test_multiple_templates(self):
+            correlator = TemplateCrossCorrelator(
+                self.dtemplates,
+                self.x.size
+            )
+
+            # Test for 2D output
+            out = correlator.correlate(self.dx, returnMax=False)
+            self.assertEqual(out.ndim, 2)
+
+            # Compare to the older method individually
+            for i in range(self.dtemplates.shape[0]):
+                # This is returned as complex QF, not QF^2,
+                # which is identical to what we are doing now
+                # However the convention in fastXcorr will result in a conjugate value,
+                # so we just compare the abs values
+                xc = fastXcorr(self.dtemplates[i].get(),
+                               self.x, absResult=False)
+
+                np.testing.assert_array_almost_equal(np.abs(xc),
+                                                     np.abs(out[i].get()))
+
+            # Test for 1D outputs
+            out1d, templateIdx = correlator.correlate(self.dx, returnMax=True)
+
+            # Compare against the 2D output, it should simply be the max down the columns
+            checkout = cp.max(cp.abs(out), axis=0).get()
+            checkTemplateIdx = np.argmax(cp.abs(out).get(), axis=0)
+
+            # These should be exactly equal, no floating point error at all
+            np.testing.assert_array_equal(checkout, out1d.get())
+            np.testing.assert_array_equal(checkTemplateIdx, templateIdx.get())
+
+            # Finally we check that our peaks are logical
+            # First peak is template 0
+            self.assertAlmostEqual(out1d.get()[20], 1.0, places=5)
+            self.assertEqual(templateIdx.get()[20], 0)
+            # 2nd peaks is template 1
+            self.assertAlmostEqual(out1d.get()[40], 1.0, places=5)
+            self.assertEqual(templateIdx.get()[40], 1)
+
+
+
+    unittest.main()

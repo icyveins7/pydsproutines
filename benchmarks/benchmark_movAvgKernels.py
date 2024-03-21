@@ -46,8 +46,7 @@ d_new = cupyMovingAverage(
     THREADS_PER_BLK=32
 )
 
+# Use standard cupy lfilter
+cpxsps.convolve(d_avgTaps, d_x)
+
 compareValues(d_old.get(), d_new.get())
-
-
-
-

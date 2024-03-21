@@ -9,7 +9,7 @@ import numpy as np
 import scipy as sp
 import scipy.signal as sps
 import time
-from spectralRoutines import czt, CZTCached, CZTCachedGPU
+from spectralRoutines import czt, CZTCached
 from signalCreationRoutines import makeFreq
 from musicRoutines import MUSIC
 # from numba import jit
@@ -21,6 +21,7 @@ from tqdm import tqdm
 try:
     import cupy as cp
     from cupyExtensions import *
+    from spectralRoutines import CZTCachedGPU
     
     def cp_fastXcorr(cutout, rx, freqsearch=True, outputCAF=False, shifts=None, absResult=True, BATCH=1024, copyToCpu=True):
         """

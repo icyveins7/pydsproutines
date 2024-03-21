@@ -14,4 +14,3 @@ for i in range(loops):
 
 total = timer.end()
 print("%fs per loop" % (total/loops))
-print("Note that benchmarking with ncu for gpu code will repeat the kernel multiple times.")

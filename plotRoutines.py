@@ -132,7 +132,8 @@ def pgPlotSurface(x, y, z, shader="normalColor", autoscale=True, title=None):
 
         w.setCameraPosition(distance=np.max([sx, sy]) * 2)
 
-    g.setDepthValue(10)  # draw grid after surfaces since they may be translucent
+    # draw grid after surfaces since they may be translucent
+    g.setDepthValue(10)
     w.addItem(g)
 
     p = gl.GLSurfacePlotItem(
@@ -240,7 +241,7 @@ def pgPlotPhasorVsTime(
     if view is None:
         view = gl.GLViewWidget()
         view.show()
-        ## create three grids, add each to the view
+        # create three grids, add each to the view
         xgrid = gl.GLGridItem()
         ygrid = gl.GLGridItem()
         zgrid = gl.GLGridItem()
@@ -248,11 +249,11 @@ def pgPlotPhasorVsTime(
         view.addItem(ygrid)
         view.addItem(zgrid)
 
-        ## create axis?
+        # create axis?
         axis = gl.GLAxisItem()
         view.addItem(axis)
 
-        ## rotate x and y grids to face the correct direction
+        # rotate x and y grids to face the correct direction
         xgrid.rotate(90, 0, 1, 0)
         ygrid.rotate(90, 1, 0, 0)
 
@@ -301,9 +302,9 @@ def plotRealImag(
         imag = np.imag(data)
         t = np.arange(data.size) / fs[i]
         if idxbounds is not None:
-            t = t[idxbounds[i][0] : idxbounds[i][1]]
-            real = real[idxbounds[i][0] : idxbounds[i][1]]
-            imag = imag[idxbounds[i][0] : idxbounds[i][1]]
+            t = t[idxbounds[i][0]: idxbounds[i][1]]
+            real = real[idxbounds[i][0]: idxbounds[i][1]]
+            imag = imag[idxbounds[i][0]: idxbounds[i][1]]
         if colors is not None:
             ax.plot(t, real, colors[i] + "-")
             ax.plot(t, imag, colors[i] + "--")
@@ -428,8 +429,8 @@ def plotAmpTime(
         amp = np.abs(data)
         t = np.arange(data.size) / fs[i]
         if idxbounds is not None:
-            t = t[idxbounds[i][0] : idxbounds[i][1]]
-            amp = amp[idxbounds[i][0] : idxbounds[i][1]]
+            t = t[idxbounds[i][0]: idxbounds[i][1]]
+            amp = amp[idxbounds[i][0]: idxbounds[i][1]]
         if colors is not None:
             ax.plot(t, amp, colors[i])
         else:
@@ -717,7 +718,8 @@ def plotFreqz(taps: np.ndarray | list, cutoff: float = None, showPhase: bool = F
         taps = [taps]
 
     numPlotRows = 2 if showPhase else 1
-    fig, ax = plt.subplots(numPlotRows, 1, num="Filter performance", sharex=True)
+    fig, ax = plt.subplots(
+        numPlotRows, 1, num="Filter performance", sharex=True)
     aax = ax[0] if showPhase else ax
     pax = ax[1] if showPhase else None
     for i, vtaps in enumerate(taps):
@@ -803,7 +805,8 @@ def plotXcorrResults1D(
             ax[0].plot(tdest, qf2est, "rx")
             ax[1].plot(tdest, freqIdxest, "rx")
             ax[0].set_title(
-                "$TD_{est} = %g, QF^2 = %g, f_i = %d$" % (tdest, qf2est, freqIdxest)
+                "$TD_{est} = %g, QF^2 = %g, f_i = %d$" % (
+                    tdest, qf2est, freqIdxest)
             )
 
     # Otherwise just plot the qf2
@@ -868,8 +871,112 @@ def mplBtnToggle(p, fig):
     fig.canvas.mpl_connect("key_press_event", btnToggle)
 
 
+def reverseMapToPixels(x: np.ndarray, y: np.ndarray,
+                       xLim: tuple[float, float],
+                       yLim: tuple[float, float],
+                       xPixels: int = 1000,
+                       yPixels: int = 1000) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Maps the data points to pixel coordinates.
+    This allows the plotted points to be compressed when
+    point density is high, reducing the total number of points
+    passed to the plotter.
+
+    Example:
+        Resolution of a pixel is 1 unit * 1 unit.
+        Two closely spaced data points are
+        A: (0, 0)
+        B: (0, 0.1)
+
+        Assuming a pixel centre is at (0,0), we can safely plot a
+        single point to represent both A and B, as it would be
+        indistinguishable at the pixel level;
+        (0,1) is too far away to accurately represent B.
+
+    This function is not intended for heatmaps; each point is assigned to a
+    single specific pixel coordinate, without any extra 'spreading' or
+    anti-aliasing effects.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Input x data points.
+    y : np.ndarray
+        Input y data points.
+    xLim : tuple[float, float]
+        X-axis limits for the pixels, (min, max) inclusive.
+    yLim : tuple[float, float]
+        Y-axis limits for the pixels, (min, max) inclusive.
+    xPixels : int
+        Number of pixels for the x-axis.
+    yPixels : int
+        Number of pixels for the y-axis.
+
+    Returns
+    -------
+    xCoords : np.ndarray
+        The (potentially compressed) x coordinates.
+    yCoords : np.ndarray
+        The (potentially compressed) y coordinates.
+    """
+    # First we define the pixel coordinates
+    xPixCoords = np.linspace(xLim[0], xLim[1], xPixels)
+    yPixCoords = np.linspace(yLim[0], yLim[1], yPixels)
+
+    xSpacing = xPixCoords[1] - xPixCoords[0]
+    ySpacing = yPixCoords[1] - yPixCoords[0]
+
+    # Then calculate the index of each point
+    xInd = np.round((x - xLim[0]) / xSpacing)
+    yInd = np.round((y - yLim[0]) / ySpacing)
+
+    # Now we find only the unique indices
+    uInd = np.unique(np.vstack((xInd, yInd)), axis=1)
+
+    # Then extract the coordinates of the used pixels
+    xCoords = xPixCoords[uInd[0]]
+    yCoords = yPixCoords[uInd[1]]
+
+    return xCoords, yCoords
+
+
 # %% testing
 if __name__ == "__main__":
-    yList = [np.arange(3) + 3 * i for i in range(15)]
-    win, ax = pgPlotAmpTime(yList, [1] * len(yList))
-    fwin, fax = pgPlotSpectra(yList, [1] * len(yList))
+    import unittest
+
+    class TestPixelMapping(unittest.TestCase):
+        def test_reverseMapToPixels(self):
+            data = np.array([
+                [0, 0],
+                [0, 0.1],
+                [0, 0.2],
+                [0, 0.3],
+                [0, 0.4],
+                [0, 0.5],
+                [0, 0.6],
+                [0, 0.7],
+                [0, 0.8],
+                [0, 0.9],
+                [0.1, 0],
+                [0.1, 0.1],
+                [0.1, 0.2],
+                [0.1, 0.3],
+                [0.1, 0.4],
+                [0.1, 0.5],
+                [0.1, 0.6],
+                [0.1, 0.7],
+                [0.1, 0.8],
+                [0.1, 0.9]
+            ])
+            x = data[:, 0]
+            y = data[:, 1]
+            xLim = (0, 1)
+            yLim = (0, 1)
+            xPixels = 3
+            yPixels = 3
+            xCoords, yCoords = reverseMapToPixels(
+                x, y, xLim, yLim, xPixels, yPixels)
+            # Note that the ordering is not necessarily maintained.
+            # In order to test it more easily we stack to 2d
+            coords = np.vstack((xCoords, yCoords)).T
+            # TODO: complete

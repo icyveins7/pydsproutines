@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from signalCreationRoutines import makeFreq
 from matplotlib import cm
 from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
+from timingRoutines import Timer
 
 try:  # Although this is the recommendation in requirements.txt, this does not work with Spyder
     from PySide6.QtCore import Qt, QRectF
@@ -874,8 +875,8 @@ def mplBtnToggle(p, fig):
 def reverseMapToPixels(x: np.ndarray, y: np.ndarray,
                        xLim: tuple[float, float],
                        yLim: tuple[float, float],
-                       xPixels: int = 1000,
-                       yPixels: int = 1000) -> tuple[np.ndarray, np.ndarray]:
+                       xPixels: int = 2000,
+                       yPixels: int = 2000) -> tuple[np.ndarray, np.ndarray]:
     """
     Maps the data points to pixel coordinates.
     This allows the plotted points to be compressed when
@@ -919,23 +920,34 @@ def reverseMapToPixels(x: np.ndarray, y: np.ndarray,
     yCoords : np.ndarray
         The (potentially compressed) y coordinates.
     """
-    # First we define the pixel coordinates
-    xPixCoords = np.linspace(xLim[0], xLim[1], xPixels)
-    yPixCoords = np.linspace(yLim[0], yLim[1], yPixels)
-
-    xSpacing = xPixCoords[1] - xPixCoords[0]
-    ySpacing = yPixCoords[1] - yPixCoords[0]
+    timer = Timer()
+    timer.start()
+    xSpacing = (xLim[1] - xLim[0]) / (xPixels - 1)
+    ySpacing = (yLim[1] - yLim[0]) / (yPixels - 1)
+    timer.evt("spacing")
 
     # Then calculate the index of each point
-    xInd = np.round((x - xLim[0]) / xSpacing)
-    yInd = np.round((y - yLim[0]) / ySpacing)
+    xInd = np.round((x - xLim[0]) / xSpacing).astype(np.int32)
+    yInd = np.round((y - yLim[0]) / ySpacing).astype(np.int32)
+    timer.evt("indices")
+
+    # We make sure we only keep those that are in range
+    kept = np.logical_and(
+        np.logical_and(xInd >= 0, xInd < xPixels),
+        np.logical_and(yInd >= 0, yInd < yPixels)
+    )
+    xInd = xInd[kept]
+    yInd = yInd[kept]
+    timer.evt("kept")
 
     # Now we find only the unique indices
     uInd = np.unique(np.vstack((xInd, yInd)), axis=1)
+    timer.evt("unique")
 
     # Then extract the coordinates of the used pixels
-    xCoords = xPixCoords[uInd[0]]
-    yCoords = yPixCoords[uInd[1]]
+    xCoords = uInd[0] * xSpacing + xLim[0]
+    yCoords = uInd[1] * ySpacing + yLim[0]
+    timer.end("coords")
 
     return xCoords, yCoords
 
@@ -943,40 +955,68 @@ def reverseMapToPixels(x: np.ndarray, y: np.ndarray,
 # %% testing
 if __name__ == "__main__":
     import unittest
+    from timingRoutines import Timer
 
+    # Also do some simple benchmarking
+    # This must be before unittest.main
+    timer = Timer()
+    timer.start()
+    x = np.random.randn(1000000)
+    y = np.random.randn(1000000)
+    xPixels, yPixels = (2000, 2000)
+    xx, yy = reverseMapToPixels(x, y, (-1, 1), (-1, 1), xPixels, yPixels)
+    timer.end("reverseMap %d pts to (%d, %d)" % (
+        x.size, xPixels, yPixels))
+
+    # Write the actual tests
     class TestPixelMapping(unittest.TestCase):
         def test_reverseMapToPixels(self):
             data = np.array([
                 [0, 0],
                 [0, 0.1],
-                [0, 0.2],
+                [0, 0.2],  # Mapped to (0, 0)
                 [0, 0.3],
                 [0, 0.4],
                 [0, 0.5],
                 [0, 0.6],
-                [0, 0.7],
+                [0, 0.7],  # Mapped to (0, 0.5)
                 [0, 0.8],
-                [0, 0.9],
+                [0, 0.9],  # Mapped to (0, 1.0)
                 [0.1, 0],
                 [0.1, 0.1],
-                [0.1, 0.2],
+                [0.1, 0.2],  # Mapped to (0, 0) as well
                 [0.1, 0.3],
                 [0.1, 0.4],
                 [0.1, 0.5],
                 [0.1, 0.6],
-                [0.1, 0.7],
+                [0.1, 0.7],  # Mapped to (0, 0.5)
                 [0.1, 0.8],
-                [0.1, 0.9]
+                [0.1, 0.9]  # Mapped to (0, 1.0)
             ])
             x = data[:, 0]
             y = data[:, 1]
             xLim = (0, 1)
             yLim = (0, 1)
-            xPixels = 3
-            yPixels = 3
+            xPixels = 3  # Map to (0, 0.5, 1)
+            yPixels = 3  # Same as x
             xCoords, yCoords = reverseMapToPixels(
                 x, y, xLim, yLim, xPixels, yPixels)
             # Note that the ordering is not necessarily maintained.
             # In order to test it more easily we stack to 2d
             coords = np.vstack((xCoords, yCoords)).T
-            # TODO: complete
+            # And then we convert it to list of tuples for checking
+            # We do this by turning into list of lists,
+            # then converting to list of tuples
+            coords = list(map(tuple, coords.tolist()))
+            # Change it into an unordered set for comparison
+            coords = set(coords)
+            # Then check our 3 points
+            self.assertEqual(
+                coords,
+                set([(0, 0), (0, 0.5), (0, 1.0)])
+            )
+
+        def test_reverseMapToPixels_outofbounds(self):
+            pass  # TODO
+
+    unittest.main()

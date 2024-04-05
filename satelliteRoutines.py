@@ -20,6 +20,10 @@ from skyfield.positionlib import Geocentric
 from skyfield.api import EarthSatellite, load, wgs84
 from skyfield.framelib import itrs
 
+from localizationRoutines import geodeticLLA2ecef
+
+import matplotlib.pyplot as plt
+
 
 class Satellite(EarthSatellite):
     """
@@ -33,6 +37,32 @@ class Satellite(EarthSatellite):
         # So remake the satrec with the const now
         self.model = Satrec.twoline2rv(line1, line2, const)
         self._setup(self.model)
+
+    def quickplot(self, gpstime: np.ndarray, rxposlla: np.ndarray):
+        gc = sf_propagate_satellite_to_gpstime(self, t)
+        lla = wgs84.geographic_position_of(gc)
+        fig, ax = plt.subplots(2, 1)
+        ax[0].plot(lla.longitude.degrees,
+                   lla.latitude.degrees)
+        # TODO: check below code for shapes
+        rxposecef = geodeticLLA2ecef(rxposlla[0], rxposlla[1], rxposlla[2])
+        rxecef = sf_geocentric_to_itrs(gc)
+        connector = rxecef - rxposecef
+        normal = rxecef / np.array(
+            [wgs84.radius.m, wgs84.radius.m, wgs84.polar_radius.m]
+        )**2
+
+        theta = np.arccos(
+            np.dot(normal, connector) /
+            np.linalg.norm(normal) /
+            np.linalg.norm(connector, axis=1)
+        )
+
+        thetadeg = np.rad2deg(np.pi/2 - theta)
+
+        ax[1].plot(thetadeg)
+
+        return fig, ax
 
 
 # %% Below we list some common functionality in wrapped functions
@@ -61,7 +91,8 @@ def sf_propagate_satellite_to_gpstime(satellite: Satellite, gpstime: float):
     if isinstance(gpstime, float):
         dd = [dt.datetime.fromtimestamp(gpstime, tz=dt.timezone.utc)]
     elif hasattr(gpstime, "__iter__") and not isinstance(gpstime, str):
-        dd = [dt.datetime.fromtimestamp(i, tz=dt.timezone.utc) for i in gpstime]
+        dd = [dt.datetime.fromtimestamp(
+            i, tz=dt.timezone.utc) for i in gpstime]
     else:
         raise TypeError("gpstime must be float or iterable")
     t = ts.from_datetimes(
@@ -121,7 +152,7 @@ if __name__ == "__main__":
     print(r)
     print(v)
 
-    ### Create Satellite object
+    # Create Satellite object
     print("===================================")
     from timingRoutines import Timer
 

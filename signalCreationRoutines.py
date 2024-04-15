@@ -98,28 +98,34 @@ def randnoise(length, bw_signal, chnBW, snr_inband_linear, sigPwr=1.0):
         * np.sqrt(sigPwr)
     )
     noise = (
-        basicnoise * np.sqrt(1.0 / snr_inband_linear) * np.sqrt(chnBW / bw_signal)
+        basicnoise * np.sqrt(1.0 / snr_inband_linear) *
+        np.sqrt(chnBW / bw_signal)
     )  # pretty sure this is correct now..
     return noise
 
 
 def addSigToNoise(
-    noiseLen,
-    sigStartIdx,
-    signal,
-    bw_signal=1,
-    chnBW=1,
-    snr_inband_linear=np.inf,
-    sigPwr=1.0,
-    fshift=None,
+    signal: np.ndarray,
+    noiseLen: int = None,
+    sigStartIdx: int = 0,
+    bw_signal: float = 1,
+    chnBW: float = 1,
+    snr_inband_linear: float = np.inf,
+    sigPwr: float = 1.0,
+    fshift: float = None,
 ):
     """Add signal into noisy background at particular index, with optional frequency shifting."""
+
+    # if noise len not specified then use length of signal
+    if noiseLen is None:
+        noiseLen = len(signal)
 
     if snr_inband_linear is np.inf:
         print("Generating zeros for inf SNR..")
         noise = np.zeros(noiseLen, dtype=np.complex128)
     else:
-        noise = randnoise(noiseLen, bw_signal, chnBW, snr_inband_linear, sigPwr)
+        noise = randnoise(noiseLen, bw_signal, chnBW,
+                          snr_inband_linear, sigPwr)
     aveNoisePwr = np.linalg.norm(noise) ** 2.0 / len(noise)
     print("Ave noise power = " + str(aveNoisePwr))
     aveSigPwr = np.linalg.norm(signal) ** 2.0 / len(signal)
@@ -127,7 +133,7 @@ def addSigToNoise(
     expectedNoisePwr = (1.0 / snr_inband_linear) * chnBW / bw_signal
     print("Expected noise power = " + str(expectedNoisePwr))
     rx = np.zeros(noiseLen, dtype=np.complex128)
-    rx[sigStartIdx : len(signal) + sigStartIdx] = signal
+    rx[sigStartIdx: len(signal) + sigStartIdx] = signal
     rx = rx + noise
 
     if fshift is not None:
@@ -164,7 +170,8 @@ def addManySigToNoise(
     SNR supplied values cannot be infinity in this case (for obvious reasons).
     """
     # create standard noise with respect to the first SNR
-    noise = randnoise(noiseLen, bw_signal, chnBW, snr_inband_linearList[0], 1.0)
+    noise = randnoise(noiseLen, bw_signal, chnBW,
+                      snr_inband_linearList[0], 1.0)
 
     # prepare the different time propagated versions of the noiseless signals
     numSigs = len(snr_inband_linearList)
@@ -174,7 +181,7 @@ def addManySigToNoise(
         sigStartTimeList is None
     ):  # use the index version (faster if moving at sample level)
         for i in range(rx.shape[0]):
-            rx[i][sigStartIdxList[i] : len(signalList[i]) + sigStartIdxList[i]] = (
+            rx[i][sigStartIdxList[i]: len(signalList[i]) + sigStartIdxList[i]] = (
                 signalList[i]
                 * np.sqrt(snr_inband_linearList[i] / snr_inband_linearList[0])
             )
@@ -196,7 +203,8 @@ def addManySigToNoise(
         tones = np.zeros((numSigs, noiseLen), dtype=np.complex128)
 
         for k in range(rx.shape[0]):
-            tones[k] = np.exp(1j * 2 * np.pi * fshifts[k] * np.arange(noiseLen) / chnBW)
+            tones[k] = np.exp(1j * 2 * np.pi * fshifts[k]
+                              * np.arange(noiseLen) / chnBW)
             rx[k] = rx[k] * tones[k]
 
         rxfull = np.sum(rx, axis=0) + noise
@@ -228,7 +236,8 @@ def makeCPFSKsyms(bits, baud, m=2, h=0.5, up=8, phase=0.0):
     # numpy version
     i_list = np.floor(np.arange(len(theta)) / up).astype(np.uint32)
     t_list = np.arange(len(theta)) / fs
-    a_list = np.hstack(([0], np.cumsum(data)))[: len(data)]  # accumulator of phase
+    a_list = np.hstack(([0], np.cumsum(data)))[
+        : len(data)]  # accumulator of phase
     a_list = np.repeat(a_list, up)
 
     theta = (
@@ -291,7 +300,8 @@ def propagateSignal(sig, time, fs, freq=None, tone=None):
 
     # to handle 1-D input
     if sig.ndim == 1:
-        sig = sig.reshape((1, -1))  # automatic 2-d row vector detection using -1
+        # automatic 2-d row vector detection using -1
+        sig = sig.reshape((1, -1))
 
     # generate a tone if no tone is passed in and a freqshift is desired
     if freq is not None and tone is None:
@@ -382,7 +392,7 @@ def timeSliceSignal(x: np.ndarray, tstart: float, tstop: float, fs: float):
     This is easier to use when you have already plotted the signal with time x-axis
     rather than sample x-axis.
     """
-    return x[int(tstart * fs) : int(tstop * fs)]
+    return x[int(tstart * fs): int(tstop * fs)]
 
 
 def freqshiftSignal(x: np.ndarray, freq: float, fs: float = 1.0) -> np.ndarray:
@@ -478,7 +488,8 @@ try:
 
     # Raw kernels for tone creation
     with open(
-        os.path.join(os.path.dirname(__file__), "custom_kernels", "genTones.cu"), "r"
+        os.path.join(os.path.dirname(__file__),
+                     "custom_kernels", "genTones.cu"), "r"
     ) as fid:
         module = cp.RawModule(code=fid.read())
         genTonesDirect_64fKernel = module.get_function("genTonesDirect_64f")
@@ -505,12 +516,14 @@ try:
 
         if dtype == np.complex128:
             genTonesDirect_64fKernel(
-                (NUM_BLOCKS,), (THREADS_PER_BLOCK,), (f0, fstep, numFreqs, length, out)
+                (NUM_BLOCKS,), (THREADS_PER_BLOCK,
+                                ), (f0, fstep, numFreqs, length, out)
             )
 
         elif dtype == np.complex64:
             genTonesDirect_32fKernel(
-                (NUM_BLOCKS,), (THREADS_PER_BLOCK,), (f0, fstep, numFreqs, length, out)
+                (NUM_BLOCKS,), (THREADS_PER_BLOCK,
+                                ), (f0, fstep, numFreqs, length, out)
             )
 
         else:
@@ -533,11 +546,13 @@ try:
 
         if dtype == np.complex128:
             genTonesScaling_64fKernel(
-                (NUM_BLOCKS,), (THREADS_PER_BLOCK,), (f0, fstep, numFreqs, length, out)
+                (NUM_BLOCKS,), (THREADS_PER_BLOCK,
+                                ), (f0, fstep, numFreqs, length, out)
             )
         elif dtype == np.complex64:
             genTonesScaling_32fKernel(
-                (NUM_BLOCKS,), (THREADS_PER_BLOCK,), (f0, fstep, numFreqs, length, out)
+                (NUM_BLOCKS,), (THREADS_PER_BLOCK,
+                                ), (f0, fstep, numFreqs, length, out)
             )
         else:
             raise TypeError("dtype must be either complex128 or complex64")
@@ -580,7 +595,8 @@ if __name__ == "__main__":
         timer.evt("cupy")
 
         # Test 32f version
-        customtone32f = cupyGenTonesDirect(f0, fstep, numFreqs, length, np.complex64)
+        customtone32f = cupyGenTonesDirect(
+            f0, fstep, numFreqs, length, np.complex64)
         timer.evt("direct kernel 32f")
         customtone32f_scaling = cupyGenTonesScaling(
             f0, fstep, numFreqs, length, np.complex64
@@ -591,11 +607,13 @@ if __name__ == "__main__":
         print("Comparing naive tones kernel with cupy")
         compareValues(customtones.get().flatten(), tones.get().flatten())
         print("Comparing scaling tones kernel with cupy")
-        compareValues(customtones_scaling.get().flatten(), tones.get().flatten())
+        compareValues(customtones_scaling.get().flatten(),
+                      tones.get().flatten())
         print("Comparing 32f tones kernel with cupy")
         compareValues(customtone32f.get().flatten(), tones.get().flatten())
         print("Comparing 32f tones scaling kernel with cupy")
-        compareValues(customtone32f_scaling.get().flatten(), tones.get().flatten())
+        compareValues(customtone32f_scaling.get().flatten(),
+                      tones.get().flatten())
 
     except ModuleNotFoundError as e:
         print("Skipping cupy-related tests.")

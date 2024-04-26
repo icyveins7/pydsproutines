@@ -52,6 +52,38 @@ def get_wgs84_tangent_plane_normal(ecef_pos: np.ndarray) -> np.ndarray:
     ]) * ecef_pos
 
 
+def get_wgs84_tangent_plane_north_east(
+    ecef_normal: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Get the WGS84 tangent plane northwards and eastwards unit
+    vectors for a given ECEF position.
+    Together with the tangent plane normal, these can represent
+    an orthogonal coordinate system at the given position.
+
+    Parameters
+    ----------
+    ecef_normal : np.ndarray
+        A length 3 array of the normal vector at the input position,
+        obtainable from get_wgs84_tangent_plane_normal.
+
+    Returns
+    -------
+    north : np.ndarray
+        Unit north vector.
+
+    east : np.ndarray
+        Unit east vector.
+    """
+    # Take cross product with z-axis
+    east = np.cross(np.array([0, 0, 1]), ecef_normal)
+    east = east / np.linalg.norm(east)
+    # Then take the cross product again to get north
+    north = np.cross(ecef_normal, east)
+    north = north / np.linalg.norm(north)
+    return north, east
+
+
 # %% Doppler convention routines
 def calculateRangeRate(
     tx_x: np.ndarray,

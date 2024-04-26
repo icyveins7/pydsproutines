@@ -75,7 +75,7 @@ class Trajectory:
             Initial position vector. This is the position at t=0.
         """
         if x0.ndim != 1:
-            raise np.ValueError("x0 must be a 1D array.")
+            raise ValueError("x0 must be a 1D array.")
 
         if x0.size != 2 and x0.size != 3:
             raise TypeError("x0 must represent a 2D or 3D point.")
@@ -144,7 +144,8 @@ class Trajectory:
         elif method == Trajectory.TauMethod.First_Order_Velocity_Approximation:
             tau = self._quadraticVelocityMethod(tx, t)
             if np.all(tau < 0):
-                raise ValueError("Not sure how to select tau; both negative valued")
+                raise ValueError(
+                    "Not sure how to select tau; both negative valued")
             tau = -np.min(
                 tau, axis=1
             )  # Take the smaller one, which is generally the negative one
@@ -297,7 +298,8 @@ def createLinearTrajectory(totalSamples, pos1, pos2, speed, sampleTime, start_co
     percentPerSample = distPerSample / anchorDist
 
     # Formulate in terms of multiples of anchorDist
-    percentAnchorDist = start_coeff + np.arange(totalSamples) * percentPerSample
+    percentAnchorDist = start_coeff + \
+        np.arange(totalSamples) * percentPerSample
 
     # First, correct the ones that have returned full cycles
     percentAnchorDist = np.mod(
@@ -332,7 +334,8 @@ def createCircularTrajectory(
     # initialize a bunch of rx points in a circle in 3d
     dtheta_per_s = desiredSpeed / r_a  # rad/s
     arcangle = totalSamples * sampleTime * dtheta_per_s  # rad
-    r_theta = np.arange(phi, phi + arcangle, dtheta_per_s * sampleTime)[:totalSamples]
+    r_theta = np.arange(phi, phi + arcangle, dtheta_per_s *
+                        sampleTime)[:totalSamples]
 
     r_x_x = r_a * np.cos(r_theta)
     r_x_y = r_a * np.sin(r_theta)
@@ -565,7 +568,8 @@ if __name__ == "__main__":
     lightspd = 299792458.0
     xr = np.arange(-10, 10, 0.1)
     yr = np.arange(-12, 12, 0.1)
-    costgrid = gridSearchTDOA(rxA.x, rxB.x, rd / lightspd, np.array([1e-9]), xr, yr, 0)
+    costgrid = gridSearchTDOA(
+        rxA.x, rxB.x, rd / lightspd, np.array([1e-9]), xr, yr, 0)
 
     pgPlotHeatmap(
         np.exp(-costgrid.reshape((yr.size, xr.size)).T),

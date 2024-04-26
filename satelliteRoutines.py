@@ -6,21 +6,21 @@ Created on Tue Nov 29 13:21:13 2022
 """
 
 import numpy as np
-import re
+# import re
 import datetime as dt
 
 from sgp4.api import Satrec, SatrecArray, jday
 
 # Apparently, generating satellite positions with WGS72 is more accurate, as that is what the TLEs are generated from
-from sgp4.api import WGS72OLD, WGS72, WGS84
-from sgp4.api import SGP4_ERRORS
+# from sgp4.api import WGS72OLD, WGS72, WGS84
+# from sgp4.api import SGP4_ERRORS
 from skyfield.positionlib import Geocentric
 
 # %% Wrapper over skyfield's EarthSatellite, to restore constants functionality
 from skyfield.api import EarthSatellite, load, wgs84
 from skyfield.framelib import itrs
 
-from localizationRoutines import geodeticLLA2ecef
+from coordinateRoutines import geodeticLLA2ecef
 
 import matplotlib.pyplot as plt
 

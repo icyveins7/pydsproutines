@@ -11,11 +11,9 @@ from scipy.stats.distributions import chi2
 
 # from numba import jit, njit
 import time
-from skyfield.api import wgs84, load, Distance
-from skyfield.toposlib import ITRSPosition
 
 from plotRoutines import *
-from satelliteRoutines import *
+from satelliteRoutines import sf_propagate_satellite_to_gpstime, sf_geocentric_to_itrs
 import skyfield.api
 
 from enum import Enum
@@ -24,57 +22,8 @@ from enum import Enum
 # %% WGS84 constants
 class WGS84Coefficients(Enum):
     a = 6378137.0
-    b = 6356752.314245  # WGS84 constants, reference https://en.wikipedia.org/wiki/World_Geodetic_System
-
-
-# %% Coordinate transformations
-def geodeticLLA2ecef(lat_rad, lon_rad, h, checkRanges=False):
-    # Some error checking
-    if checkRanges and (
-        np.any(np.abs(lat_rad) > np.pi / 2) or np.any(np.abs(lon_rad) > np.pi)
-    ):
-        raise ValueError(
-            "Latitude and longitude magnitudes are too large. Did you forget to convert to radians?"
-        )
-    # This should replicate wgs84.latlon().itrs_xyz.m (which also works on arrays)
-    # Speedwise, this is about 2-3x faster, since it skips all the object instantiations
-    # Reference https://en.wikipedia.org/wiki/Geodetic_coordinates
-    a = 6378137.0
-    b = 6356752.314245  # WGS84 constants, reference https://en.wikipedia.org/wiki/World_Geodetic_System
-    N = a**2 / np.sqrt(a**2 * np.cos(lat_rad) ** 2 + b**2 * np.sin(lat_rad) ** 2)
-
-    x = (N + h) * np.cos(lat_rad) * np.cos(lon_rad)
-    y = (N + h) * np.cos(lat_rad) * np.sin(lon_rad)
-    z = (b**2 / a**2 * N + h) * np.sin(lat_rad)
-
-    return np.vstack((x, y, z))
-
-
-def ecef2geodeticLLA(x: np.ndarray):
-    if not isinstance(x, np.ndarray):
-        raise TypeError("Must be numpy array.")
-
-    now = load.timescale().now()  # Can re-use since ITRS is time-agnostic
-
-    # A single 3-d position
-    if x.ndim == 1 and x.size == 3:
-        x = x.reshape((1, 3))
-
-    # Multiple 3-d positions, one in each column
-    if x.shape[0] == 3:
-        pos = ITRSPosition(Distance(m=x))  # This accepts a 3xN array directly
-        latlonele = wgs84.geographic_position_of(pos.at(now))
-        lle_arr = np.vstack(
-            (
-                latlonele.latitude.degrees,
-                latlonele.longitude.degrees,
-                latlonele.elevation.m,
-            )
-        )
-        return lle_arr
-
-    else:
-        raise ValueError("Invalid dimensions; expected 3xN.")
+    # WGS84 constants, reference https://en.wikipedia.org/wiki/World_Geodetic_System
+    b = 6356752.314245
 
 
 # %% Doppler convention routines
@@ -90,7 +39,8 @@ def calculateRangeRate(
     if dirvec.ndim == 1:
         dirvec = dirvec.reshape((1, 3))  # Ensure its a 2D row
     elif dirvec.shape[1] != 3:
-        raise ValueError("Direction vectors (rx_x - tx_x) must be a Nx3 array.")
+        raise ValueError(
+            "Direction vectors (rx_x - tx_x) must be a Nx3 array.")
     dirvec = dirvec / (np.linalg.norm(dirvec, axis=1).reshape((-1, 1)))
     # Find the speed parallel to this direction vector
     tx_xdot_p = np.dot(
@@ -224,7 +174,7 @@ def hyperbolaGradDesc(
     # # print(cnt)
     # return pt
 
-    ### SCIPY.OPTIMIZE VERSION
+    # SCIPY.OPTIMIZE VERSION
     g = g / np.linalg.norm(g)
     result = sp.optimize.minimize(
         hyperboloidLineIntersectCostFunc, 0, args=(pt, s1, s2, rangediff, g)
@@ -740,15 +690,18 @@ def gridSearchTDFD_direct(
 
 # %% Grid generator for most localizers
 def latlongrid_to_ecef(centrelat, centrelon, latspan, lonspan, numLat, numLon):
-    lonlist = np.linspace(centrelon - lonspan / 2, centrelon + lonspan / 2, numLon)
-    latlist = np.linspace(centrelat - latspan / 2, centrelat + latspan / 2, numLat)
+    lonlist = np.linspace(centrelon - lonspan / 2,
+                          centrelon + lonspan / 2, numLon)
+    latlist = np.linspace(centrelat - latspan / 2,
+                          centrelat + latspan / 2, numLat)
     longrid, latgrid = np.meshgrid(lonlist, latlist)
 
     longridflat = longrid.flatten()
     latgridflat = latgrid.flatten()
 
     # Convert to xyz
-    ecefgrid = wgs84.latlon(latgridflat, longridflat).itrs_xyz.m.transpose()  # N x 3
+    ecefgrid = wgs84.latlon(
+        latgridflat, longridflat).itrs_xyz.m.transpose()  # N x 3
 
     return ecefgrid, lonlist, latlist
 
@@ -1437,7 +1390,8 @@ try:
                 z,
                 d_cost_grid,
             ),
-            shared_mem=(d_s1x_l.size + d_s2x_l.size + d_tdoa_l.size + d_tdsigma_l.size)
+            shared_mem=(d_s1x_l.size + d_s2x_l.size +
+                        d_tdoa_l.size + d_tdsigma_l.size)
             * 4,
         )
         t2 = time.time()

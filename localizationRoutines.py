@@ -26,6 +26,32 @@ class WGS84Coefficients(Enum):
     b = 6356752.314245
 
 
+def get_wgs84_tangent_plane_normal(ecef_pos: np.ndarray) -> np.ndarray:
+    """
+    Get the WGS84 tangent plane normal vector at a given position.
+
+    Parameters
+    ----------
+    ecef_pos : np.ndarray
+        A length 3 array of an ECEF position.
+
+    Returns
+    -------
+    np.ndarray
+        A length 3 array of the normal vector at the input position.
+    """
+    if not isinstance(ecef_pos, np.ndarray):
+        raise TypeError("Must be numpy array.")
+
+    # Definition of the normal is simply gradient of ellipsoid function
+    # i.e. 2x/a^2 + 2y/a^2 + 2z/b^2
+    return np.array([
+        2 / WGS84Coefficients.a**2,
+        2 / WGS84Coefficients.a**2,
+        2 / WGS84Coefficients.b**2
+    ]) * ecef_pos
+
+
 # %% Doppler convention routines
 def calculateRangeRate(
     tx_x: np.ndarray,

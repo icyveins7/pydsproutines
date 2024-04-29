@@ -108,6 +108,23 @@ class Ellipsoid:
         return ax, fig
 
     def intersectRay(self, s: np.ndarray, direction: np.ndarray):
+        """
+        Solves for an intersection point between the ellipsoid and a ray.
+
+        Parameters
+        ----------
+        s : 1-D array
+            Starting point of the ray.
+
+        direction : 1-D array
+            Direction of the ray.
+
+        Returns
+        -------
+        intersection : 1-D array or None
+            Intersection point of the ray with the ellipsoid,
+            or None if there is no intersection.
+        """
         # Check 1-D inputs
         if s.ndim != 1 or direction.ndim != 1:
             raise ValueError("s and direction must be 1-D arrays")
@@ -148,16 +165,18 @@ class Ellipsoid:
 
         Parameters
         ----------
-        x : 1-D array
+        x : 1-D array, or 2-D matrix.
             Point on the ellipsoid.
+            Can also be supplied as multiple rows in a matrix;
+            each row will be computed individually.
 
         normalised : bool, optional
             Whether to normalise the result, by default False.
 
         Returns
         -------
-        normal : 1-D array
-            Unit normal vector.
+        normal : 1-D array, or 2-D matrix
+            (Potentially normalised) normal vector(s).
         """
         normal = np.array([
             2 / self.a**2,
@@ -181,19 +200,22 @@ class Ellipsoid:
 
         Parameters
         ----------
-        normal : 1-D array
+        normal : 1-D array, or 2-D matrix.
             Normal vector.
+            Can also be supplied as multiple rows in a matrix;
+            each row will be computed individually.
+            Usually computed from normalAtPoint().
 
         normalised : bool, optional
             Whether to normalise the result, by default False.
 
         Returns
         -------
-        north : 1-D array
-            North vector.
+        north : 1-D array, or 2-D matrix
+            (Potentially normalised) north vector(s).
 
         east : 1-D array
-            East vector.
+            (Potentially normalised) east vector(s).
         """
         # Take cross product with z-axis
         east = np.cross(np.array([0, 0, 1]), normal)

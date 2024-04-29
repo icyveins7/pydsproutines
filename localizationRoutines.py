@@ -57,6 +57,7 @@ def get_wgs84_tangent_plane_north_east(
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Get the WGS84 tangent plane northwards and eastwards unit
+%matplotlib
     vectors for a given ECEF position.
     Together with the tangent plane normal, these can represent
     an orthogonal coordinate system at the given position.
@@ -758,7 +759,7 @@ def latlongrid_to_ecef(centrelat, centrelon, latspan, lonspan, numLat, numLon):
     latgridflat = latgrid.flatten()
 
     # Convert to xyz
-    ecefgrid = wgs84.latlon(
+    ecefgrid = skyfield.api.wgs84.latlon(
         latgridflat, longridflat).itrs_xyz.m.transpose()  # N x 3
 
     return ecefgrid, lonlist, latlist

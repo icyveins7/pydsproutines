@@ -220,6 +220,22 @@ class OblateSpheroid(Ellipsoid):
         super().__init__(omega, omega, lmbda, mu, Rx, Rz)
 
 
+class WGS84Spheroid(OblateSpheroid):
+    def __init__(
+        self,
+        mu: np.ndarray = np.zeros(3),
+        Rx: np.ndarray = np.eye(3),
+        Rz: np.ndarray = np.eye(3),
+    ):
+        super().__init__(
+            omega=6378137.0,
+            lmbda=6356752.314245,
+            mu=mu,
+            Rx=Rx,
+            Rz=Rz
+        )
+
+
 class Sphere(Ellipsoid):
     def __init__(self, r: float, mu: np.ndarray = np.zeros(3)):
         self.r = r

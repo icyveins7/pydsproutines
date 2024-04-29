@@ -6,9 +6,10 @@ Created on Mon Sep 19 15:40:43 2022
 """
 
 import numpy as np
-import pyqtgraph.opengl as gl
+# import pyqtgraph.opengl as gl
 
-from plotRoutines import *
+import matplotlib.pyplot as plt
+from plotRoutines import closeAllFigs
 
 
 # %%
@@ -137,6 +138,71 @@ class Ellipsoid:
         else:
             return None
 
+    def normalAtPoint(
+        self,
+        x: np.ndarray,
+        normalised: bool = False
+    ) -> np.ndarray:
+        """
+        Returns the unit normal vector at a point on the ellipsoid.
+
+        Parameters
+        ----------
+        x : 1-D array
+            Point on the ellipsoid.
+
+        normalised : bool, optional
+            Whether to normalise the result, by default False.
+
+        Returns
+        -------
+        normal : 1-D array
+            Unit normal vector.
+        """
+        normal = np.array([
+            2 / self.a**2,
+            2 / self.b**2,
+            2 / self.c**2
+        ]) * x
+
+        if normalised:
+            normal = normal / np.linalg.norm(normal)
+
+        return normal
+
+    def north_and_east_vectors(
+        self,
+        normal: np.ndarray,
+        normalised: bool = False
+    ) -> np.ndarray:
+        """
+        Returns the north and east vectors for a given normal vector,
+        which are tangential to the surface.
+
+        Parameters
+        ----------
+        normal : 1-D array
+            Normal vector.
+
+        normalised : bool, optional
+            Whether to normalise the result, by default False.
+
+        Returns
+        -------
+        north : 1-D array
+            North vector.
+
+        east : 1-D array
+            East vector.
+        """
+        # Take cross product with z-axis
+        east = np.cross(np.array([0, 0, 1]), normal)
+        east = east / np.linalg.norm(east)
+        # Then take the cross product again to get north
+        north = np.cross(normal, east)
+        north = north / np.linalg.norm(north)
+        return north, east
+
 
 class OblateSpheroid(Ellipsoid):
     def __init__(
@@ -170,7 +236,8 @@ class Sphere(Ellipsoid):
         B = lmbda**2 * 2 * rs * self.mu[1]
 
         with np.errstate(divide="ignore", invalid="ignore"):
-            alpha = np.arctan2(B, A)  # do not use arctan! make sure its arctan2!
+            # do not use arctan! make sure its arctan2!
+            alpha = np.arctan2(B, A)
             t = (lmbda**2 * omega**2 - beta - gamma) / np.sqrt(A**2 + B**2)
             # breakpoint()
             basic = np.arccos(t)  # returns [0, pi]
@@ -200,7 +267,7 @@ if __name__ == "__main__":
     sphere = Sphere(1, np.array([-1, -2, 0]))
 
     theta = np.arange(0, np.pi, 0.01)
-    omega = 2.0
+    omega = 5.0
     lmbda = 1.5
     points = sphere.intersectOblateSpheroid(theta, omega, lmbda)
 
@@ -248,5 +315,37 @@ if __name__ == "__main__":
             [s[2], intersection[2]],
             "rx-",
         )
+
+        # Test the normal, north and east vectors
+        normal = oblate.normalAtPoint(intersection, True)
+        north, east = oblate.north_and_east_vectors(normal, True)
+        ax2.plot3D(
+            [intersection[0], intersection[0] + normal[0]],
+            [intersection[1], intersection[1] + normal[1]],
+            [intersection[2], intersection[2] + normal[2]],
+            "b-"
+        )
+        ax2.plot3D(
+            [intersection[0], intersection[0] + north[0]],
+            [intersection[1], intersection[1] + north[1]],
+            [intersection[2], intersection[2] + north[2]],
+            "g-"
+        )
+        ax2.plot3D(
+            [intersection[0], intersection[0] + east[0]],
+            [intersection[1], intersection[1] + east[1]],
+            [intersection[2], intersection[2] + east[2]],
+            "g-"
+        )
+
+        # Validate that they are all orthogonal
+        print(np.dot(normal, north))
+        print(np.dot(normal, east))
+        print(np.dot(north, east))
+
+        # Validate that they are all normalised
+        print(np.linalg.norm(normal))
+        print(np.linalg.norm(north))
+        print(np.linalg.norm(east))
 
     plt.show()

@@ -748,7 +748,51 @@ def gridSearchTDFD_direct(
 
 
 # %% Grid generator for most localizers
-def latlongrid_to_ecef(centrelat, centrelon, latspan, lonspan, numLat, numLon):
+def latlongrid_to_ecef(
+    centrelat: float,
+    centrelon: float,
+    latspan: float,
+    lonspan: float,
+    numLat: int,
+    numLon: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Generates a grid of latitude/longitude centred around a point,
+    converting it to ECEF directly.
+
+    Parameters
+    ----------
+    centrelat : float
+        Centre point latitude in degrees.
+
+    centrelon : float
+        Centre point longitude in degrees.
+
+    latspan : float
+        Latitude span of the grid in degrees.
+        The grid will span +/- latspan/2 from the centre point.
+
+    lonspan : float
+        Longitude span of the grid in degrees.
+        The grid will span +/- lonspan/2 from the centre point.
+
+    numLat : int
+        Number of latitude points in the grid.
+
+    numLon : int
+        Number of longitude points in the grid.
+
+    Returns
+    -------
+    ecefgrid : np.ndarray
+        Grid of ECEF points for use. This is returned as a N x 3 array.
+
+    lonlist : np.ndarray
+        Array of longitude points used in the grid, in degrees.
+
+    latlist : np.ndarray
+        Array of latitude points used in the grid, in degrees.
+    """
     lonlist = np.linspace(centrelon - lonspan / 2,
                           centrelon + lonspan / 2, numLon)
     latlist = np.linspace(centrelat - latspan / 2,
@@ -767,7 +811,11 @@ def latlongrid_to_ecef(centrelat, centrelon, latspan, lonspan, numLat, numLon):
 
 # %% CRB Routines (conversions from commonMex)
 def calcCRB_TD(x, S, sig_r, pairs=None, cmat=None):
-    """S is presented column-wise i.e. 3 X N array."""
+    """
+    S is presented column-wise i.e. 3 X N array.
+
+    Use crbRoutines for better UX!
+    """
     if x.ndim == 1:
         x = x.reshape(
             (-1, 1)

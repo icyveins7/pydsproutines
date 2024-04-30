@@ -125,7 +125,7 @@ def calculateDoppler(
     rx_x: np.ndarray,
     tx_xdot: np.ndarray = np.zeros(3),
     rx_xdot: np.ndarray = np.zeros(3),
-    lightspd: float = 299792458.0,
+    lightspd: float = speed_of_light
 ):
     # To calculate Doppler, simply get the range rate
     rdot = calculateRangeRate(tx_x, rx_x, tx_xdot, rx_xdot)

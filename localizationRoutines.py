@@ -8,6 +8,7 @@ Created on Thu Apr  1 13:47:58 2021
 import numpy as np
 import scipy as sp
 from scipy.stats.distributions import chi2
+from scipy.constants import speed_of_light
 
 # from numba import jit, njit
 import time
@@ -957,8 +958,6 @@ def projectCRBtoEllipse(crb, pos, percent, dof=2, theta=None):
 
 # %% Helper classes
 class GridLocalizer:
-    lightspd = 299792458.0
-
     def __init__(self, gridmat: np.ndarray, xrange: np.ndarray, yrange: np.ndarray):
         """
         Initialises a localizer which will search a grid of points.
@@ -1230,10 +1229,10 @@ class TDFDMixin:
         crb = calcCRB_TDFD(
             gridmin,
             S_combined,
-            td_sigma_list * self.lightspd,
+            td_sigma_list * speed_of_light,
             np.array([0, 0, 0]),
             Sdot_combined,
-            fd_sigma_list / fc * self.lightspd,
+            fd_sigma_list / fc * speed_of_light,
             cmat=cmat,
         )
 

@@ -1,18 +1,23 @@
 import numpy as np
 import ctypes as ct
 import os
+from intelHelpers import include_ipp
+include_ipp()
+
 
 os.environ["PATH"] = (
-    os.environ["PATH"] + os.pathsep + os.path.dirname(os.path.realpath(__file__))
+    os.environ["PATH"] + os.pathsep +
+    os.path.dirname(os.path.realpath(__file__))
 )
-if os.name == "nt":
-    os.add_dll_directory(os.path.join(os.environ["IPPROOT"], "redist", "intel64"))
-elif os.name == "posix":
-    os.environ["PATH"] = (
-        os.environ["PATH"]
-        + os.pathsep
-        + os.path.join(os.environ["IPPROOT"], "lib", "intel64")
-    )
+# if os.name == "nt":
+#     os.add_dll_directory(os.path.join(
+#         os.environ["IPPROOT"], "redist", "intel64"))
+# elif os.name == "posix":
+#     os.environ["PATH"] = (
+#         os.environ["PATH"]
+#         + os.pathsep
+#         + os.path.join(os.environ["IPPROOT"], "lib", "intel64")
+#     )
 
 
 def cpuTone(length: int, freq: float, fs: int, phase: float = 0):

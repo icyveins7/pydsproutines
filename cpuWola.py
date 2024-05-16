@@ -1,14 +1,17 @@
 import numpy as np
 import ctypes as ct
 import os
+from intelHelpers import include_ipp
 
 os.environ["PATH"] = (
     os.environ["PATH"] + os.pathsep +
     os.path.dirname(os.path.realpath(__file__))
 )
 try:
-    os.add_dll_directory(os.path.join(
-        os.environ["IPPROOT"], "redist", "intel64"))
+    include_ipp()
+
+    # os.add_dll_directory(os.path.join(
+    #     os.environ["IPPROOT"], "redist", "intel64"))
 except KeyError:
     raise ImportError("Couldn't find IPPROOT env var.")
 

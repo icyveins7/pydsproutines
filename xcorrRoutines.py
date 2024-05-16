@@ -5,6 +5,7 @@ Created on Sat Mar  7 17:03:53 2020
 @author: Seo
 """
 
+from intelHelpers import include_ipp
 import os
 import numpy as np
 import scipy as sp
@@ -2056,9 +2057,10 @@ except:
 # %% Cythonised classes
 if os.name == "nt":  # Load the directory on windows
     try:
-        os.add_dll_directory(
-            os.path.join(os.environ["IPPROOT"], "redist", "intel64")
-        )  # Configure IPP dll reliance
+        include_ipp()
+        # os.add_dll_directory(
+        #     os.path.join(os.environ["IPPROOT"], "redist", "intel64")
+        # )  # Configure IPP dll reliance
     except KeyError:
         print("Unable to find IPPROOT env var.")
 

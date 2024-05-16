@@ -1,6 +1,7 @@
+from intelHelpers import include_ipp
 import os
 if os.name == 'nt': # Load the directory on windows
-    os.add_dll_directory(os.path.join(os.environ['IPPROOT'], 'redist', 'intel64')) # Configure IPP dll reliance
+    include_ipp()
 
 # Import the cythonized pyd directly into namespace
 try:

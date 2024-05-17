@@ -31,10 +31,10 @@ The ```cython_ext``` subfolder contains a few extensions built using cython.
 
 IMPORTANT: This requires you to ensure the submodules are set correctly in the previous step.
 
-First, install cython:
+If you haven't yet, install cython and numpy:
 
 ```
-pip install cython
+pip install cython numpy
 ```
 
 Then compile all of them by running the build script (only for Windows)
@@ -42,3 +42,7 @@ Then compile all of them by running the build script (only for Windows)
 ```
 build_all.bat
 ```
+
+## pybinds
+
+TO BE COMPLETED

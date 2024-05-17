@@ -14,10 +14,31 @@ pip install -e .
 When on a local network, all submodules should be cloned and pushed to the internal git server. For now, the following submodules are required:
 
 1. ipp_ext
+2. ffs
 
 Then make sure to re-set the submodule url with, for example,
 
 ```
 git submodule set-url ipp_ext git@mygitserver:myuser/ipp_ext.git
 git submodule update --init # and other related commands
+```
+
+You can also modify ```.gitmodules``` directly instead of using ```set-url```.
+
+## Cython extensions
+
+The ```cython_ext``` subfolder contains a few extensions built using cython.
+
+IMPORTANT: This requires you to ensure the submodules are set correctly in the previous step.
+
+First, install cython:
+
+```
+pip install cython
+```
+
+Then compile all of them by running the build script (only for Windows)
+
+```
+build_all.bat
 ```

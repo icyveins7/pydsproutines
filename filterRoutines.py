@@ -1167,6 +1167,11 @@ def cupyMovingAverage(
     NUM_PER_THREAD: int = 33, THREADS_PER_BLK: int = 32,
     sumInstead: bool = False
 ):
+    """
+    Note that this kernel outputs an array length equal to the input length.
+    It does this by padding zeros to the front of the input array.
+    """
+
     # Check types
     cupyRequireDtype(cp.float32, x)
 

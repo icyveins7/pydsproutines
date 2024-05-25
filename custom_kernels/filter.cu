@@ -345,3 +345,78 @@ extern "C" __global__ void movingAverage(const float *d_x, const int xlen,
       d_out[o0 + t] = s_ws[t];
   }
 }
+
+/*
+This is very similar to the above kernel,
+but developed specifically for complex values i.e. the accumulator is complex.
+
+We make some other adjustments here, as the use-case is targeted at the
+matrix profiler diagonal calculation:
+
+1) We make this a __device__ function, for use in a bigger kernel.
+Assumptions on shared memory layouts are to be determined.
+
+2) We only calculate 'valid' inputs. Hence the first (few) blocks will not
+internally zero-pad the input.
+
+3) The default is now a sum, instead of an average. We remove the option for
+averages.
+*/
+extern "C" __global__ void movingComplexSum(const float *d_x, const int xlen,
+                                            const int avgLength,
+                                            const int NUM_PER_THREAD,
+                                            float *d_out, // should also be xlen
+                                            const bool sumInstead) {
+  // // Total length we have to read in from global mem
+  // int workspaceInputLength = blockDim.x * NUM_PER_THREAD + avgLength - 1;
+  // // And to output to global mem
+  // int workspaceOutputLength = blockDim.x * NUM_PER_THREAD;
+  // // Where we start reading from global mem for this block
+  // int i0 =
+  //     workspaceOutputLength * blockIdx.x - (avgLength - 1); // offset
+  //     backwards
+  // // Where to start writing to global mem for this block
+  // int o0 = workspaceOutputLength * blockIdx.x;
+  //
+  // // allocate shared memory
+  // extern __shared__ double s[];
+  //
+  // float *s_x = (float *)s; // (workspaceInputLength) floats
+  // float *s_ws =
+  //     (float *)&s_x[workspaceInputLength]; // (workspaceOutputLength) floats
+  //
+  // for (int t = threadIdx.x; t < workspaceInputLength; t += blockDim.x) {
+  //   // Only read if it's in range
+  //   int idx = t + i0;
+  //   if (idx >= 0 && idx < xlen)
+  //     s_x[t] = d_x[idx];
+  //   else
+  //     s_x[t] = 0;
+  // }
+  // __syncthreads();
+  //
+  // // Now compute the 'first' average for each thread
+  // double sum =
+  //     0.0; // We internally calculate as a double to have higher precision
+  // for (int i = 0; i < avgLength; i++) {
+  //   sum += (double)s_x[threadIdx.x * NUM_PER_THREAD + i];
+  // }
+  // s_ws[threadIdx.x * NUM_PER_THREAD] =
+  //     sumInstead ? (float)sum : (float)(sum / (double)avgLength);
+  //
+  // // For the rest of it, compute the average by removing earliest and adding
+  // // latest
+  // for (int j = 1; j < NUM_PER_THREAD; j++) {
+  //   sum -= (double)s_x[threadIdx.x * NUM_PER_THREAD + j - 1];
+  //   sum += (double)s_x[threadIdx.x * NUM_PER_THREAD + avgLength + j - 1];
+  //   // We either save the sum or the average
+  //   s_ws[threadIdx.x * NUM_PER_THREAD + j] =
+  //       sumInstead ? (float)sum : (float)(sum / (double)avgLength);
+  // }
+  //
+  // // Finally write our output coalesced to global
+  // for (int t = threadIdx.x; t < workspaceOutputLength; t += blockDim.x) {
+  //   if (o0 + t < xlen)
+  //     d_out[o0 + t] = s_ws[t];
+  // }
+}

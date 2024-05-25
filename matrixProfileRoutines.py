@@ -1,4 +1,8 @@
 import numpy as np
+import cupy as cp
+from filterRoutines import cupyMovingAverage
+
+# ============== Basic Pythonic Class
 
 
 class MatrixProfile:
@@ -98,6 +102,45 @@ class MatrixProfile:
         return kdiag
 
 
+# ===================== CuPy subclass
+
+
+class CupyMatrixProfile(MatrixProfile):
+    def _computeNormsSq(self, x: cp.ndarray) -> cp.ndarray:
+        # We already have a movingAverage/movingSum kernel, so let's use it
+        power = cp.abs(x)**2
+        normsSq = cupyMovingAverage(power, self._windowLength, sumInstead=True)
+        normsSq = normsSq[self._windowLength-1:]  # Remove the padded zeroes
+
+        return normsSq
+
+    def _computeDiagonal(self, x: cp.ndarray, diagIdx: int) -> cp.ndarray:
+        if diagIdx <= 0:
+            raise ValueError('diagIdx must be greater than 0.')
+
+        slice1 = x[0:-diagIdx]
+        slice2 = x[diagIdx:]
+        if slice1.size <= 0 or slice2.size <= 0:
+            raise RuntimeError("Nothing in the diagonal.")
+
+        energy1 = self._normsSq[0:-diagIdx]
+        energy2 = self._normsSq[diagIdx:]
+        if energy1.size <= 0 or energy2.size <= 0:
+            raise RuntimeError("Indexing out of valid normSq values.")
+
+        pdt = slice1 * slice2.conj()
+        # Here we need to apply the movingAvg kernel but as a complex..
+        # TODO: finish this
+
+        # kdiag = np.convolve(pdt, np.ones(self._windowLength), mode='valid')
+        # kdiag = np.abs(kdiag)**2
+        # # Normalise appropriately
+        # kdiag = kdiag / energy1 / energy2
+        #
+        # return kdiag
+
+
+# ==================== Unit testing
 if __name__ == "__main__":
     # The following are used for unittests and signal gen
     import unittest
@@ -196,5 +239,37 @@ if __name__ == "__main__":
                     np.testing.assert_allclose(
                         dv, qf2
                     )
+
+    class TestCupyMatrixProfile(unittest.TestCase):
+        def setUp(self):
+            self.totalLength = 100
+            self.windowLength = 10
+            self.numCopies = 3
+            self.syms, self.bits = randPSKsyms(
+                self.windowLength, 4, dtype=np.complex64)
+            noise, self.x = addManySigToNoise(
+                self.totalLength,
+                np.arange(self.numCopies) * self.windowLength * 3,
+                [self.syms for i in range(self.numCopies)],
+                1, 1, [40.0 for i in range(self.numCopies)]
+            )
+            self.d_x = cp.asarray(self.x)
+
+            self.mpo = CupyMatrixProfile(self.windowLength)
+
+        def test_computeNormsSq(self):
+            d_normsSq = self.mpo._computeNormsSq(self.d_x)
+            normsSq = d_normsSq.get()
+            # Check that the length is correct
+            self.assertEqual(
+                normsSq.size,
+                self.totalLength - self.windowLength + 1)
+
+            # Check all values are correct
+            for i, nsq in enumerate(normsSq):
+                np.testing.assert_allclose(
+                    nsq,
+                    np.linalg.norm(self.x[i:i+self.windowLength])**2
+                )
 
     unittest.main()

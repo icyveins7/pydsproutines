@@ -5,7 +5,6 @@ class MatrixProfile:
     def __init__(
         self,
         windowLength: int,
-        onlyUpperTriangle: bool = True
     ):
         self._windowLength = windowLength
         self._normsSq = None
@@ -21,11 +20,20 @@ class MatrixProfile:
 
         Returns
         -------
-        mp : np.ndarray
-            The matrix profile.
+        mp : list of np.ndarray
+            The matrix profile, returned as a list of diagonals.
         """
         self._normsSq = None  # Reset values
-        self._normsSq = self._computeNorms(x)
+        self._normsSq = self._computeNormsSq(x)
+
+        # Loop over all diagonals
+        mp = list()
+        for i in range(1, x.size - self._windowLength + 1):
+            # Compute the diagonal
+            diag = self._computeDiagonal(x, i)
+            mp.append(diag)
+
+        return mp
 
     def _computeNormsSq(self, x: np.ndarray) -> np.ndarray:
         """
@@ -166,6 +174,20 @@ if __name__ == "__main__":
                     self.x.size - self.windowLength + 1 - k
                 )
 
+                for i, dv in enumerate(diag0):
+                    qf2 = calcQF2(
+                        self.x[i:i+self.windowLength],
+                        self.x[i+k:i+k+self.windowLength]
+                    )
+                    np.testing.assert_allclose(
+                        dv, qf2
+                    )
+
+        def test_compute(self):
+            mp = self.mpo.compute(self.x)
+            # Check each one manually
+            for j, diag0 in enumerate(mp):
+                k = j+1
                 for i, dv in enumerate(diag0):
                     qf2 = calcQF2(
                         self.x[i:i+self.windowLength],

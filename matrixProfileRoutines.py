@@ -100,38 +100,38 @@ if __name__ == "__main__":
     import pyqtgraph as pg
     from plotRoutines import pgPlotAmpTime, closeAllFigs
     closeAllFigs()
-
-    windowLength = 10
-    numCopies = 3
-    syms, bits = randPSKsyms(windowLength, 4, dtype=np.complex64)
-    noise, x = addManySigToNoise(
-        200,
-        np.arange(numCopies) * windowLength * 3,
-        [syms for i in range(numCopies)],
-        1, 1, [40.0 for i in range(numCopies)]
-    )
-
-    mpo = MatrixProfile(windowLength)
-    mpo._normsSq = mpo._computeNormsSq(x)
-    k = 30
-    diag0 = mpo._computeDiagonal(x, k)
-    print(diag0)
-    print(diag0.shape)
-
-    awin, aax = pgPlotAmpTime(x, title='ampl-time')
-
-    win = pg.plot(np.arange(diag0.size) + k, diag0)
-    win.setTitle('Diagonal %d' % k)
-    win.show()
+    #
+    # windowLength = 10
+    # numCopies = 3
+    # syms, bits = randPSKsyms(windowLength, 4, dtype=np.complex64)
+    # noise, x = addManySigToNoise(
+    #     200,
+    #     np.arange(numCopies) * windowLength * 3,
+    #     [syms for i in range(numCopies)],
+    #     1, 1, [40.0 for i in range(numCopies)]
+    # )
+    #
+    # mpo = MatrixProfile(windowLength)
+    # mpo._normsSq = mpo._computeNormsSq(x)
+    # k = 30
+    # diag0 = mpo._computeDiagonal(x, k)
+    # print(diag0)
+    # print(diag0.shape)
+    #
+    # awin, aax = pgPlotAmpTime(x, title='ampl-time')
+    #
+    # win = pg.plot(np.arange(diag0.size) + k, diag0)
+    # win.setTitle('Diagonal %d' % k)
+    # win.show()
 
     # Unittest code
     class TestMatrixProfile(unittest.TestCase):
         def setUp(self):
-            self.totalLength = 200
+            self.totalLength = 100
             self.windowLength = 10
             self.numCopies = 3
             self.syms, self.bits = randPSKsyms(
-                windowLength, 4, dtype=np.complex64)
+                self.windowLength, 4, dtype=np.complex64)
             noise, self.x = addManySigToNoise(
                 self.totalLength,
                 np.arange(self.numCopies) * self.windowLength * 3,
@@ -157,16 +157,22 @@ if __name__ == "__main__":
 
         def test_computeDiagonal(self):
             # Here we manually set normsSq for testing purposes
-            self.mpo._normsSq = self.mpo._computeNormsSq(x)
-            for k in range(1, self.totalLength):
-                diag0 = mpo._computeDiagonal(x, k)
+            self.mpo._normsSq = self.mpo._computeNormsSq(self.x)
+            for k in range(1, self.totalLength - self.windowLength + 1):
+                diag0 = self.mpo._computeDiagonal(self.x, k)
+                # Check length of k-diagonal
+                self.assertEqual(
+                    diag0.size,
+                    self.x.size - self.windowLength + 1 - k
+                )
+
                 for i, dv in enumerate(diag0):
+                    qf2 = calcQF2(
+                        self.x[i:i+self.windowLength],
+                        self.x[i+k:i+k+self.windowLength]
+                    )
                     np.testing.assert_allclose(
-                        dv,
-                        calcQF2(
-                            self.x[i:i+self.windowLength],
-                            self.x[i+k:i+k+self.windowLength]
-                        )
+                        dv, qf2
                     )
 
     unittest.main()

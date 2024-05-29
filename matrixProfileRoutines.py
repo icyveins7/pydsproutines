@@ -1,6 +1,6 @@
 import numpy as np
 import cupy as cp
-from filterRoutines import cupyMovingAverage
+from filterRoutines import cupyMovingAverage, cupyComplexMovingSum
 
 # ============== Basic Pythonic Class
 
@@ -130,14 +130,13 @@ class CupyMatrixProfile(MatrixProfile):
 
         pdt = slice1 * slice2.conj()
         # Here we need to apply the movingAvg kernel but as a complex..
-        # TODO: finish this
+        kdiag = cupyComplexMovingSum(
+            pdt, self._windowLength
+        )
+        # Normalise appropriately
+        kdiag = kdiag / energy1 / energy2
 
-        # kdiag = np.convolve(pdt, np.ones(self._windowLength), mode='valid')
-        # kdiag = np.abs(kdiag)**2
-        # # Normalise appropriately
-        # kdiag = kdiag / energy1 / energy2
-        #
-        # return kdiag
+        return kdiag
 
 
 # ==================== Unit testing
@@ -176,6 +175,8 @@ if __name__ == "__main__":
     # win.show()
 
     # Unittest code
+    # For float32s, 1e-5 rtol seems to be ok most of the time,
+    # but you may get some edge case failures, so it's left at 1e-4
     class TestMatrixProfile(unittest.TestCase):
         def setUp(self):
             self.totalLength = 100
@@ -189,6 +190,7 @@ if __name__ == "__main__":
                 [self.syms for i in range(self.numCopies)],
                 1, 1, [40.0 for i in range(self.numCopies)]
             )
+            self.x = self.x.astype(np.complex64)
 
             self.mpo = MatrixProfile(self.windowLength)
 
@@ -203,7 +205,8 @@ if __name__ == "__main__":
             for i, nsq in enumerate(normsSq):
                 np.testing.assert_allclose(
                     nsq,
-                    np.linalg.norm(self.x[i:i+self.windowLength])**2
+                    np.linalg.norm(self.x[i:i+self.windowLength])**2,
+                    rtol=1e-4
                 )
 
         def test_computeDiagonal(self):
@@ -223,7 +226,8 @@ if __name__ == "__main__":
                         self.x[i+k:i+k+self.windowLength]
                     )
                     np.testing.assert_allclose(
-                        dv, qf2
+                        dv, qf2,
+                        rtol=1e-4
                     )
 
         def test_compute(self):
@@ -237,7 +241,8 @@ if __name__ == "__main__":
                         self.x[i+k:i+k+self.windowLength]
                     )
                     np.testing.assert_allclose(
-                        dv, qf2
+                        dv, qf2,
+                        rtol=1e-4
                     )
 
     class TestCupyMatrixProfile(unittest.TestCase):
@@ -253,7 +258,7 @@ if __name__ == "__main__":
                 [self.syms for i in range(self.numCopies)],
                 1, 1, [40.0 for i in range(self.numCopies)]
             )
-            self.d_x = cp.asarray(self.x)
+            self.d_x = cp.asarray(self.x).astype(cp.complex64)
 
             self.mpo = CupyMatrixProfile(self.windowLength)
 
@@ -269,7 +274,48 @@ if __name__ == "__main__":
             for i, nsq in enumerate(normsSq):
                 np.testing.assert_allclose(
                     nsq,
-                    np.linalg.norm(self.x[i:i+self.windowLength])**2
+                    np.linalg.norm(self.x[i:i+self.windowLength])**2,
+                    rtol=1e-4
                 )
 
-    unittest.main()
+        def test_computeDiagonal(self):
+            # Here we manually set normsSq for testing purposes
+            self.mpo._normsSq = self.mpo._computeNormsSq(self.d_x)
+            for k in range(1, self.totalLength - self.windowLength + 1):
+                d_diag0 = self.mpo._computeDiagonal(self.d_x, k)
+                diag0 = d_diag0.get()
+                # Check length of k-diagonal
+                self.assertEqual(
+                    diag0.size,
+                    self.x.size - self.windowLength + 1 - k
+                )
+
+                for i, dv in enumerate(diag0):
+                    qf2 = calcQF2(
+                        self.x[i:i+self.windowLength],
+                        self.x[i+k:i+k+self.windowLength]
+                    )
+                    np.testing.assert_allclose(
+                        dv, qf2,
+                        rtol=1e-4
+                    )
+
+        def test_compute(self):
+            # This test should be identical, even though
+            # the subclass doesn't reimplement.
+            mp = self.mpo.compute(self.d_x)
+            # Check each one manually
+            for j, diag0 in enumerate(mp):
+                k = j+1
+                for i, dv in enumerate(diag0):
+                    qf2 = calcQF2(
+                        self.x[i:i+self.windowLength],
+                        self.x[i+k:i+k+self.windowLength]
+                    )
+                    # Remember it's now a list of cupy arrays
+                    np.testing.assert_allclose(
+                        dv.get(), qf2,
+                        rtol=1e-4
+                    )
+
+    unittest.main(verbosity=2)

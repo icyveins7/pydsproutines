@@ -367,15 +367,18 @@ averages.
 backward-looking window. Coupled with using only 'valid' inputs, this means that
 the first output is the result of a sum from indices 0 to L-1 (inclusive). In
 the previous kernel, this would have been indices -L+1 to 0 (inclusive).
+
+5) The sum is returned as a real-valued number based on QF2, i.e. it's the abs^2
+value of the complex sum.
 */
 extern "C" __global__ void movingComplexSum(const complex<float> *d_x,
-                                            const int xlen, const int avgLength,
+                                            const int xlen, const int sumLength,
                                             const int NUM_PER_THREAD,
                                             float *d_out, // should also be xlen
                                             const bool sumInstead) {
   // Lengths do not change..
   // Total length we have to read in from global mem
-  int workspaceInputLength = blockDim.x * NUM_PER_THREAD + avgLength - 1;
+  int workspaceInputLength = blockDim.x * NUM_PER_THREAD + sumLength - 1;
   // And to output to global mem
   int workspaceOutputLength = blockDim.x * NUM_PER_THREAD;
 
@@ -406,26 +409,30 @@ extern "C" __global__ void movingComplexSum(const complex<float> *d_x,
   // Now compute the 'first' average for each thread
   complex<double> sum =
       0; // We internally calculate as a double to have higher precision
-  for (int i = 0; i < avgLength; i++) {
+  for (int i = 0; i < sumLength; i++) {
     sum += (complex<double>)s_x[threadIdx.x * NUM_PER_THREAD + i];
   }
   s_ws[threadIdx.x * NUM_PER_THREAD] =
-      sumInstead ? (complex<float>)sum
-                 : (complex<float>)(sum / (double)avgLength);
-
-  // For the rest of it, compute the average by removing earliest and adding
+      sumInstead
+          ? (complex<float>)sum
+          : (complex<float>)(sum /
+                             (double)sumLength); // For the rest of it, compute
+                                                 // the average by removing
+                                                 // earliest and adding
   // latest
   for (int j = 1; j < NUM_PER_THREAD; j++) {
-    sum -= (double)s_x[threadIdx.x * NUM_PER_THREAD + j - 1];
-    sum += (double)s_x[threadIdx.x * NUM_PER_THREAD + avgLength + j - 1];
+    sum -= (complex<double>)s_x[threadIdx.x * NUM_PER_THREAD + j - 1];
+    sum +=
+        (complex<double>)s_x[threadIdx.x * NUM_PER_THREAD + sumLength + j - 1];
     // We either save the sum or the average
     s_ws[threadIdx.x * NUM_PER_THREAD + j] =
-        sumInstead ? (float)sum : (float)(sum / (double)avgLength);
+        sumInstead ? (complex<float>)sum
+                   : (complex<float>)(sum / (double)sumLength);
   }
 
   // Finally write our output coalesced to global
   for (int t = threadIdx.x; t < workspaceOutputLength; t += blockDim.x) {
     if (o0 + t < xlen)
-      d_out[o0 + t] = s_ws[t];
+      d_out[o0 + t] = abs(s_ws[t]) * abs(s_ws[t]);
   }
 }

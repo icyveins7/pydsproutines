@@ -1119,9 +1119,11 @@ def resampleFactorWizard(fs: int, rsfs: int):
 
 # %%
 filtkernels, _ = cupyModuleToKernelsLoader(
-    "filter.cu", ["multiMovingAverage", "movingAverage"]
+    "filter.cu", ["multiMovingAverage", "movingAverage", "movingComplexSum"]
 )
-_multiMovingAvgKernel, _movingAverageKernel = filtkernels  # Unpack
+(
+    _multiMovingAvgKernel, _movingAverageKernel, _movingComplexSumKernel
+) = filtkernels  # Unpack
 
 
 def cupyMultiMovingAverage(
@@ -1195,6 +1197,41 @@ def cupyMovingAverage(
         (NUM_BLKS,),
         (THREADS_PER_BLK,),
         (x, x.size, avgLength, NUM_PER_THREAD, d_out, sumInstead),
+        shared_mem=smReq,
+    )
+
+    return d_out
+
+
+def cupyComplexMovingSum(
+    x: cp.ndarray, sumLength: int,
+    NUM_PER_THREAD: int = 33, THREADS_PER_BLK: int = 32,
+    sumInstead: bool = True
+):
+    # Check types
+    cupyRequireDtype(cp.complex64, x)
+
+    # Check NUM_PER_THREAD is not even
+    if NUM_PER_THREAD % 2 == 0:
+        raise ValueError("NUM_PER_THREAD must be odd.")
+
+    # Calculate shared memory requirement
+    workspaceInputLength = (
+        THREADS_PER_BLK * NUM_PER_THREAD + sumLength - 1
+    ) * x.itemsize
+    workspaceOutputLength = (THREADS_PER_BLK * NUM_PER_THREAD) * x.itemsize
+    smReq = workspaceInputLength + workspaceOutputLength
+
+    # Alloc output, specifically to float32 real values
+    d_out = cp.empty(x.size - sumLength + 1, dtype=cp.float32)
+
+    # Invoke
+    NUM_BLKS = cupyGetEnoughBlocks(
+        x.size, THREADS_PER_BLK * NUM_PER_THREAD)
+    _movingComplexSumKernel(
+        (NUM_BLKS,),
+        (THREADS_PER_BLK,),
+        (x, x.size, sumLength, NUM_PER_THREAD, d_out, sumInstead),
         shared_mem=smReq,
     )
 
@@ -1298,5 +1335,33 @@ if __name__ == "__main__":
                 self.assertAlmostEqual(h_sum[i], check[i], places=5)
 
         # TODO: test small range fuzz here too
+
+    class TestComplexMovingSumKernel(unittest.TestCase):
+        def setUp(self):
+            self.x = np.random.randn(100) + 1j*np.random.randn(100)
+            self.x = self.x.astype(np.complex64)
+            self.d_x = cp.asarray(self.x)
+
+        # Same checks for thread count and types
+        def test_even_numPerThread_error(self):
+            self.assertRaises(ValueError, cupyComplexMovingSum,
+                              self.d_x, 20, 32)
+
+        def test_not_complex64_error(self):
+            self.assertRaises(TypeError, cupyComplexMovingSum,
+                              self.d_x.astype(cp.complex128), 21)
+
+        def test_simple(self):
+            # Sum in the CPU
+            sumLength = 20
+            onesTaps = np.ones(sumLength).astype(np.float32)
+            check = np.convolve(onesTaps, self.x, mode='valid')
+            check = np.abs(check)**2
+            # Sum in the GPU
+            d_sum = cupyComplexMovingSum(self.d_x, sumLength)
+            h_sum = d_sum.get()
+            self.assertEqual(check.size, h_sum.size)
+            for i in range(check.shape[0]):
+                self.assertAlmostEqual(h_sum[i], check[i], places=4)
 
     unittest.main(verbosity=2)

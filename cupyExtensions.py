@@ -143,7 +143,8 @@ def cupyCopyEqualSlicesToMatrix_32fc(
         cupyRequireDtype(cp.complex64, d_out)
         if d_out.shape != (d_xStartIdxs.size, rowLength):
             raise ValueError(
-                "d_out must have the shape %d, %d" % (d_xStartIdxs.size, rowLength)
+                "d_out must have the shape %d, %d" % (
+                    d_xStartIdxs.size, rowLength)
             )
 
     # Execute
@@ -179,7 +180,8 @@ def cupyCopyIncrementalEqualSlicesToMatrix_32fc(
         # Check it
         cupyRequireDtype(cp.complex64, d_out)
         if d_out.shape != (numRows, rowLength):
-            raise ValueError("d_out must have the shape %d, %d" % (numRows, rowLength))
+            raise ValueError("d_out must have the shape %d, %d" %
+                             (numRows, rowLength))
 
     # Shared mem requirements
     smReq = blockRows * blockCols * 8
@@ -227,7 +229,8 @@ def cupyArgmax3d_uint32(
     if d_x.dtype != cp.uint32:
         raise TypeError("d_x must be uint32.")
     if d_x.ndim != 4:
-        raise ValueError("d_x must be 4-d. Argmax taken over the last 3 dimensions.")
+        raise ValueError(
+            "d_x must be 4-d. Argmax taken over the last 3 dimensions.")
 
     # Extract the dimensions
     numItems, dim1, dim2, dim3 = d_x.shape
@@ -254,7 +257,8 @@ def cupyArgmax3d_uint32(
         _argmax3d_uint32kernel(
             (NUM_BLKS,),
             (THREADS_PER_BLOCK,),
-            (d_x, numItems, dim1, dim2, dim3, d_argmax, 0),  # Set nullptr to last arg
+            # Set nullptr to last arg
+            (d_x, numItems, dim1, dim2, dim3, d_argmax, 0),
             shared_mem=smReq,
         )
 
@@ -283,7 +287,8 @@ def cupyArgmaxAbsRows_complex64(
     else:
         cupyRequireDtype(cp.uint32, d_argmax)
         if d_argmax.shape != (numRows,):
-            raise ValueError("d_argmax shape must be 1D of length %d" % numRows)
+            raise ValueError(
+                "d_argmax shape must be 1D of length %d" % numRows)
 
     if returnMaxValues:
         if d_max is None:
@@ -291,7 +296,8 @@ def cupyArgmaxAbsRows_complex64(
         else:
             cupyRequireDtype(cp.float32, d_max)
             if d_argmax.shape != (numRows,):
-                raise ValueError("d_max shape must be 1D of length %d" % numRows)
+                raise ValueError(
+                    "d_max shape must be 1D of length %d" % numRows)
     else:
         d_max = 0
 
@@ -489,7 +495,8 @@ def multiplySlidesNormalised(
     idxlen: int,  # Number of searched indices i.e. [startIdx, startIdx+idxlen)
     THREADS_PER_BLOCK: int = 128,
     numSlidesPerBlk: int = None,
-    coefficient: float = None,  # Extra constant coefficient to multiply, this should default to norm of d_x
+    # Extra constant coefficient to multiply, this should default to norm of d_x
+    coefficient: float = None,
 ):
     """
     Calls the slidingMultiplyNormalised kernel.
@@ -503,7 +510,8 @@ def multiplySlidesNormalised(
 
     # Check that the slides do not exceed bounds
     if startIdx < 0 or startIdx + idxlen > d_y.size:
-        raise ValueError("startIdx and idxlen should be within the bounds of d_y.")
+        raise ValueError(
+            "startIdx and idxlen should be within the bounds of d_y.")
 
     # Compute norm of x if required
     if coefficient is None:
@@ -554,7 +562,8 @@ def multiplySlidesNormalised(
 
 def multiTemplateSlidingDotProduct(
     d_x: cp.ndarray,  # This is the searched input (longer array)
-    d_templates: cp.ndarray,  # This is the matrix of templates (1 row = 1 template)
+    # This is the matrix of templates (1 row = 1 template)
+    d_templates: cp.ndarray,
     startIdx: int,  # First index of d_x to start searching
     idxlen: int,  # Number of searched indices i.e. [startIdx, startIdx+idxlen)
     d_templateEnergies: cp.ndarray = None,
@@ -567,7 +576,8 @@ def multiTemplateSlidingDotProduct(
 
     # Ensure templates is 2D
     if d_templates.ndim != 2:
-        raise ValueError("Templates should be 2D; each row is an individual template.")
+        raise ValueError(
+            "Templates should be 2D; each row is an individual template.")
     numTemplates, templateLength = d_templates.shape
 
     # Check that the slides do not exceed bounds
@@ -620,7 +630,7 @@ def multiTemplateSlidingDotProduct(
             d_templateEnergies,
             d_templates.shape[0],
             templateLength,
-            d_x[startIdx : startIdx + idxlen + templateLength - 1],
+            d_x[startIdx: startIdx + idxlen + templateLength - 1],
             idxlen + templateLength - 1,
             numSlidesPerBlk,
             d_templateIdx,
@@ -633,7 +643,8 @@ def multiTemplateSlidingDotProduct(
 
 
 # %% Peak finding kernels
-peakfindingKernels, _ = cupyModuleToKernelsLoader("peakfinding.cu", ["findLocalMaxima"])
+peakfindingKernels, _ = cupyModuleToKernelsLoader(
+    "peakfinding.cu", ["findLocalMaxima"])
 (_findLocalMaximaKernel,) = peakfindingKernels  # Unpack
 
 

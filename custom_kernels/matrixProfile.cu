@@ -8,14 +8,19 @@ extern "C" __device__ int diagonal_length(const int len, const int k,
   return len - windowLength + 1 - k;
 }
 
-__device__ int atomicAggInc(int *counter) {
+__device__ int atomicAggInc(int *counter, const int MAX_CHAINS) {
   auto g = coalesced_threads();
   int warp_res;
   if (g.thread_rank() ==
       0) // use only the first (leader) thread to increment the counter
     warp_res = atomicAdd(counter, g.size());
-  return g.shfl(warp_res, 0) +
-         g.thread_rank(); // return the output position for each (active) thread
+
+  // return the output position for each (active) thread
+  int returnedIdx = g.shfl(warp_res, 0) + g.thread_rank();
+  if (returnedIdx < MAX_CHAINS)
+    return returnedIdx;
+  else
+    return -1; // use negative number to denote invalid index
 }
 
 /*
@@ -165,8 +170,9 @@ extern "C" __global__ void matrix_profile_chains(
     const int *d_k,              // the indices of the diagonals to output
     const int blocksPerDiagonal, // to help find out which diagonal to compute
     const int windowLength, const int NUM_PER_THREAD, const float minThreshold,
+    const int MAX_CHAINS,
     int *numChains, // scalar counter to atomically increment d_chains
-    int *d_chains   // output array, atomically added 3-tuples (x, y = x+k, len)
+    int *d_chains   // output array, atomically added 3-tuples (x, y = x+k,len)
 ) {
   // Lengths do not change..
   // Total length we have to read in from global mem
@@ -202,7 +208,7 @@ extern "C" __global__ void matrix_profile_chains(
   // And this is where (within the diagonal output) the block actually writes
   int blkOffset =
       (blockIdx.x % blocksPerDiagonal) * blockDim.x * NUM_PER_THREAD;
-  int okb0 = ok0 + blkOffset;
+  // int okb0 = ok0 + blkOffset;
 
   // Where we start reading from global mem for this block
   // This is now 0-offsetted
@@ -259,14 +265,24 @@ extern "C" __global__ void matrix_profile_chains(
 
   // Calculate magnitudes (QF2) and scale by the normSq values in global mem
   // Write these to the front of the input array in shared mem (reuse it)
-  float *s_qf2 = (float *)s_ws;
+  float *s_qf2 = (float *)s_pdt;
   for (int t = threadIdx.x; t < workspaceOutputLength; t += blockDim.x) {
     if (t + blkOffset < diagLength)
-      s_qf2[t] = norm(s_ws[t]) / (d_xnormSqs[i0 + t] * d_xnormSqs[j0 + t]);
+      s_qf2[t] =
+          (float)(norm(s_ws[t]) / (d_xnormSqs[i0 + t] * d_xnormSqs[j0 + t]));
     else
-      s_qf2[t] = 0;
+      s_qf2[t] = 0.0f;
   }
   __syncthreads();
+
+  // DEBUG: just atomically dump passing qf2 values
+  // for (int j = 0; j < NUM_PER_THREAD; ++j) {
+  //   int si = threadIdx.x * NUM_PER_THREAD + j;
+  //   if (s_qf2[si] > minThreshold) {
+  //     d_chains[atomicAggInc(numChains)] = s_qf2[si];
+  //     // d_chains[atomicAggInc(numChains)] = minThreshold;
+  //   }
+  // }
 
   // Define the current chain
   int chain[3] = {-1, -1, -1};
@@ -294,16 +310,28 @@ extern "C" __global__ void matrix_profile_chains(
     else {
       // If chain exists, write it, and clear it back to -1s
       if (chain[0] != -1) {
-        int wIdx = atomicAggInc(numChains);
-        d_chains[wIdx * 3 + 0] = chain[0];
-        d_chains[wIdx * 3 + 1] = chain[1];
-        d_chains[wIdx * 3 + 2] = chain[2];
+        int wIdx = atomicAggInc(numChains, MAX_CHAINS);
+        if (wIdx >= 0) {
+          d_chains[wIdx * 3 + 0] = k;
+          d_chains[wIdx * 3 + 1] = chain[0];
+          d_chains[wIdx * 3 + 2] = chain[0] + chain[2];
 
-        chain[0] = -1;
-        chain[1] = -1;
-        chain[2] = -1;
+          chain[0] = -1;
+          chain[1] = -1;
+          chain[2] = -1;
+        }
       }
       // Otherwise don't need to do anything
+    }
+  }
+
+  // At the end of the loop, there may be chains remaining
+  if (chain[0] != -1) {
+    int wIdx = atomicAggInc(numChains, MAX_CHAINS);
+    if (wIdx >= 0) {
+      d_chains[wIdx * 3 + 0] = k;
+      d_chains[wIdx * 3 + 1] = chain[0];
+      d_chains[wIdx * 3 + 2] = chain[0] + chain[2];
     }
   }
 }

@@ -78,9 +78,9 @@ class MatrixProfile:
             ):
                 chains.append(
                     (
+                        i,
                         idx[cStart],
-                        idx[cStart] + i,
-                        cLen
+                        idx[cStart] + cLen
                     )
                 )
 
@@ -256,7 +256,7 @@ class CupyMatrixProfile(MatrixProfile):
 
     def _compute_chains(self,
                         x: cp.ndarray,
-                        MAX_CHAINS: int = 1000,
+                        MAX_CHAINS: int = 1000000,
                         diagIdx: cp.ndarray = None) -> cp.ndarray:
         """
         Overloaded submethod for computing chains using custom kernel.
@@ -272,6 +272,7 @@ class CupyMatrixProfile(MatrixProfile):
 
         # Set up to some maximum number of chains for the output
         d_chains = cp.zeros(3*MAX_CHAINS, dtype=cp.int32)
+        # d_chains = cp.zeros(3*MAX_CHAINS, dtype=cp.float32)
 
         # Determine shared memory requirements
         NUM_PER_THREAD = 33
@@ -293,6 +294,8 @@ class CupyMatrixProfile(MatrixProfile):
         numChains = cp.zeros(1, cp.int32)
 
         # Invoke kernel
+        print("Invoking chains matrix profile kernel with minThreshold %f" %
+              (self._minThreshold))
         _matrixProfileChainsKernel(
             (NUM_BLKS,), (THREADS_PER_BLK,),
             (
@@ -303,7 +306,9 @@ class CupyMatrixProfile(MatrixProfile):
                 blocksPerDiagonal,
                 self._windowLength,
                 NUM_PER_THREAD,
-                self._minThreshold,
+                # must decorate type for float32 in order to work
+                cp.float32(self._minThreshold),
+                MAX_CHAINS,
                 numChains,
                 d_chains
             ),
@@ -311,7 +316,48 @@ class CupyMatrixProfile(MatrixProfile):
         )
         print(numChains)
 
-        return d_chains
+        # Extract the subchains
+        subchains = d_chains[:3*numChains[0]].reshape((-1, 3))
+
+        # Connect them then return
+        return self._connectSubchains(subchains)
+
+    def _connectSubchains(self, d_chains: cp.ndarray):
+        """
+        Used to connect the subchains on the host(CPU) side.
+        Usually called using the output of _compute_chains.
+        """
+        # We perform the transpose in the GPU before pulling
+        h_chains = cp.ascontiguousarray(d_chains.T).get()
+        # It's now 3 rows X N
+
+        # We output as a flat list
+        out = list()
+        keys = np.unique(h_chains[0])  # Find all unique keys from 1st row
+        for k in keys:
+            # Extract those in the diagonal
+            starts = h_chains[1, h_chains[0] == k]
+            ends = h_chains[2, h_chains[0] == k]
+
+            # Then we sort
+            sIdx = np.argsort(starts)
+            starts = starts[sIdx]
+            ends = ends[sIdx]
+
+            # Iterate forwards and connect
+            for i, (start, end) in enumerate(zip(starts, ends)):
+                # First iteration
+                if i == 0:
+                    out.append([k, start, end])
+                # Check if start matches previous end
+                elif start == out[-1][2]:
+                    # Amend in place
+                    out[-1][2] = end
+                # Otherwise create new one
+                else:
+                    out.append([k, start, end])
+
+        return out
 
     def _computeNormsSq(self, x: cp.ndarray) -> cp.ndarray:
         # We already have a movingAverage/movingSum kernel, so let's use it
@@ -376,11 +422,11 @@ if __name__ == "__main__":
     print(diag0)
     print(diag0.shape)
 
-    awin, aax = pgPlotAmpTime(x, title='ampl-time')
+    # awin, aax = pgPlotAmpTime(x, title='ampl-time')
 
-    win = pg.plot(np.arange(diag0.size) + k, diag0)
-    win.setTitle('Diagonal %d' % k)
-    win.show()
+    # win = pg.plot(np.arange(diag0.size) + k, diag0)
+    # win.setTitle('Diagonal %d' % k)
+    # win.show()
 
     out = mpo.compute(x)
     # We compress it to easily compare with the GPU version
@@ -388,13 +434,13 @@ if __name__ == "__main__":
 
     # We test with half the windowLength requirement, which seems
     # like a good number
-    mpoc = MatrixProfile(windowLength, True, 0.6, windowLength//2)
+    mpoc = MatrixProfile(windowLength, True, 0.6, 0)
     chains = mpoc.compute(x)
     print(chains)
-    for chain in chains:
-        if chain[1] - chain[0] == k:  # Just plotting over to look at it
-            win.addItem(pg.InfiniteLine(chain[1]))
-            win.addItem(pg.InfiniteLine(chain[1] + chain[2]))
+    # for chain in chains:
+    #     if chain[1] - chain[0] == k:  # Just plotting over to look at it
+    #         win.addItem(pg.InfiniteLine(chain[1]))
+    #         win.addItem(pg.InfiniteLine(chain[1] + chain[2]))
 
     # Compute raw output
     cpmpo = CupyMatrixProfile(windowLength)
@@ -403,6 +449,7 @@ if __name__ == "__main__":
     compareValues(d_out[:out.size].get(), out)
 
     cpmpoc = CupyMatrixProfile(windowLength, True, 0.6, windowLength//2)
+    print(cpmpoc._minThreshold)
     cchains = cpmpoc.compute(cp.asarray(x).astype(cp.complex64))
     print(cchains)
 

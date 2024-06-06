@@ -1,5 +1,15 @@
+"""
+Some notes on the 2 classes.
+
+The outputs are not necessarily the same as GPU floating point multiplication
+is not identical to the CPU's. As such, there may be sporadic extra values which pass
+the threshold, and this is more pronounced the longer the original input array is.
+
+"""
+
 import numpy as np
 import cupy as cp
+import warnings
 
 from cupyHelpers import (
     cupyModuleToKernelsLoader, cupyRequireDtype,
@@ -205,6 +215,23 @@ class MatrixProfile:
 
 
 class CupyMatrixProfile(MatrixProfile):
+    MAX_CHAINS = 10000000
+
+    def setMaxChains(self, maxChains: int):
+        """
+        Sets the maximum number of chains that can be stored
+        during a single compute() invocation.
+
+        This is required in this CUDA kernel-flavoured implementation,
+        since the memory is pre-allocated and then atomically filled.
+
+        Hence if there is not enough memory to store all chains, an 
+        unrecoverable memory error is likely to occur.
+
+        Set it to something big!
+        """
+        self.MAX_CHAINS = maxChains
+
     def _compute_raw(self, x: cp.ndarray):
         cupyRequireDtype(cp.complex64, x)
         cupyRequireDtype(cp.float32, self._normsSq)
@@ -256,7 +283,7 @@ class CupyMatrixProfile(MatrixProfile):
 
     def _compute_chains(self,
                         x: cp.ndarray,
-                        MAX_CHAINS: int = 1000000,
+                        MAX_CHAINS: int = 10000000,
                         diagIdx: cp.ndarray = None) -> cp.ndarray:
         """
         Overloaded submethod for computing chains using custom kernel.
@@ -315,6 +342,9 @@ class CupyMatrixProfile(MatrixProfile):
             shared_mem=smReq
         )
         print(numChains)
+        if numChains[0] >= MAX_CHAINS:
+            warnings.warn(
+                "Exceeded maximum number of chains (%d) requested." % MAX_CHAINS)
 
         # Extract the subchains
         subchains = d_chains[:3*numChains[0]].reshape((-1, 3))
@@ -409,7 +439,7 @@ if __name__ == "__main__":
     numCopies = 3
     syms, bits = randPSKsyms(windowLength, 4, dtype=np.complex64)
     noise, x = addManySigToNoise(
-        200,
+        20000,
         np.arange(numCopies) * windowLength * 3,
         [syms for i in range(numCopies)],
         1, 1, [40.0 for i in range(numCopies)]
@@ -434,8 +464,9 @@ if __name__ == "__main__":
 
     # We test with half the windowLength requirement, which seems
     # like a good number
-    mpoc = MatrixProfile(windowLength, True, 0.6, 0)
+    mpoc = MatrixProfile(windowLength, True, 0.9, 0)
     chains = mpoc.compute(x)
+    chains = np.array(chains)
     print(chains)
     # for chain in chains:
     #     if chain[1] - chain[0] == k:  # Just plotting over to look at it
@@ -448,9 +479,10 @@ if __name__ == "__main__":
 
     compareValues(d_out[:out.size].get(), out)
 
-    cpmpoc = CupyMatrixProfile(windowLength, True, 0.6, windowLength//2)
+    cpmpoc = CupyMatrixProfile(windowLength, True, 0.9, 0)
     print(cpmpoc._minThreshold)
     cchains = cpmpoc.compute(cp.asarray(x).astype(cp.complex64))
+    cchains = np.array(cchains)
     print(cchains)
 
     # Unittest code

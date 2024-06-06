@@ -268,9 +268,10 @@ class DSPConfig(DirectSingleConfig):
     # And with a certain workspace, you only want the associated processes
     @property
     def processes(self):
-        return {
-            key: self._proxies[self._makeProKey(key)] for key in list(self.currentSection.keys()) if key in self.allProcesses
-        }
+        return {self._keySuffix(key): self._proxies[key] for key in list(self.currentSection.keys()) if self._isProcessingSection(key)}
+        # return {
+        #     key: self._proxies[self._makeProKey(key)] for key in list(self.currentSection.keys()) if key in self.allProcesses
+        # }
         
     # Modifiers
     def addSignal(self, signalName: str):

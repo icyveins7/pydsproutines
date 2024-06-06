@@ -267,7 +267,7 @@ extern "C" __global__ void matrix_profile_chains(
   // Write these to the front of the input array in shared mem (reuse it)
   float *s_qf2 = (float *)s_pdt;
   for (int t = threadIdx.x; t < workspaceOutputLength; t += blockDim.x) {
-    if (t + blkOffset < diagLength)
+    if (t + blkOffset < diagLength && i0 + t < len && j0 + t < len)
       s_qf2[t] =
           (float)(norm(s_ws[t]) / (d_xnormSqs[i0 + t] * d_xnormSqs[j0 + t]));
     else

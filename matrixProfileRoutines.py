@@ -225,7 +225,7 @@ class CupyMatrixProfile(MatrixProfile):
         This is required in this CUDA kernel-flavoured implementation,
         since the memory is pre-allocated and then atomically filled.
 
-        Hence if there is not enough memory to store all chains, an 
+        Hence if there is not enough memory to store all chains, an
         unrecoverable memory error is likely to occur.
 
         Set it to something big!
@@ -283,7 +283,6 @@ class CupyMatrixProfile(MatrixProfile):
 
     def _compute_chains(self,
                         x: cp.ndarray,
-                        MAX_CHAINS: int = 10000000,
                         diagIdx: cp.ndarray = None) -> cp.ndarray:
         """
         Overloaded submethod for computing chains using custom kernel.
@@ -298,8 +297,8 @@ class CupyMatrixProfile(MatrixProfile):
             cupyRequireDtype(cp.int32, diagIdx)
 
         # Set up to some maximum number of chains for the output
-        d_chains = cp.zeros(3*MAX_CHAINS, dtype=cp.int32)
-        # d_chains = cp.zeros(3*MAX_CHAINS, dtype=cp.float32)
+        d_chains = cp.zeros(3*self.MAX_CHAINS, dtype=cp.int32)
+        print("Interrim d_chains size = %d" % (d_chains.size))  # DEBUG
 
         # Determine shared memory requirements
         NUM_PER_THREAD = 33
@@ -314,8 +313,10 @@ class CupyMatrixProfile(MatrixProfile):
             x.size - self._windowLength,  # length of the k=1 diagonal output
             NUM_PER_THREAD * THREADS_PER_BLK
         )
+        print("blocksPerDiagonal = %d" % (blocksPerDiagonal))
         # Many extraneous blocks for later diagonals, which will do nothing
         NUM_BLKS = blocksPerDiagonal * (x.size - self._windowLength)
+        print("NUM_BLKS = %d" % (NUM_BLKS))
 
         # Allocate counters for atomics
         numChains = cp.zeros(1, cp.int32)
@@ -335,16 +336,16 @@ class CupyMatrixProfile(MatrixProfile):
                 NUM_PER_THREAD,
                 # must decorate type for float32 in order to work
                 cp.float32(self._minThreshold),
-                MAX_CHAINS,
+                cp.int32(self.MAX_CHAINS),
                 numChains,
                 d_chains
             ),
             shared_mem=smReq
         )
         print(numChains)
-        if numChains[0] >= MAX_CHAINS:
+        if numChains[0] >= self.MAX_CHAINS:
             warnings.warn(
-                "Exceeded maximum number of chains (%d) requested." % MAX_CHAINS)
+                "Exceeded maximum number of chains (%d) requested." % self.MAX_CHAINS)
 
         # Extract the subchains
         subchains = d_chains[:3*numChains[0]].reshape((-1, 3))
